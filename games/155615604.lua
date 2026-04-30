@@ -1062,3 +1062,5 @@ run(function() -- Auto Arrest
     })
     ArrestRange = AutoArrest:CreateSlider({ Name = "Arrest Range", Min=1, Max=1000, Default=100, Suffix=function(val) return val==1 and 'stud' or 'studs' end })
 end)
+
+print("Hello, V4.1)                                                                                            
