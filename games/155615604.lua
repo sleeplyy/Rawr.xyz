@@ -478,76 +478,77 @@ run(function() -- SA & TB
                     if entitylib.isAlive then
                         local character = entitylib.character.Character
                         local head = entitylib.character.Head
-                        if not head or not character then task.wait(); continue end
+                        -- Replace 'continue' with nested if to avoid Lua 5.1 error
+                        if head and character then
+                            local origin = head.CFrame
+                            local ent = entitylib['Entity' .. Mode.Value]({
+                                Range = Range.Value,
+                                Wallcheck = Target.Walls.Enabled or nil,
+                                Part = 'Head',
+                                Origin = origin.Position,
+                                Players = Target.Players.Enabled,
+                                NPCs = Target.NPCs.Enabled
+                            })
 
-                        local origin = head.CFrame
-                        local ent = entitylib['Entity' .. Mode.Value]({
-                            Range = Range.Value,
-                            Wallcheck = Target.Walls.Enabled or nil,
-                            Part = 'Head',
-                            Origin = origin.Position,
-                            Players = Target.Players.Enabled,
-                            NPCs = Target.NPCs.Enabled
-                        })
+                            if ShowTarget.Enabled and ent then
+                                targetinfo.Targets[ent] = tick() + 1
+                            end
 
-                        if ShowTarget.Enabled and ent then
-                            targetinfo.Targets[ent] = tick() + 1
-                        end
+                            if CircleObject then
+                                CircleObject.Position = inputService:GetMouseLocation()
+                            end
 
-                        if CircleObject then
-                            CircleObject.Position = inputService:GetMouseLocation()
-                        end
-
-                        if AutoFire.Enabled then
-                            local mouseDown = mouse1click()  -- GUI function
-                            local windowActive = (isrbxactive or iswindowactive)()  -- GUI function
-                            if mouseDown and windowActive then
-                                if ent and canClick() then
-                                    if Method.Value == 'Click' then
-                                        if delayCheck < tick() then
-                                            if mouseClicked then
-                                                mouse1release()
-                                                mouseClicked = false
-                                                delayCheck = tick() + AutoFireShootDelay.Value
-                                            else
-                                                mouse1press()
-                                                mouseClicked = true
-                                                delayCheck = tick() + AutoFireShootDelay.Value
+                            if AutoFire.Enabled then
+                                local mouseDown = mouse1click()  -- GUI function
+                                local windowActive = (isrbxactive or iswindowactive)()  -- GUI function
+                                if mouseDown and windowActive then
+                                    if ent and canClick() then
+                                        if Method.Value == 'Click' then
+                                            if delayCheck < tick() then
+                                                if mouseClicked then
+                                                    mouse1release()
+                                                    mouseClicked = false
+                                                    delayCheck = tick() + AutoFireShootDelay.Value
+                                                else
+                                                    mouse1press()
+                                                    mouseClicked = true
+                                                    delayCheck = tick() + AutoFireShootDelay.Value
+                                                end
                                             end
-                                        end
-                                    else -- Simulation method
-                                        if delayCheck < tick() then
-                                            delayCheck = tick() + AutoFireShootDelay.Value
-                                            local tool = character:FindFirstChildOfClass("Tool")
-                                            if tool then
-                                                tryShoot(origin.Position, ent.Head, tool)
+                                        else -- Simulation method
+                                            if delayCheck < tick() then
+                                                delayCheck = tick() + AutoFireShootDelay.Value
+                                                local tool = character:FindFirstChildOfClass("Tool")
+                                                if tool then
+                                                    tryShoot(origin.Position, ent.Head, tool)
+                                                end
                                             end
                                         end
                                     end
-                                end
-                            else
-                                -- Release click if button released
-                                if mouseClicked then
-                                    mouse1release()
-                                    mouseClicked = false
+                                else
+                                    -- Release click if button released
+                                    if mouseClicked then
+                                        mouse1release()
+                                        mouseClicked = false
+                                    end
                                 end
                             end
-                        end
 
-                        if Face.Enabled and ent then
-                            local rootPart = ent.Character and ent.Character:FindFirstChild("HumanoidRootPart")
-                            if rootPart then
-                                local vec = rootPart.Position * Vector3.new(1,0,1)
-                                entitylib.character.RootPart.CFrame = CFrame.lookAt(
-                                    entitylib.character.RootPart.Position,
-                                    Vector3.new(vec.X, entitylib.character.RootPart.Position.Y + 0.01, vec.Z)
-                                )
+                            if Face.Enabled and ent then
+                                local rootPart = ent.Character and ent.Character:FindFirstChild("HumanoidRootPart")
+                                if rootPart then
+                                    local vec = rootPart.Position * Vector3.new(1,0,1)
+                                    entitylib.character.RootPart.CFrame = CFrame.lookAt(
+                                        entitylib.character.RootPart.Position,
+                                        Vector3.new(vec.X, entitylib.character.RootPart.Position.Y + 0.01, vec.Z)
+                                    )
+                                end
                             end
-                        end
 
-                        if ent and ent.Character and ent.Character:FindFirstChild("HumanoidRootPart") then
-                            t.bt.m = true
-                            t.bt.p = ent.HumanoidRootPart.Position
+                            if ent and ent.Character and ent.Character:FindFirstChild("HumanoidRootPart") then
+                                t.bt.m = true
+                                t.bt.p = ent.HumanoidRootPart.Position
+                            end
                         end
                     end
                     task.wait()
@@ -1063,4 +1064,4 @@ run(function() -- Auto Arrest
     ArrestRange = AutoArrest:CreateSlider({ Name = "Arrest Range", Min=1, Max=1000, Default=100, Suffix=function(val) return val==1 and 'stud' or 'studs' end })
 end)
 
-print("Hello, V4.1)                                                                                            
+print("Hello, V4.1")
