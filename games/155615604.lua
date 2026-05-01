@@ -191,7 +191,7 @@ run(function()
         local midPoint = (startPos + endPos) / 2
 
         local part = Instance.new("Part")
-        part.Name = "RayPart"
+        part.Name = "CustomRayPart"
         part.Material = Enum.Material.Neon
         part.Anchored = true
         part.Transparency = 0.5
@@ -1137,12 +1137,7 @@ run(function()
             ArrestPlayer:InvokeServer(player, 1)
             InteractWithItem:InvokeServer(char.Head)
         end)
-        task.spawn(function()
-            while Cooldown > 0 do
-                task.wait(0.1)
-                Cooldown = math.max(0, Cooldown - 0.1)
-            end
-        end)
+        Cooldown = tick() + 7.5
     end
 
     local function Cleanup(plr)
@@ -1161,8 +1156,8 @@ run(function()
 
         local function Listener(char)
             local TasedConnection = char:GetAttributeChangedSignal("Tased"):Connect(function()
-                if tick() - Cooldown < 7.5 then
-                    notif('Vape', 'Arrest Cooldown: ' .. math.ceil(7.5 - (tick() - Cooldown)) .. 's', 3)
+                if tick() < Cooldown then
+                    notif('Vape', 'Arrest Cooldown: ' .. math.ceil(Cooldown - tick()) .. 's', 3)
                     return
                 end
                 if not entitylib.isAlive then return end
