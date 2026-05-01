@@ -1061,8 +1061,14 @@ run(function()
                     renderStepConnection:Disconnect()
                     renderStepConnection = nil
                 end
-                for _, box in pairs(Boxes) do box.Visible = false; box.Adornee = nil end
-                for _, part in pairs(Particles) do part.Parent = nil end
+                if Boxes then
+                    for _, v in pairs(Boxes) do v:Destroy() end
+                    table.clear(Boxes)
+                end
+                if Particles then
+                    for _, v in pairs(Particles) do v:Destroy() end
+                    table.clear(Particles)
+                end
             end
         end,
         Tooltip = 'Attack players around you without aiming at them.'
@@ -1090,8 +1096,10 @@ run(function()
                     Boxes[i] = box
                 end
             else
-                for _, v in pairs(Boxes) do v:Destroy() end
-                table.clear(Boxes)
+                if Boxes then
+                    for _, v in pairs(Boxes) do v:Destroy() end
+                    table.clear(Boxes)
+                end
             end
         end
     })
@@ -1132,8 +1140,10 @@ run(function()
                     Particles[i] = part
                 end
             else
-                for _, v in pairs(Particles) do v:Destroy() end
-                table.clear(Particles)
+                if Particles then
+                    for _, v in pairs(Particles) do v:Destroy() end
+                    table.clear(Particles)
+                end
             end
         end
     })
@@ -1152,6 +1162,15 @@ run(function()
     local AutoArrest
     local ArrestRange
 
+    local function disconnectPlayerConnections(plr)
+        if Players[plr] then
+            for _, conn in pairs(Players[plr]) do
+                pcall(function() conn:Disconnect() end)
+            end
+            Players[plr] = nil
+        end
+    end
+
     local function Arrest(player, char)
         if not player or not char then return end
         pcall(function()
@@ -1162,20 +1181,18 @@ run(function()
     end
 
     local function Cleanup(plr)
-        if Players[plr] then
-            for _, conn in pairs(Players[plr]) do conn:Disconnect() end
-            Players[plr] = nil
-        end
+        disconnectPlayerConnections(plr)
     end
 
     local function Auto(v)
         if not AutoArrest.Enabled then return end
         if not entitylib.isAlive then return end
 
-        Cleanup(v)
+        disconnectPlayerConnections(v)
         Players[v] = {}
 
         local function Listener(char)
+            if not char then return end
             local TasedConnection = char:GetAttributeChangedSignal("Tased"):Connect(function()
                 if tick() < Cooldown then
                     notif('Vape', 'Arrest Cooldown: ' .. math.ceil(Cooldown - tick()) .. 's', 3)
@@ -1207,12 +1224,16 @@ run(function()
                 end
             end)
             Players[v].TasedConnection = TasedConnection
+
+            char.Destroying:Connect(function()
+                disconnectPlayerConnections(v)
+            end)
         end
 
         if v.Character then Listener(v.Character) end
 
         Players[v].leaveConnection = entitylib.Events.EntityRemoved:Connect(function(plr)
-            if plr.Player == v then Cleanup(v) end
+            if plr.Player == v then disconnectPlayerConnections(v) end
         end)
     end
 
@@ -1228,7 +1249,9 @@ run(function()
                 AutoArrest:Clean(entitylib.Events.EntityAdded:Connect(function(plr) setup(plr.Player) end))
             else
                 for _, conns in pairs(Players) do
-                    for _, conn in pairs(conns) do conn:Disconnect() end
+                    for _, conn in pairs(conns) do
+                        pcall(function() conn:Disconnect() end)
+                    end
                 end
                 Players = {}
             end
