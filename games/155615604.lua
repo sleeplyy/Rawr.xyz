@@ -9,7 +9,7 @@ if not mouse1release then mouse1release = function() end end
 
 local run = function(func, issue)
     if issue then return end
-    pcall(func)  -- wrap in pcall so one module's error doesn't break everything
+    pcall(func)
 end
 
 local cloneref = cloneref or function(obj) return obj end
@@ -24,6 +24,12 @@ local coreGui = cloneref(game:GetService('CoreGui'))
 local guiService = cloneref(game:GetService('GuiService'))
 local vimService = cloneref(game:GetService('VirtualInputManager'))
 local playerGui = cloneref(playersService.LocalPlayer:WaitForChild("PlayerGui"))
+
+-- Global Search
+local guardsTeam = teamService.Guards
+local criminalsTeam = teamService.Criminals
+local inmatesTeam = teamService.Inmates
+local neutralTeam = teamService.Neutral
 
 local remotes = replicatedStorageService:WaitForChild("Remotes")
 local gunRemotes = replicatedStorageService:WaitForChild("GunRemotes")
@@ -52,7 +58,6 @@ local function canClick()
             return false
         end
     end
-    -- Added nil check for ClickGui visibility
     local clickGuiVisible = vape.gui.ScaledGui and vape.gui.ScaledGui.ClickGui and vape.gui.ScaledGui.ClickGui.Visible
     return not clickGuiVisible and not inputService:GetFocusedTextBox()
 end
@@ -63,10 +68,10 @@ for _, v in {
 } do vape:Remove(v) end
 
 local t = {
-    d = {l = CFrame.new(), s = CFrame.new()}, -- desync
-    bt = {m = false, q = false, p = Vector3.new()}, -- bullet manip (client)
-    sa = {hooks = {}, toggle = nil}, -- silent aim
-    hn = {e = false} -- hit notifications
+    d = {l = CFrame.new(), s = CFrame.new()},
+    bt = {m = false, q = false, p = Vector3.new()},
+    sa = {hooks = {}, toggle = nil},
+    hn = {e = false}
 }
 
 run(function()
@@ -94,7 +99,7 @@ run(function()
     vape:Clean(function() hookmetamethod(game, "__index", old) end)
 end)
 
-run(function() -- visual bullet manip
+run(function()
     vape:Clean(gameCamera.ChildAdded:Connect(function(child)
         if typeof(child.Transparency) == "number" then
             child.Transparency = 1
@@ -137,7 +142,7 @@ run(function() -- visual bullet manip
     end))
 end)
 
-run(function() -- silent aim hook
+run(function()
     local old
 
     old = hookmetamethod(game, '__namecall', function(self, ...)
@@ -156,18 +161,17 @@ run(function() -- silent aim hook
 end)
 
 playersService.LocalPlayer.CharacterAdded:Connect(function(character)
-    local antiJumpScript = character:WaitForChild("AntiJump", 1)  -- Just incase 
+    local antiJumpScript = character:WaitForChild("AntiJump", 1)
     if antiJumpScript then
         antiJumpScript:Destroy()
     end
 end)
--- also destroy it now if you're already alive
 if playersService.LocalPlayer.Character then
     local s = playersService.LocalPlayer.Character:WaitForChild("AntiJump", 1)
     if s then s:Destroy() end
 end
 
-run(function() -- Team Switcher
+run(function()
     local RequestTeamChange = remotes:WaitForChild("RequestTeamChange")
     local Shippingcontainers = workspaceService:WaitForChild("Shippingcontainers")
     local TeamSwitcher
@@ -177,7 +181,7 @@ run(function() -- Team Switcher
         Name = "TeamSwitcher",
         Function = function(callback)
             if callback == true then
-                notif('Vape', 'Please expand this module to use it', 3, 'alert')
+                notif('Rawr.xyz', 'Please expand this module to use it', 3, 'alert')
                 TeamSwitcher:Toggle()
             end
         end
@@ -191,33 +195,33 @@ run(function() -- Team Switcher
         Name = "Switch",
         Function = function()
             if Team.Value == "Neutral" then
-                RequestTeamChange:InvokeServer(teamService.Neutral, 1)
+                RequestTeamChange:InvokeServer(neutralTeam, 1)
             elseif Team.Value == "Guards" then
-                RequestTeamChange:InvokeServer(teamService.Neutral, 1)
+                RequestTeamChange:InvokeServer(neutralTeam, 1)
                 task.wait(1.5)
-                RequestTeamChange:InvokeServer(teamService.Guards, 1)
+                RequestTeamChange:InvokeServer(guardsTeam, 1)
                 task.delay(1, function()
-                    if lplr.Team ~= teamService.Guards then
-                        notif('Vape', 'Failed to switch to guards team, please try again later', 3, 'alert')
+                    if lplr.Team ~= guardsTeam then
+                        notif('Rawr.xyz', 'Failed to switch to guards team, please try again later', 3, 'alert')
                     end
                 end)
             elseif Team.Value == "Criminals" then
-                if lplr.Team == teamService.Inmates then
+                if lplr.Team == inmatesTeam then
                     repeat
                         t.d.s = Shippingcontainers.WorldPivot
                         task.wait(0.05)
-                    until lplr.Team == teamService.Criminals
+                    until lplr.Team == criminalsTeam
                     t.d.s = CFrame.new()
                 else
-                    notif('Vape', 'Please switch to the inmates team and try again', 3, 'alert')
+                    notif('Rawr.xyz', 'Please switch to the inmates team and try again', 3, 'alert')
                 end
             elseif Team.Value == "Inmates" then
-                RequestTeamChange:InvokeServer(game:GetService("Teams").Neutral, 1)
+                RequestTeamChange:InvokeServer(neutralTeam, 1)
                 task.wait(1.5)
-                RequestTeamChange:InvokeServer(game:GetService("Teams").Inmates, 1)
+                RequestTeamChange:InvokeServer(inmatesTeam, 1)
                 task.delay(1, function()
-                    if lplr.Team ~= teamService.Inmates then
-                        notif('Vape', 'Failed to switch to inmates team, please try again later', 3, 'alert')
+                    if lplr.Team ~= inmatesTeam then
+                        notif('Rawr.xyz', 'Failed to switch to inmates team, please try again later', 3, 'alert')
                     end
                 end)
             end
@@ -227,12 +231,12 @@ end)
 
 entitylib.start()
 
-run(function() -- AR & AS
+run(function()
     local AutoReload
     local AutoSwitch
-    local reloadConnection   -- connection for characterAdded
-    local backpackConn       -- connection for backpack child added
-    local toolConns = {}    -- per-tool connections
+    local reloadConnection
+    local backpackConn
+    local toolConns = {}
 
     local OwnShotgun = false
     local OwnSniper = false
@@ -300,7 +304,6 @@ run(function() -- AR & AS
             Shotgun = v
         end
 
-        -- Disconnect old connection for this tool if exists (though not really needed)
         if toolConns[v] then toolConns[v]:Disconnect() end
 
         toolConns[v] = v:GetAttributeChangedSignal("Local_CurrentAmmo"):Connect(function()
@@ -318,7 +321,7 @@ run(function() -- AR & AS
                            entitylib.character.Character:FindFirstChildOfClass("Tool") and
                            entitylib.character.Character:FindFirstChildOfClass("Tool"):GetAttribute("Local_CurrentAmmo") and
                            entitylib.character.Character:FindFirstChildOfClass("Tool"):GetAttribute("Local_CurrentAmmo") > 0)
-                           or attempts > 10  -- prevents infinite loop
+                           or attempts > 10
                 end
             end
         end)
@@ -326,14 +329,15 @@ run(function() -- AR & AS
 
     local function characterAdded(char)
         clearToolConns()
-        -- Connect to character and backpack children
         if backpackConn then backpackConn:Disconnect() end
         backpackConn = lplr.Backpack.ChildAdded:Connect(function(child)
             itemAdded(child)
         end)
-        -- Also check existing children in character and backpack
-        for _, child in ipairs(char.Character:GetChildren()) do itemAdded(child) end
-        for _, child in ipairs(lplr.Backpack:GetChildren()) do itemAdded(child) end
+        -- Numeric for loop 
+        local children = char.Character:GetChildren()
+        for i = 1, #children do itemAdded(children[i]) end
+        children = lplr.Backpack:GetChildren()
+        for i = 1, #children do itemAdded(children[i]) end
 
         OwnShotgun = false
         OwnSniper = false
@@ -364,7 +368,7 @@ run(function() -- AR & AS
     })
 end)
 
-run(function() -- SA & TB
+run(function()
     local SilentAim
     local Target
     local Mode
@@ -384,14 +388,14 @@ run(function() -- SA & TB
     local GunTracers = require(replicatedStorageService:WaitForChild("SharedModules"):WaitForChild("GunTracers"))
     local hud = playerGui:FindFirstChild("Home") and playerGui.Home:FindFirstChild("Hud")
     local Method
-    local mouseClicked = false  -- track click state for Click method
+    local mouseClicked = false
 
     local function tryShoot(origin, targetPart, tool)
         if not tool then return end
         local ammo = tool:GetAttribute("Local_CurrentAmmo")
         if not ammo or ammo <= 0 then return end
         local reloadSession = tool:GetAttribute("Local_ReloadSession")
-        if reloadSession and reloadSession > 0 then return end  -- reloading
+        if reloadSession and reloadSession > 0 then return end
 
         tool:SetAttribute("Local_IsShooting", true)
         local projectileCount = tool:GetAttribute("ProjectileCount") or 1
@@ -488,9 +492,8 @@ run(function() -- SA & TB
             if callback then
                 repeat
                     if entitylib.isAlive then
-                        local character = entitylib.character.Character
+                        local character = entitylib.character.Character  -- cached locally for this iteration
                         local head = entitylib.character.Head
-                        -- Replace 'continue' with nested if to avoid Lua 5.1 error
                         if head and character then
                             local origin = head.CFrame
                             local ent = entitylib['Entity' .. Mode.Value]({
@@ -511,8 +514,8 @@ run(function() -- SA & TB
                             end
 
                             if AutoFire.Enabled then
-                                local mouseDown = mouse1click()  -- GUI function
-                                local windowActive = (isrbxactive or iswindowactive)()  -- GUI function
+                                local mouseDown = mouse1click()
+                                local windowActive = (isrbxactive or iswindowactive)()
                                 if mouseDown and windowActive then
                                     if ent and canClick() then
                                         if Method.Value == 'Click' then
@@ -527,7 +530,7 @@ run(function() -- SA & TB
                                                     delayCheck = tick() + AutoFireShootDelay.Value
                                                 end
                                             end
-                                        else -- Simulation method
+                                        else
                                             if delayCheck < tick() then
                                                 delayCheck = tick() + AutoFireShootDelay.Value
                                                 local tool = character:FindFirstChildOfClass("Tool")
@@ -538,7 +541,6 @@ run(function() -- SA & TB
                                         end
                                     end
                                 else
-                                    -- Release click if button released
                                     if mouseClicked then
                                         mouse1release()
                                         mouseClicked = false
@@ -563,7 +565,7 @@ run(function() -- SA & TB
                             end
                         end
                     end
-                    task.wait()
+                    task.wait(0.03)  -- reduced because it caused preformance issues 
                 until not SilentAim.Enabled
             end
         end,
@@ -636,7 +638,7 @@ run(function() -- SA & TB
     ShowTarget = SilentAim:CreateToggle({ Name = "Show Target Info" })
 end)
 
-run(function() -- Head Pitch Spinbot (Client)
+run(function()
     local Pitch
     local Original = CFrame.new()
 
@@ -678,7 +680,7 @@ run(function()
     })
 end)
 
-run(function() -- GunMods
+run(function()
     local GunMods
     local Range
     local SpreadRadius
@@ -696,8 +698,10 @@ run(function() -- GunMods
     local function characterAdded(char)
         GunMods:Clean(char.Character.ChildAdded:Connect(itemAdded))
         GunMods:Clean(lplr.Backpack.ChildAdded:Connect(itemAdded))
-        for _, v in char.Character:GetChildren() do itemAdded(v) end
-        for _, v in lplr.Backpack:GetChildren() do itemAdded(v) end
+        local children = char.Character:GetChildren()
+        for i = 1, #children do itemAdded(children[i]) end
+        children = lplr.Backpack:GetChildren()
+        for i = 1, #children do itemAdded(children[i]) end
     end
 
     GunMods = vape.Categories.Combat:CreateModule({
@@ -714,7 +718,7 @@ run(function() -- GunMods
     FireRate = GunMods:CreateSlider({ Name = "Fire Rate", Min=0, Max=1, Decimal=100, Default=0.1, Suffix=function(val) return val==1 and 'second' or 'seconds' end })
 end)
 
-run(function() -- Auto Pickup
+run(function()
     local AutoPickup
     local PrisonItems = {}
     local Keycard
@@ -753,9 +757,9 @@ run(function() -- Auto Pickup
 
     local function canPickup(v)
         if v and v.Parent and v.Parent.Name == "Model" then
-            return entitylib.character.Player.Team == teamService.Criminals
+            return entitylib.character.Player.Team == criminalsTeam
         end
-        return entitylib.character.Player.Team == teamService.Inmates or entitylib.character.Player.Team == teamService.Guards
+        return entitylib.character.Player.Team == inmatesTeam or entitylib.character.Player.Team == guardsTeam
     end
 
     AutoPickup = vape.Categories.Utility:CreateModule({
@@ -772,9 +776,9 @@ run(function() -- Auto Pickup
                     end
                 end))
                 AutoPickup:Clean(workspaceService.ChildAdded:Connect(function(v)
-                    if v.Name == "Key card" and Keycard.Enabled and lplr.Team ~= teamService.Guards then
+                    if v.Name == "Key card" and Keycard.Enabled and lplr.Team ~= guardsTeam then
                         pickUp(v)
-                    elseif v.Name == "M9" and M9.Enabled and lplr.Team ~= teamService.Guards then
+                    elseif v.Name == "M9" and M9.Enabled and lplr.Team ~= guardsTeam then
                         pickUp(v)
                     end
                 end))
@@ -802,7 +806,7 @@ run(function() -- Auto Pickup
     end
 end)
 
-run(function() -- KillAura
+run(function()
     local meleeEvent = replicatedStorageService:WaitForChild("meleeEvent")
     local Killaura
     local Targets
@@ -838,10 +842,11 @@ run(function() -- KillAura
                         Limit = Max.Value
                     })
 
-                    for _, v in ipairs(plrs) do
+                    -- Numeric for loop
+                    for i = 1, #plrs do
+                        local v = plrs[i]
                         local delta = (v.RootPart.Position - selfpos)
                         local angle = math.acos( localfacing:Dot((delta * Vector3.new(1,0,1)).Unit) )
-                        -- FIX: check if angle is WITHIN your attack angle (less than or equal)
                         if angle <= (math.rad(AngleSlider.Value) / 2) then
                             table.insert(attacked, {
                                 Entity = v,
@@ -851,14 +856,13 @@ run(function() -- KillAura
 
                             if AttackDelay < tick() then
                                 AttackDelay = tick() + (1 / CPS.GetRandomValue())
-                                pcall(function()  -- safety for FireServer errors
+                                pcall(function()
                                     meleeEvent:FireServer(v.Player, 1, 1)
                                 end)
                             end
                         end
                     end
 
-                    -- Update boxes
                     for i, box in ipairs(Boxes) do
                         if attacked[i] then
                             box.Adornee = attacked[i].Entity.RootPart
@@ -871,7 +875,6 @@ run(function() -- KillAura
                         end
                     end
 
-                    -- Update particles
                     for i, part in ipairs(Particles) do
                         if attacked[i] then
                             part.Position = attacked[i].Entity.RootPart.Position
@@ -892,7 +895,7 @@ run(function() -- KillAura
                         end
                     end
 
-                    task.wait()
+                    task.wait(0.03)  -- reduced CPU usage
                 until not Killaura.Enabled
             else
                 for _, box in pairs(Boxes) do box.Visible = false; box.Adornee = nil end
@@ -978,7 +981,7 @@ run(function() -- KillAura
     Face = Killaura:CreateToggle({ Name='Face target' })
 end)
 
-run(function() -- Auto Arrest
+run(function()
     local ArrestPlayer = remotes:WaitForChild("ArrestPlayer")
     local InteractWithItem = remotes:WaitForChild("InteractWithItem")
     local Cooldown = 0
@@ -1026,8 +1029,8 @@ run(function() -- Auto Arrest
                 local dist = (entitylib.character.RootPart.Position - root.Position).Magnitude
                 if dist > ArrestRange.Value then return end
 
-                if char:GetAttribute("Tased") == true and lplr.Team == teamService.Guards then
-                    if v.Team == teamService.Criminals or (v.Team == teamService.Inmates and (char:GetAttribute("Trespassing") or char:GetAttribute("Hostile"))) then
+                if char:GetAttribute("Tased") == true and lplr.Team == guardsTeam then
+                    if v.Team == criminalsTeam or (v.Team == inmatesTeam and (char:GetAttribute("Trespassing") or char:GetAttribute("Hostile"))) then
                         local Handcuffs = char:FindFirstChild("Handcuffs") or lplr.Backpack:FindFirstChild("Handcuffs")
                         if Handcuffs then
                             Handcuffs.Parent = char
@@ -1038,7 +1041,7 @@ run(function() -- Auto Arrest
                                 t.d.s = char.HumanoidRootPart.CFrame
                                 Arrest(v, char)
                                 task.wait(0.1)
-                            until (not char) or char:GetAttribute("Arrested") or (tick()-start > 5)  -- timeout
+                            until (not char) or char:GetAttribute("Arrested") or (tick()-start > 5)
                             Handcuffs.Parent = lplr.Backpack
                             t.d.s = CFrame.new()
                         end
@@ -1076,4 +1079,4 @@ run(function() -- Auto Arrest
     ArrestRange = AutoArrest:CreateSlider({ Name = "Arrest Range", Min=1, Max=1000, Default=100, Suffix=function(val) return val==1 and 'stud' or 'studs' end })
 end)
 
-print("Hello, V4.2")
+print("Hello, V4.3")
