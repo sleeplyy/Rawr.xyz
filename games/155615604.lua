@@ -181,13 +181,12 @@ run(function()
 
     -- default colours
     local taserColor = Color3.fromRGB(0, 234, 255)
-    local sniperColor = Color3.fromRGB(255, 50, 50)   -- changed to red so it's obviously different
+    local sniperColor = Color3.fromRGB(255, 50, 50)
     local bulletColor = Color3.fromRGB(255, 255, 0)
 
     local customColorsEnabled = false
     local showTracersEnabled = true
 
-    -- CC Helper
     local function createColoredTracer(startPos, endPos, color, sizeThickness, duration, hasLight)
         local distance = (endPos - startPos).magnitude
         local midPoint = (startPos + endPos) / 2
@@ -203,7 +202,7 @@ run(function()
         part.CanCollide = false
         part.CanQuery = false
         part.CanTouch = false
-        part.Color = color          -- use cc
+        part.Color = color
         part.Parent = workspace.CurrentCamera
 
         if hasLight then
@@ -272,7 +271,6 @@ run(function()
         end
     })
 
-    -- CS
     local TaserColorSlider = TracerVisuals:CreateColorSlider({
         Name = "Taser Color",
         Function = function(hue, sat, val)
@@ -301,7 +299,6 @@ run(function()
         end
     })
 
-    -- HTBD
     TaserColorSlider.Object.Visible = false
     SniperColorSlider.Object.Visible = false
     BulletColorSlider.Object.Visible = false
@@ -953,6 +950,147 @@ run(function()
     end
 end)
 
+-- ============================================================
+-- NEW MODULE: Hitmarker & Hitsound
+-- ============================================================
+run(function()
+    local HitmarkerModule = vape.Categories.Utility:CreateModule({
+        Name = "Hitmarker & Hitsound",
+        Function = function(callback) end
+    })
+
+    -- State toggles
+    local visualEnabled = false
+    local soundEnabled = false
+    local lastSoundPath = "newvape/assets/sounds/hit.mp3"
+    local soundCooldown = 0.1   -- avoid audio overlap
+    local lastSoundTime = 0
+
+    -- Hitmarker drawing (cross)
+    local hitmarkerLines = {}
+    local function createHitmarker()
+        for i = 1, 4 do
+            local line = Drawing.new("Line")
+            line.Color = Color3.fromRGB(255, 0, 0)  -- red
+            line.Thickness = 2
+            line.Transparency = 1
+            line.Visible = false
+            table.insert(hitmarkerLines, line)
+        end
+    end
+    createHitmarker()
+
+    local function showHitmarker()
+        local center = vape.gui.AbsoluteSize / 2
+        local size = 10
+        -- cross pattern: top, bottom, left, right
+        local directions = {
+            {Vector2.new(0, -size), Vector2.new(0, -size/3)},   -- top
+            {Vector2.new(0, size), Vector2.new(0, size/3)},     -- bottom
+            {Vector2.new(-size, 0), Vector2.new(-size/3, 0)},   -- left
+            {Vector2.new(size, 0), Vector2.new(size/3, 0)}      -- right
+        }
+        for i, line in ipairs(hitmarkerLines) do
+            if i <= #directions then
+                line.From = center + directions[i][1]
+                line.To = center + directions[i][2]
+                line.Transparency = 1
+                line.Visible = true
+            end
+        end
+        -- fade out
+        task.delay(0.2, function()
+            for _, line in ipairs(hitmarkerLines) do
+                line.Visible = false
+            end
+        end)
+    end
+
+    -- Play hitsound using getcustomaudio
+    local function playHitsound(path)
+        if tick() - lastSoundTime < soundCooldown then return end
+        lastSoundTime = tick()
+
+        local audioId
+        local success = pcall(function()
+            audioId = getcustomaudio(path)
+        end)
+        if success and audioId then
+            local sound = Instance.new("Sound", workspace.CurrentCamera)
+            sound.Volume = 1
+            sound.PlayOnRemove = false
+            sound.SoundId = audioId
+            sound:Play()
+            sound.Ended:Connect(function()
+                sound:Destroy()
+            end)
+        else
+            -- fallback: try syn.play_audio
+            local synSuccess = pcall(function()
+                if syn and syn.play_audio then
+                    syn.play_audio(path)
+                end
+            end)
+            if not synSuccess then
+                notif('Hitmarker', 'Could not load sound: '..path, 3, 'alert')
+            end
+        end
+    end
+
+    -- Called from the shooting hook (we'll modify t.sa.hooks.PrisonLife slightly)
+    -- To keep it clean, we override the notification function to also trigger hitmarker/sound
+    local originalNotif = notif
+    notif = function(title, msg, duration, type)
+        -- Catch hit messages and trigger effects
+        if type == 'hit' or string.find(msg, "'s ") then
+            if visualEnabled then showHitmarker() end
+            if soundEnabled then playHitsound(lastSoundPath) end
+        end
+        originalNotif(title, msg, duration, type)
+    end
+
+    -- GUI elements
+    HitmarkerModule:CreateToggle({
+        Name = "Hitmarker (Visual)",
+        Default = false,
+        Function = function(callback) visualEnabled = callback end
+    })
+
+    HitmarkerModule:CreateToggle({
+        Name = "Hitsound",
+        Default = false,
+        Function = function(callback) soundEnabled = callback end
+    })
+
+    local soundPathBox = HitmarkerModule:CreateTextBox({
+        Name = "Hitsound File Path",
+        Default = lastSoundPath,
+        Placeholder = "newvape/assets/sounds/hit.mp3"
+    })
+
+    HitmarkerModule:CreateButton({
+        Name = "Set Path",
+        Function = function()
+            local newPath = soundPathBox.Value
+            if newPath and newPath ~= "" then
+                lastSoundPath = newPath
+                notif('Hitmarker', 'Sound path set to: '..newPath, 2, 'success')
+            end
+        end
+    })
+
+    HitmarkerModule:CreateButton({
+        Name = "Preview Sound",
+        Function = function()
+            if soundEnabled then
+                playHitsound(lastSoundPath)
+            else
+                notif('Hitmarker', 'Enable Hitsound first', 2, 'alert')
+            end
+        end
+    })
+end)
+
 run(function()
     local meleeEvent = replicatedStorageService:WaitForChild("meleeEvent")
     local Killaura
@@ -1228,9 +1366,7 @@ end)
 run(function()
     local NameChanger = vape.Categories.Utility:CreateModule({
         Name = "Name Changer",
-        Function = function(callback)
-            -- nothing needed on toggle
-        end
+        Function = function(callback) end
     })
 
     local displayNameBox = NameChanger:CreateTextBox({
@@ -1259,4 +1395,4 @@ run(function()
     })
 end)
 
-print("Hello, V4.5")
+print("Hello, V4.6")
