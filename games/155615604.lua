@@ -955,88 +955,56 @@ run(function()
         Function = function(callback) end
     })
 
-    -- State toggles
     local visualEnabled = false
     local soundEnabled = false
     local lastSoundPath = "newvape/assets/sounds/Beep.mp3"
     local soundCooldown = 0.1
     local lastSoundTime = 0
 
-    -- Complete sound database from GitHub repo
-    local soundFiles = {
-        -- MP3
-        {name = "1nn", ext = ".mp3"},
-        {name = "67", ext = ".mp3"},
-        {name = "BatHit", ext = ".mp3"},
-        {name = "Beep", ext = ".mp3"},
-        {name = "Bonk", ext = ".mp3"},
-        {name = "Bow", ext = ".mp3"},
-        {name = "Bubble", ext = ".mp3"},
-        {name = "Bubble2", ext = ".mp3"},
-        {name = "CSGO", ext = ".mp3"},
-        {name = "Cod", ext = ".mp3"},
-        {name = "Fairy1", ext = ".mp3"},
-        {name = "Fairy2", ext = ".mp3"},
-        {name = "Fatality", ext = ".mp3"},
-        {name = "Fatality2", ext = ".mp3"},
-        {name = "Hentai1", ext = ".mp3"},
-        {name = "Hentai2", ext = ".mp3"},
-        {name = "Hentai3", ext = ".mp3"},
-        {name = "Lazer", ext = ".mp3"},
-        {name = "MarioCoins", ext = ".mp3"},
-        {name = "MinecraftXP", ext = ".mp3"},
-        {name = "Neverlose", ext = ".mp3"},
-        {name = "OSU", ext = ".mp3"},
-        {name = "PubgPan", ext = ".mp3"},
-        {name = "Rifk7", ext = ".mp3"},
-        {name = "RustHeadshot", ext = ".mp3"},
-        {name = "Skeet", ext = ".mp3"},
-        {name = "SpanishMoan", ext = ".mp3"},
-        {name = "StaryKrow", ext = ".mp3"},
-        {name = "Steve", ext = ".mp3"},
-        {name = "TF2Crit", ext = ".mp3"},
-        {name = "TF2Default", ext = ".mp3"},
-        {name = "Windows", ext = ".mp3"},
-        {name = "lobby", ext = ".mp3"},
-        -- OGG
-        {name = "boolean", ext = ".ogg"},
-        {name = "disable", ext = ".ogg"},
-        {name = "enable", ext = ".ogg"},
-        {name = "keypress", ext = ".ogg"},
-        {name = "keyrelease", ext = ".ogg"},
-        {name = "moan1", ext = ".ogg"},
-        {name = "moan2", ext = ".ogg"},
-        {name = "moan3", ext = ".ogg"},
-        {name = "moan4", ext = ".ogg"},
-        {name = "orthodox", ext = ".ogg"},
-        {name = "pmsound", ext = ".ogg"},
-        {name = "rifk", ext = ".ogg"},
-        {name = "scroll", ext = ".ogg"},
-        {name = "skeet", ext = ".ogg"},
-        {name = "swipein", ext = ".ogg"},
-        {name = "swipeout", ext = ".ogg"},
-        {name = "uwu", ext = ".ogg"},
-        -- No extension
-        {name = "ex", ext = ""}
-    }
-
-    -- Build display list for dropdown
     local soundNames = {}
     local soundMap = {}
-    for _, s in ipairs(soundFiles) do
-        table.insert(soundNames, s.name)
-        soundMap[s.name] = s.name .. s.ext
-    end
-
-    -- Assets
     local GITHUB_SOUNDS_BASE = "https://raw.githubusercontent.com/imcomingforyou6959-gif/RPL/main/assets/sounds/"
+    local GITHUB_API_URL = "https://api.github.com/repos/imcomingforyou6959-gif/RPL/contents/assets/sounds"
 
-    -- Folders
     if not isfolder("newvape/assets/sounds") then
         makefolder("newvape/assets/sounds")
     end
 
-    -- :(
+    -- Fetch file list from GitHub
+    local function fetchSoundList()
+        soundNames = {}
+        soundMap = {}
+        local success, response = pcall(function()
+            return game:HttpGet(GITHUB_API_URL)
+        end)
+        if success and response then
+            local ok, files = pcall(game.HttpService.JSONDecode, game:GetService("HttpService"), response)
+            if ok and type(files) == "table" then
+                for _, file in ipairs(files) do
+                    if file.type == "file" then
+                        local fullName = file.name
+                        local base = string.match(fullName, "(.+)%.[^%.]+$") or fullName
+                        if base and soundMap[base] == nil then
+                            table.insert(soundNames, base)
+                        end
+                        soundMap[base] = fullName   -- FEXE
+                    end
+                end
+            end
+        end
+        -- Fallback
+        if #soundNames == 0 then
+            local fallback = {"Beep", "Cod", "TF2Default", "MinecraftXP"}
+            for _, name in ipairs(fallback) do
+                table.insert(soundNames, name)
+                soundMap[name] = name .. ".mp3"
+            end
+        end
+    end
+
+    fetchSoundList()
+
+    -- m
     local hitmarkerLines = {}
     local function createHitmarker()
         for i = 1, 4 do
@@ -1092,18 +1060,14 @@ run(function()
                 sound:Destroy()
             end)
         else
-            local synSuccess = pcall(function()
+            pcall(function()
                 if syn and syn.play_audio then
                     syn.play_audio(path)
                 end
             end)
-            if not synSuccess then
-                notif('Hitmarker', 'Could not load sound: '..path, 3, 'alert')
-            end
         end
     end
 
-    -- Override notif to trigger hitmarker/sound on hit messages
     local originalNotif = notif
     notif = function(title, msg, duration, type)
         if type == 'hit' or (msg and string.find(msg, "'s ")) then
@@ -1126,7 +1090,6 @@ run(function()
         Function = function(callback) soundEnabled = callback end
     })
 
-    -- Dropdown with all sounds from GitHub
     HitmarkerModule:CreateDropdown({
         Name = "Select Sound",
         List = soundNames,
@@ -1134,7 +1097,6 @@ run(function()
             local fullName = soundMap[val]
             if fullName then
                 lastSoundPath = "newvape/assets/sounds/" .. fullName
-                -- Auto-download if missing
                 if not isfile(lastSoundPath) then
                     local rawUrl = GITHUB_SOUNDS_BASE .. fullName
                     local suc, res = pcall(function()
@@ -1144,7 +1106,7 @@ run(function()
                         writefile(lastSoundPath, res)
                         notif('Hitmarker', 'Downloaded: '..fullName, 2, 'success')
                     else
-                        notif('Hitmarker', 'Failed to download: '..fullName, 3, 'alert')
+                        notif('Hitmarker', 'Download failed – check filename: '..fullName, 3, 'alert')
                     end
                 else
                     notif('Hitmarker', 'Selected: '..fullName, 2, 'success')
@@ -1164,7 +1126,6 @@ run(function()
         end
     })
 end)
-
 run(function()
     local meleeEvent = replicatedStorageService:WaitForChild("meleeEvent")
     local Killaura
