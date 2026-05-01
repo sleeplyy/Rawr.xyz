@@ -179,14 +179,16 @@ run(function()
     local debris = game:GetService("Debris")
     local tweenService = game:GetService("TweenService")
 
+    -- default colours
     local taserColor = Color3.fromRGB(0, 234, 255)
-    local sniperColor = Color3.fromRGB(127, 127, 127)
+    local sniperColor = Color3.fromRGB(255, 50, 50)   -- changed to red so it's obviously different
     local bulletColor = Color3.fromRGB(255, 255, 0)
 
     local customColorsEnabled = false
     local showTracersEnabled = true
 
-    local function createTracerPart(startPos, endPos, brickColorName, sizeThickness, duration, lightColor)
+    -- helper to create a tracer part with custom color
+    local function createColoredTracer(startPos, endPos, color, sizeThickness, duration, hasLight)
         local distance = (endPos - startPos).magnitude
         local midPoint = (startPos + endPos) / 2
 
@@ -201,12 +203,12 @@ run(function()
         part.CanCollide = false
         part.CanQuery = false
         part.CanTouch = false
-        part.BrickColor = BrickColor.new(brickColorName)
+        part.Color = color          -- use custom colour
         part.Parent = workspace.CurrentCamera
 
-        if lightColor then
+        if hasLight then
             local light = Instance.new("SurfaceLight", part)
-            light.Color = lightColor
+            light.Color = color
             light.Range = 7
             light.Face = "Bottom"
             light.Brightness = 5
@@ -219,15 +221,15 @@ run(function()
     end
 
     local function customCreateTaser(startPos, endPos)
-        createTracerPart(startPos, endPos, "Cyan", 0.2, 2, taserColor)
+        createColoredTracer(startPos, endPos, taserColor, 0.2, 2, true)
     end
 
     local function customCreateSniper(startPos, endPos)
-        createTracerPart(startPos, endPos, "Medium stone grey", 0.17, 4, nil)
+        createColoredTracer(startPos, endPos, sniperColor, 0.17, 4, false)
     end
 
     local function customCreateBullet(startPos, endPos)
-        createTracerPart(startPos, endPos, "Yellow", 0.1, 0.05, nil)
+        createColoredTracer(startPos, endPos, bulletColor, 0.1, 0.05, false)
     end
 
     local function emptyTracer() end
@@ -270,6 +272,7 @@ run(function()
         end
     })
 
+    -- colour sliders (always visible when module is on)
     local TaserColorSlider = TracerVisuals:CreateColorSlider({
         Name = "Taser Color",
         Function = function(hue, sat, val)
@@ -298,6 +301,7 @@ run(function()
         end
     })
 
+    -- hide them by default
     TaserColorSlider.Object.Visible = false
     SniperColorSlider.Object.Visible = false
     BulletColorSlider.Object.Visible = false
@@ -1221,4 +1225,4 @@ run(function()
     ArrestRange = AutoArrest:CreateSlider({ Name = "Arrest Range", Min=1, Max=1000, Default=100, Suffix=function(val) return val==1 and 'stud' or 'studs' end })
 end)
 
-print("Hello, V4.4.1")
+print("Hello, V4.4.2")
