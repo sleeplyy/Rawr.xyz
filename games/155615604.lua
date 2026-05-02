@@ -12,7 +12,7 @@ local run = function(func, issue)
     pcall(func)
 end
 
-local blacklistUrl = "https://raw.githubusercontent.com/imcomingforyou6959-gif/whitelists/refs/heads/main/PlayerBlacklist.json"
+local blacklistUrl = "https://raw.githubusercontent.com/imcomingforyou6959-gif/whitelists/refs/heads/main/PlayerBlacklist.json" .. "?t=" .. tick()
 local function checkBlacklist()
     local httpService = game:GetService("HttpService")
     local success, result = pcall(function()
@@ -32,7 +32,7 @@ local function checkBlacklist()
 end
 
 if checkBlacklist() then
-    -- stop the script from running any further (infinite wait)
+    -- stop script execution
     while true do task.wait(10) end
 end
 
