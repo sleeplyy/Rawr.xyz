@@ -32,7 +32,6 @@ local function checkBlacklist()
 end
 
 if checkBlacklist() then
-    -- stop script execution
     while true do task.wait(10) end
 end
 
@@ -66,6 +65,15 @@ local entitylib = vape.Libraries.entity
 local targetinfo = vape.Libraries.targetinfo
 
 local function notif(...) return vape:CreateNotification(...) end
+
+-- Executor compatibility warning
+if identifyexecutor then
+    local execName = ({identifyexecutor()})[1]
+    local allowed = {Madium = true, Velocity = true, Sirhurt = true, Volt = true, LX63 = true}
+    if not allowed[execName] then
+        notif('Rawr.xyz', 'Your Executor is too bad to use all features :(', 10, 'alert')
+    end
+end
 
 local function canClick()
     local mousepos = (inputService:GetMouseLocation() - guiService:GetGuiInset())
