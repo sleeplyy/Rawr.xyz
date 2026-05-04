@@ -926,7 +926,7 @@ run(function()
 	Speed = AimAssist:CreateSlider({
 		Name = 'Speed',
 		Min = 0,
-		Max = 30,
+		Max = 100,
 		Default = 15
 	})
 	AimAssist:CreateToggle({
