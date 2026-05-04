@@ -597,11 +597,8 @@ run(function()
     })
 end)
 
--- =============================================
--- CROSSHAIR MODULE (grey start, text fixed)
--- =============================================
 run(function()
-    -- crosshair settings (local, not global)
+    -- crosshair
     local crosshairEnabled = false
     local crosshairColor = Color3.fromRGB(128, 128, 128)  -- grey
     local crosshairSpin = true
@@ -612,17 +609,16 @@ run(function()
     local lastRender = 0
     local renderConnection
 
-    -- helper functions
     local function solve(angle, radius)
         return Vector2.new(math.sin(math.rad(angle)) * radius, math.cos(math.rad(angle)) * radius)
     end
 
     local function createDrawings()
-        -- 8 lines (4 outline + 4 inline)
+        -- c4
         for i = 1, 8 do
             drawings.lines[i] = Drawing.new('Line')
         end
-        -- fixed text (do not allow user to change)
+        -- 6
         drawings.texts[1] = Drawing.new('Text', {
             Size = 13, Font = 2, Outline = true,
             Text = 'Made with love |',
@@ -637,7 +633,7 @@ run(function()
 
     local function updateCrosshair()
         local pos
-        if false then  -- always mouse mode (no other modes exposed)
+        if false then
             pos = camera.ViewportSize / 2
         else
             pos = inputService:GetMouseLocation()
@@ -681,7 +677,7 @@ run(function()
         end
     end
 
-    -- Module definition
+    -- MD
     local CrosshairModule = vape.Categories.Visuals:CreateModule({
         Name = "Crosshair",
         Function = function(callback)
@@ -739,9 +735,6 @@ run(function()
     })
 end)
 
--- =============================================
--- MINECRAFT TEXTURES MODULE
--- =============================================
 run(function()
     local faces = {"Front", "Back", "Bottom", "Top", "Right", "Left"}
     local materials = {
