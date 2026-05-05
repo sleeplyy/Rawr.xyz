@@ -71,7 +71,7 @@ if identifyexecutor then
     local execName = execInfo[1] or "Unknown"
     local execVersion = execInfo[2] or "Unknown"
 
-    print("[Rawr.xyz] Executor: " .. execName .. " | Version: " .. execVersion)
+    print("Executor: " .. execName .. " | Version: " .. execVersion)
     notif('Rawr.xyz', 'Executor: ' .. execName .. ' | v' .. execVersion, 5, 'info')
 
     local allowed = {
@@ -83,6 +83,22 @@ if identifyexecutor then
         notif('Rawr.xyz', 'Your Executor is too bad to use all features :(', 10, 'alert')
     end
 end
+
+local CURRENT_VERSION = "4.9.5.3"
+local VERSION_URL = "https://raw.githubusercontent.com/imcomingforyou6959-gif/RPL/main/version.txt?t=" .. tick()
+
+local function checkForUpdate()
+    local suc, latest = pcall(game.HttpGet, game, VERSION_URL)
+    if not suc or not latest then return end
+    latest = latest:match("^%s*(.-)%s*$")
+    if latest == "" then return end
+
+    if latest ~= CURRENT_VERSION then
+        notif('Rawr.xyz', 'A new version is available: ' .. latest .. '\nYou are on ' .. CURRENT_VERSION .. '. Please re‑execute.', 15, 'alert')
+    end
+end
+
+checkForUpdate()
 
 local function safeCall(desc, func)
     local ok, err = pcall(func)
