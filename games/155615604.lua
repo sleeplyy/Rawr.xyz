@@ -233,20 +233,10 @@ local HttpService = game:GetService("HttpService")
 
 local function fetchTeam()
     local url = "https://raw.githubusercontent.com/imcomingforyou6959-gif/whitelists/refs/heads/main/Team.json?t=" .. tick()
-    print("[Rawr.xyz] Fetching team list from:", url)
     local ok, res = pcall(function() return game:HttpGet(url) end)
-    if not ok then
-        warn("[Rawr.xyz] Failed to fetch team JSON:", res)
-        notif('Rawr.xyz', 'Failed to load team list (network error)', 5, 'alert')
-        return false
-    end
-    print("[Rawr.xyz] Fetched JSON:", res:sub(1, 200).."...")
+    if not ok then return false end
     local jsonOk, data = pcall(function() return HttpService:JSONDecode(res) end)
-    if not jsonOk or not data or type(data.TeamMembers) ~= "table" then
-        warn("[Rawr.xyz] Invalid team JSON:", jsonOk, data)
-        notif('Rawr.xyz', 'Bad team JSON format', 5, 'alert')
-        return false
-    end
+    if not jsonOk or not data or type(data.TeamMembers) ~= "table" then return false end
 
     table.clear(teamLookup)
     table.clear(nameLookup)
@@ -254,17 +244,13 @@ local function fetchTeam()
         if m.userId then teamLookup[m.userId] = m end
         if m.username then nameLookup[m.username:lower()] = m end
     end
-    local count = #data.TeamMembers
-    print("[Rawr.xyz] Team members loaded:", count)
-    notif('Rawr.xyz', 'Team list loaded (' .. count .. ' members)', 5, 'success')
+    notif('Rawr.xyz', 'Team list loaded (' .. #data.TeamMembers .. ' members)', 3, 'success')
     return true
 end
 
--- try immediately, then every 10 seconds until success, then every 5 minutes
 task.spawn(function()
-    local loaded = false
     repeat
-        loaded = fetchTeam()
+        local loaded = fetchTeam()
         if not loaded then task.wait(10) end
     until loaded
     while true do
@@ -273,20 +259,18 @@ task.spawn(function()
     end
 end)
 
-local function attachNametag(char, role)
-    print("[Rawr.xyz] Attaching tag to:", char and char.Name, role)
-    local head = char and (char:FindFirstChild("Head") or char:WaitForChild("Head", 10))
-    if not head then
-        warn("[Rawr.xyz] No head found for:", char and char.Name)
-        return
-    end
+local function attachNametag(character, role)
+    if not character then return end
+    local head = character:FindFirstChild("Head") or character:WaitForChild("Head", 10)
+    if not head then return end
 
     local billboard = Instance.new("BillboardGui")
     billboard.Adornee = head
     billboard.Size = UDim2.new(0, 200, 0, 40)
     billboard.StudsOffset = Vector3.new(0, 2.5, 0)
-    billboard.AlwaysOnTop = true
-    billboard.Parent = char
+    billboard.AlwaysOnTop = false
+    billboard.MaxDistance = 1000
+    billboard.Parent = character
 
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(1, 0, 1, 0)
@@ -295,28 +279,20 @@ local function attachNametag(char, role)
     label.TextColor3 = Color3.fromRGB(255, 0, 0)
     label.Font = Enum.Font.GothamBold
     label.TextScaled = true
+    label.TextStrokeTransparency = 0.2
+    label.TextStrokeColor3 = Color3.new(0, 0, 0)
     label.Parent = billboard
-    print("[Rawr.xyz] Tag attached for", char.Name)
 end
 
 local function onPlayerDetected(player)
-    local info = teamLookup[player.UserId]
-    if not info then
-        info = nameLookup[player.Name:lower()]
-    end
+    local info = teamLookup[player.UserId] or nameLookup[player.Name:lower()]
     if not info then return end
 
-    print("[Rawr.xyz] Team member detected:", player.Name, info.role or "?")
     notif('Rawr.xyz', 'Team member ' .. player.Name .. ' (' .. (info.role or '') .. ') joined', 5, 'success')
 
-    if player.Character then
-        attachNametag(player.Character, info.role)
-    else
-        print("[Rawr.xyz] " .. player.Name .. " has no character yet, waiting...")
-    end
-    player.CharacterAdded:Connect(function(chr)
-        print("[Rawr.xyz] " .. player.Name .. " spawned, attaching tag")
-        attachNametag(chr, info.role)
+    task.spawn(function()
+        local char = player.Character or player.CharacterAdded:Wait()
+        if char then attachNametag(char, info.role) end
     end)
 end
 
