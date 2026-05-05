@@ -267,10 +267,11 @@ local function attachNametag(char, role)
     label.Size = UDim2.new(1, 0, 1, 0)
     label.BackgroundTransparency = 1
     label.Text = "Rawr.xyz | " .. role
-    label.Font = Enum.Font.GothamBold
-    label.TextScaled = true
+    label.TextColor3 = Color3.fromRGB(255, 0, 0)
     label.TextStrokeTransparency = 0.2
     label.TextStrokeColor3 = Color3.new(0, 0, 0)
+    label.Font = Enum.Font.GothamBold
+    label.TextScaled = true
     label.Parent = billboard
 
     local animThread
@@ -1057,37 +1058,32 @@ run(function()
     end
 
     t.sa.hooks.PrisonLife = function(args)
-        if not entitylib or not entitylib.isAlive then return end
-        local character = entitylib.character
-        if not character then return end
-        local head = character.Head
-        if not head or not head:IsA("BasePart") then return end
-        local origin = head.Position
-        local ent, targetPart = getTarget(origin, nil)
-        if not ent or not targetPart or typeof(args[1]) ~= "table" then return end
+    if not entitylib or not entitylib.isAlive then return end
+    local ent, targetPart, origin = getTarget(entitylib.character.Head.Position, nil)
+    if not ent or not targetPart or typeof(args[1]) ~= "table" then return end
 
-        local originalHits = args[1]
-        local count = math.clamp(#originalHits, 1, 20)
-        if SilentAim and SilentAim.Enabled then
-            local newHits = table.create(count)
-            for i = 1, count do
-                newHits[i] = {origin, targetPart.Position, targetPart}
-            end
-            args[1] = newHits
-            if t.hn.e and targetPart.Parent then
-                notif('Rawr.xyz', 'attempted to hit ' .. targetPart.Parent.Name .. "'s " .. targetPart.Name, 3)
-            end
-        else
-            if t.hn.e then
-                for _, v in originalHits do
-                    local part = v[3]
-                    if typeof(part) == "Instance" and part.Parent and part.Parent:FindFirstChild("Humanoid") then
-                        notif('Rawr.xyz', 'hit ' .. part.Parent.Name .. "'s " .. part.Name, 3)
-                    end
+    local originalHits = args[1]
+    local count = math.clamp(#originalHits, 1, 20)
+    if SilentAim and SilentAim.Enabled then
+        local newHits = table.create(count)
+        for i = 1, count do
+            newHits[i] = {origin, targetPart.Position, targetPart}
+        end
+        args[1] = newHits
+        if t.hn.e and targetPart.Parent then
+            notif('Rawr.xyz', 'attempted to hit ' .. targetPart.Parent.Name .. "'s " .. targetPart.Name, 3)
+        end
+    else
+        if t.hn.e then
+            for _, v in originalHits do
+                local part = v[3]
+                if typeof(part) == "Instance" and part.Parent and part.Parent:FindFirstChild("Humanoid") then
+                    notif('Rawr.xyz', 'hit ' .. part.Parent.Name .. "'s " .. part.Name, 3)
                 end
             end
         end
     end
+end
 
     SilentAim = vape.Categories.Combat:CreateModule({
         Name = 'SilentAim',
