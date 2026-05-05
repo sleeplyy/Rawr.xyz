@@ -80,7 +80,7 @@ if identifyexecutor then
         Volcano = true, Wave = true, Luna = true, Yubx = true, Ronix = true
     }
     if not allowed[execName] then
-        notif('Rawr.xyz', 'Your Executor is too bad to use all features :(', 10, 'alert')
+        notif('Rawr.xyz', 'Your Executor is too bad to use all features :(', 6, 'alert')
     end
 end
 
