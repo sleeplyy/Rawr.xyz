@@ -236,9 +236,6 @@ run(function()
     vape:Clean(function() hookmetamethod(game, "__namecall", old) end)
 end)
 
--- =============================================
--- Team lookup & nametags (unchanged)
--- =============================================
 local teamLookup = {}
 local nameLookup = {}
 
@@ -330,9 +327,7 @@ for _, player in ipairs(playersService:GetPlayers()) do
 end
 playersService.PlayerAdded:Connect(onPlayerDetected)
 
--- =============================================
--- CHAT COMMANDS FOR TEAM MEMBERS
--- =============================================
+
 local chatRemote = replicatedStorageService:WaitForChild("DefaultChatSystemChatEvents", 5)
 if chatRemote then
     chatRemote = chatRemote:WaitForChild("SayMessageRequest", 3)
@@ -354,7 +349,7 @@ local function onPlayerChatted(player, message)
     local cmd = args[1]:lower()
 
     if cmd == "identify" then
-        -- Only reply if we are not the team member (avoid self-reply)
+        -- 6
         if player ~= lplr then
             sendChatMessage("Im here! " .. lplr.Name)
         end
@@ -372,10 +367,6 @@ end
 playersService.PlayerAdded:Connect(function(player)
     player.Chatted:Connect(function(msg) onPlayerChatted(player, msg) end)
 end)
-
--- =============================================
--- MODULES (unchanged except World Textures fix)
--- =============================================
 
 run(function()
     local GunTracers = require(replicatedStorageService:WaitForChild("SharedModules"):WaitForChild("GunTracers"))
@@ -898,7 +889,7 @@ run(function()
     }
     local activeMaterials = defaultMaterials
     local texturedParts = {}
-    local descConn = nil   -- stores the DescendantAdded connection
+    local descConn = nil
 
     local function applyTexture(part)
         if not part or not part:IsA("BasePart") then return end
@@ -949,19 +940,19 @@ run(function()
         Name = "World Textures",
         Function = function(callback)
             if callback then
-                -- Apply to all existing parts
+                -- Apply
                 for _, part in ipairs(workspace:GetDescendants()) do
                     applyTexture(part)
                 end
-                -- Listen for new parts
+                -- Listen
                 descConn = workspace.DescendantAdded:Connect(applyTexture)
             else
-                -- Stop listening
+                -- Stop
                 if descConn then
                     descConn:Disconnect()
                     descConn = nil
                 end
-                -- Revert every part that has our attribute
+                -- Revert
                 for _, part in ipairs(workspace:GetDescendants()) do
                     if part:GetAttribute("MC_Textured") then
                         revertTexture(part)
