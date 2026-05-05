@@ -263,33 +263,21 @@ local function attachNametag(char, role)
     billboard.MaxDistance = 1000
     billboard.Parent = char
 
-    local bg = Instance.new("Frame")
-    bg.Size = UDim2.new(1, 0, 1, 0)
-    bg.BackgroundColor3 = Color3.new(0, 0, 0)
-    bg.BackgroundTransparency = 0
-    bg.BorderSizePixel = 0
-    bg.Parent = billboard
-
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(1, 0, 1, 0)
     label.BackgroundTransparency = 1
     label.Text = "Rawr.xyz | " .. role
-    label.TextColor3 = Color3.fromRGB(255, 255, 255)
     label.Font = Enum.Font.GothamBold
     label.TextScaled = true
     label.TextStrokeTransparency = 0.2
     label.TextStrokeColor3 = Color3.new(0, 0, 0)
     label.Parent = billboard
 
-    local speed = 0.8
     task.spawn(function()
         while billboard and billboard.Parent do
-            local t = (tick() * speed) % (2 * math.pi)
+            local t = tick() * 2
             local factor = (math.sin(t) + 1) / 2
-            local r = 1 - factor * 0.2
-            local g = 1 - factor * 0.2
-            local b = 1 - factor * 0.2
-            label.TextColor3 = Color3.new(r, g, b)
+            label.TextColor3 = Color3.fromRGB(255, 0, 0):Lerp(Color3.fromRGB(255, 255, 255), factor)
             task.wait(0.05)
         end
     end)
@@ -444,7 +432,7 @@ run(function()
     })
     local BulletColorSlider = TracerVisuals:CreateColorSlider({
         Name = "Bullet Color",
-        Function = function(hide, sat, val)
+        Function = function(hue, sat, val)
             bulletColor = Color3.fromHSV(hue, sat, val)
             if customColorsEnabled and showTracersEnabled then
                 updateTracerFunctions()
@@ -939,6 +927,7 @@ run(function()
     local CircleObject
     local Face
     local ShowTarget
+    local filterTeamSA
     local TeamFilterSA
     local rand = Random.new()
     local delayCheck = tick()
@@ -1003,11 +992,9 @@ run(function()
         tool:SetAttribute("Local_IsShooting", false)
     end
 
-    local function passesTeamCheck(player)
-        if not TeamFilterSA or TeamFilterSA.Value == "All" then return true end
-        if not player then return false end
-        local teamName = tostring(player.Team)
-        return teamName == TeamFilterSA.Value
+    local function passesTeamCheckSA(player)
+        if not filterTeamSA then return true end
+        return player and player.Team == filterTeamSA
     end
 
     local function getTarget(origin, obj)
@@ -1026,7 +1013,7 @@ run(function()
             NPCs = Target and Target.NPCs and Target.NPCs.Enabled
         })
         if ent and targetinfo then targetinfo.Targets[ent] = tick() + 1 end
-        if ent and ent.Player and not passesTeamCheck(ent.Player) then
+        if ent and ent.Player and not passesTeamCheckSA(ent.Player) then
             return nil
         end
         return ent, ent and ent[targetPart], origin
@@ -1081,7 +1068,7 @@ run(function()
                         NPCs = Target and Target.NPCs and Target.NPCs.Enabled
                     })
 
-                    if ent and ent.Player and not passesTeamCheck(ent.Player) then
+                    if ent and ent.Player and not passesTeamCheckSA(ent.Player) then
                         ent = nil
                     end
 
@@ -1189,6 +1176,13 @@ run(function()
     TeamFilterSA = SilentAim:CreateDropdown({
         Name = 'Team Filter',
         List = {'All', 'Criminals', 'Inmates', 'Guards', 'Neutral'},
+        Function = function(val)
+            if val == 'Criminals' then filterTeamSA = criminalsTeam
+            elseif val == 'Inmates' then filterTeamSA = inmatesTeam
+            elseif val == 'Guards' then filterTeamSA = guardsTeam
+            elseif val == 'Neutral' then filterTeamSA = neutralTeam
+            else filterTeamSA = nil end
+        end,
         Tooltip = 'Only target players on the selected team'
     })
     SilentAim:CreateToggle({
@@ -1426,16 +1420,15 @@ run(function()
     local ParticleColor2
     local ParticleSize
     local Face
+    local filterTeamKA
     local TeamFilterKA
     local Particles, Boxes = {}, {}
     local AttackDelay = tick()
     local renderStepConnection
 
     local function passesTeamCheckKA(player)
-        if not TeamFilterKA or TeamFilterKA.Value == "All" then return true end
-        if not player then return false end
-        local teamName = tostring(player.Team)
-        return teamName == TeamFilterKA.Value
+        if not filterTeamKA then return true end
+        return player and player.Team == filterTeamKA
     end
 
     Killaura = vape.Categories.Blatant:CreateModule({
@@ -1556,6 +1549,13 @@ run(function()
     TeamFilterKA = Killaura:CreateDropdown({
         Name = 'Team Filter',
         List = {'All', 'Criminals', 'Inmates', 'Guards', 'Neutral'},
+        Function = function(val)
+            if val == 'Criminals' then filterTeamKA = criminalsTeam
+            elseif val == 'Inmates' then filterTeamKA = inmatesTeam
+            elseif val == 'Guards' then filterTeamKA = guardsTeam
+            elseif val == 'Neutral' then filterTeamKA = neutralTeam
+            else filterTeamKA = nil end
+        end,
         Tooltip = 'Only attack players on the selected team'
     })
     Killaura:CreateToggle({
