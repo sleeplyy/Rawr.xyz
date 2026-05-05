@@ -1947,4 +1947,65 @@ run(function()
     })
 end)
 
+run(function()
+    local hidden = {}
+    local conn = nil
+
+    local function hideTreePart(part)
+        if part:IsA("BasePart") and not hidden[part] then
+            hidden[part] = part.Transparency
+            part.Transparency = 1
+            part.CanCollide = false
+        end
+    end
+
+    local function restoreTreePart(part)
+        if hidden[part] then
+            part.Transparency = hidden[part]
+            part.CanCollide = true
+            hidden[part] = nil
+        end
+    end
+
+    local function isTreePart(part)
+        if part.Name == "Tree" or part.Name:lower():find("tree") then return true end
+        local parent = part.Parent
+        while parent and parent ~= workspace do
+            if parent.Name == "Tree" or parent.Name == "TreeFolder" then
+                return true
+            end
+            parent = parent.Parent
+        end
+        return false
+    end
+
+    local function scanAndApply()
+        for _, part in ipairs(workspace:GetDescendants()) do
+            if isTreePart(part) then
+                hideTreePart(part)
+            end
+        end
+    end
+
+    vape.Categories.World:CreateModule({
+        Name = "No Trees",
+        Function = function(callback)
+            if callback then
+                scanAndApply()
+                conn = workspace.DescendantAdded:Connect(function(part)
+                    if isTreePart(part) then
+                        hideTreePart(part)
+                    end
+                end)
+            else
+                if conn then conn:Disconnect(); conn = nil end
+                for part, _ in pairs(hidden) do
+                    restoreTreePart(part)
+                end
+                table.clear(hidden)
+            end
+        end
+    })
+end)
+
 print("Hello, V4.9.5.3")
