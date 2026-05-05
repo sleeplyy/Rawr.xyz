@@ -112,7 +112,6 @@ local t = {
     hn = {e = false}
 }
 
--- AntiJump bypass (hook Humanoid __newindex)
 run(function()
     local oldHumanoidNewindex
     oldHumanoidNewindex = hookmetamethod(game, "__newindex", newcclosure(function(self, key, value)
@@ -227,7 +226,6 @@ run(function()
     vape:Clean(function() hookmetamethod(game, "__namecall", old) end)
 end)
 
--- Team member detection & nametag (improved)
 local teamLookup = {}
 local nameLookup = {}
 
@@ -268,7 +266,7 @@ local function attachNametag(char, role)
     local bg = Instance.new("Frame")
     bg.Size = UDim2.new(1, 0, 1, 0)
     bg.BackgroundColor3 = Color3.new(0, 0, 0)
-    bg.BackgroundTransparency = 0.5
+    bg.BackgroundTransparency = 0
     bg.BorderSizePixel = 0
     bg.Parent = billboard
 
@@ -941,7 +939,7 @@ run(function()
     local CircleObject
     local Face
     local ShowTarget
-    local TeamFilterSA  -- team filter for SilentAim
+    local TeamFilterSA
     local rand = Random.new()
     local delayCheck = tick()
     local GunTracers = require(replicatedStorageService:WaitForChild("SharedModules"):WaitForChild("GunTracers"))
@@ -1428,7 +1426,7 @@ run(function()
     local ParticleColor2
     local ParticleSize
     local Face
-    local TeamFilterKA  -- team filter for KillAura
+    local TeamFilterKA
     local Particles, Boxes = {}, {}
     local AttackDelay = tick()
     local renderStepConnection
