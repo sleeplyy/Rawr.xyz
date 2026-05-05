@@ -84,7 +84,7 @@ if identifyexecutor then
     end
 end
 
-local CURRENT_VERSION = "4.9.5.4"
+local CURRENT_VERSION = "4.9.5.6"
 local VERSION_URL = "https://raw.githubusercontent.com/imcomingforyou6959-gif/RPL/main/version.txt?t=" .. tick()
 
 local function checkForUpdate()
@@ -2015,4 +2015,4 @@ run(function()
     })
 end)
 
-print("Hello, V4.9.5.5")
+print("Hello, V4.9.5.6")
