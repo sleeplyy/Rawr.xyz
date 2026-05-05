@@ -229,81 +229,91 @@ end)
 local teamLookup = {}
 local nameLookup = {}
 
-local HttpService = game:GetService("HttpService")
-
-local function fetchTeam()
+local function loadTeamMembers()
     local url = "https://raw.githubusercontent.com/imcomingforyou6959-gif/whitelists/refs/heads/main/Team.json?t=" .. tick()
-    local ok, res = pcall(function() return game:HttpGet(url) end)
-    if not ok then return false end
-    local jsonOk, data = pcall(function() return HttpService:JSONDecode(res) end)
-    if not jsonOk or not data or type(data.TeamMembers) ~= "table" then return false end
-
-    table.clear(teamLookup)
-    table.clear(nameLookup)
-    for _, m in ipairs(data.TeamMembers) do
-        if m.userId then teamLookup[m.userId] = m end
-        if m.username then nameLookup[m.username:lower()] = m end
+    local suc, res = pcall(function() return game:HttpGet(url) end)
+    if not suc then return end
+    local ok, data = pcall(game.HttpService.JSONDecode, game:GetService("HttpService"), res)
+    if not ok or not data or type(data.TeamMembers) ~= "table" then return end
+    teamLookup = {}
+    nameLookup = {}
+    for _, mem in ipairs(data.TeamMembers) do
+        if mem.userId then
+            teamLookup[mem.userId] = mem
+        end
+        if mem.username then
+            nameLookup[mem.username:lower()] = mem
+        end
     end
-    notif('Rawr.xyz', 'Team list loaded (' .. #data.TeamMembers .. ' members)', 3, 'success')
-    return true
 end
 
-task.spawn(function()
-    repeat
-        local loaded = fetchTeam()
-        if not loaded then task.wait(10) end
-    until loaded
-    while true do
-        task.wait(300)
-        fetchTeam()
-    end
-end)
+loadTeamMembers()
 
-local function attachNametag(character, role)
-    if not character then return end
-    local head = character:FindFirstChild("Head") or character:WaitForChild("Head", 10)
-    if not head then 
-        notif('Rawr.xyz', 'Failed to attach nametag - no head found', 3, 'alert')
-        return 
-    end
-
+local function attachNametag(char, role)
+    if not char then return end
+    local head = char:FindFirstChild("Head") or char:WaitForChild("Head", 5)
+    if not head then return end
+    
     local billboard = Instance.new("BillboardGui")
     billboard.Adornee = head
-    billboard.Size = UDim2.new(0, 200, 0, 50)
+    billboard.Size = UDim2.new(0, 200, 0, 40)
     billboard.StudsOffset = Vector3.new(0, 2.5, 0)
     billboard.AlwaysOnTop = false
-    billboard.MaxDistance = 1000
-    billboard.Parent = character
-
+    billboard.MaxDistance = 100
+    billboard.Parent = head
+    
+    local bg = Instance.new("Frame")
+    bg.Size = UDim2.new(1, 0, 1, 0)
+    bg.BackgroundColor3 = Color3.new(0, 0, 0)
+    bg.BackgroundTransparency = 0.8
+    bg.BorderSizePixel = 0
+    bg.Parent = billboard
+    
     local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, -10, 1, 0)
+    label.Size = UDim2.new(1, -4, 1, 0)
     label.BackgroundTransparency = 1
-    label.Text = "Rawr.xyz | " .. (role or "Team")
-    label.TextColor3 = Color3.fromRGB(255, 0, 0)
+    label.Text = "Rawr.xyz | " .. role
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
     label.Font = Enum.Font.GothamBold
     label.TextSize = 14
     label.TextStrokeTransparency = 0.2
     label.TextStrokeColor3 = Color3.new(0, 0, 0)
     label.Parent = billboard
-end
-
-local function onPlayerDetected(player)
-    local info = teamLookup[player.UserId] or nameLookup[player.Name:lower()]
-    if not info then return end
-
-    notif('Rawr.xyz', 'Team member ' .. player.Name .. ' (' .. (info.role or '') .. ') joined', 5, 'success')
-
+    
+    local speed = 0.8
     task.spawn(function()
-        local char = player.Character or player.CharacterAdded:Wait()
-        if char then attachNametag(char, info.role) end
+        while billboard and billboard.Parent do
+            local t = tick() * speed
+            local factor = (math.sin(t) + 1) / 2
+            label.TextColor3 = Color3.fromRGB(255, 0, 0):Lerp(Color3.fromRGB(255, 255, 255), factor)
+            task.wait(0.05)
+        end
     end)
 end
 
-for _, p in ipairs(playersService:GetPlayers()) do
-    onPlayerDetected(p)
+local function isTeamMember(player)
+    if teamLookup[player.UserId] then
+        return teamLookup[player.UserId]
+    end
+    local name = player.Name:lower()
+    if nameLookup[name] then
+        return nameLookup[name]
+    end
+    return nil
+end
+
+local function onPlayerDetected(player)
+    local info = isTeamMember(player)
+    if not info then return end
+    notif('Rawr.xyz', 'A Rawr.xyz ' .. info.role .. ' is in the game | ' .. player.Name, 5, 'success')
+    if player.Character then attachNametag(player.Character, info.role) end
+    player.CharacterAdded:Connect(function(char) attachNametag(char, info.role) end)
+end
+
+for _, player in ipairs(playersService:GetPlayers()) do
+    onPlayerDetected(player)
 end
 playersService.PlayerAdded:Connect(onPlayerDetected)
-
 run(function()
     local GunTracers = require(replicatedStorageService:WaitForChild("SharedModules"):WaitForChild("GunTracers"))
     local originalCreateTaser = GunTracers and GunTracers.createTaser or function() end
