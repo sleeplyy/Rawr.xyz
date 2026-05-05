@@ -68,7 +68,7 @@ local function notif(...) return vape:CreateNotification(...) end
 
 if identifyexecutor then
     local execName = ({identifyexecutor()})[1]
-    local allowed = {Madium = true, Velocity = true, Sirhurt = true, Volt = true, LX63 = true}
+    local allowed = {Velocity = true, Sirhurt = true, Volt = true, LX63 = true}
     if not allowed[execName] then
         notif('Rawr.xyz', 'Your Executor is too bad to use all features :(', 10, 'alert')
     end
