@@ -896,9 +896,9 @@ run(function()
         {"Marble", "15342683277"}, {"Metal", "17372377849"},
         {"Sand", "17372377849"}, {"Slate", "17205627296"}
     }
-    local currentSet = "Default"
     local activeMaterials = defaultMaterials
     local texturedParts = {}
+    local descConn = nil   -- stores the DescendantAdded connection
 
     local function applyTexture(part)
         if not part or not part:IsA("BasePart") then return end
@@ -949,16 +949,19 @@ run(function()
         Name = "World Textures",
         Function = function(callback)
             if callback then
+                -- Apply to all existing parts
                 for _, part in ipairs(workspace:GetDescendants()) do
                     applyTexture(part)
                 end
-                local conn = workspace.DescendantAdded:Connect(applyTexture)
-                TexturesModule.Conn = conn
+                -- Listen for new parts
+                descConn = workspace.DescendantAdded:Connect(applyTexture)
             else
-                if TexturesModule.Conn then
-                    TexturesModule.Conn:Disconnect()
-                    TexturesModule.Conn = nil
+                -- Stop listening
+                if descConn then
+                    descConn:Disconnect()
+                    descConn = nil
                 end
+                -- Revert every part that has our attribute
                 for _, part in ipairs(workspace:GetDescendants()) do
                     if part:GetAttribute("MC_Textured") then
                         revertTexture(part)
@@ -1006,9 +1009,6 @@ run(function()
         end
     })
 end)
-
--- SilentAim, Head Pitch Spinbot, HitNotifications, GunMods, AutoPickup, KillAura, AutoArrest, NameChanger
--- (All remaining modules are identical to your last working version, no changes needed)
 
 run(function()
     local SilentAim
