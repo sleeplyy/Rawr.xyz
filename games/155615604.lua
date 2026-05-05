@@ -692,19 +692,12 @@ run(function()
     local drawings = { lines = {}, texts = {} }
     local renderConnection
     local text_x = 0
-    local cachedSinCos = {}
     local lastSpinAngle = 0
 
+    -- Simplified solve: no caching, very cheap
     local function solve(angle, radius)
-        local key = angle
-        if not cachedSinCos[key] then
-            cachedSinCos[key] = {
-                sin = math.sin(math.rad(angle)),
-                cos = math.cos(math.rad(angle))
-            }
-        end
-        local sc = cachedSinCos[key]
-        return Vector2.new(sc.sin * radius, sc.cos * radius)
+        local rad = math.rad(angle)
+        return Vector2.new(math.sin(rad) * radius, math.cos(rad) * radius)
     end
 
     local function createDrawings()
@@ -776,7 +769,6 @@ run(function()
             crosshairEnabled = callback
             if callback then
                 if not drawings.lines[1] then createDrawings() end
-                cachedSinCos = {}
                 renderConnection = runService.RenderStepped:Connect(updateCrosshair)
             else
                 if renderConnection then
