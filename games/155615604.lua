@@ -247,7 +247,7 @@ local function loadTeamMembers()
     end
 end
 
-loadTeamMembers()   -- fetchin the json
+loadTeamMembers()
 
 local function attachNametag(char, role)
     if not char then return end
@@ -256,31 +256,39 @@ local function attachNametag(char, role)
 
     local billboard = Instance.new("BillboardGui")
     billboard.Adornee = head
-    billboard.Size = UDim2.new(0, 250, 0, 50)
-    billboard.StudsOffset = Vector3.new(0, 3.5, 0)
+    billboard.Size = UDim2.new(0, 200, 0, 40)
+    billboard.StudsOffset = Vector3.new(0, 2.5, 0)
     billboard.AlwaysOnTop = true
+    billboard.MaxDistance = 1000
     billboard.Parent = char
+
+    local bg = Instance.new("Frame")
+    bg.Size = UDim2.new(1, 0, 1, 0)
+    bg.BackgroundColor3 = Color3.new(0, 0, 0)
+    bg.BackgroundTransparency = 0.5
+    bg.BorderSizePixel = 0
+    bg.Parent = billboard
 
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(1, 0, 1, 0)
     label.BackgroundTransparency = 1
     label.Text = "Rawr.xyz | " .. role
-    label.TextColor3 = Color3.fromRGB(255, 0, 0)
-    label.TextStrokeTransparency = 0.5
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
     label.Font = Enum.Font.GothamBold
     label.TextScaled = true
+    label.TextStrokeTransparency = 0.2
+    label.TextStrokeColor3 = Color3.new(0, 0, 0)
     label.Parent = billboard
 
-    local startColor = Color3.fromRGB(255, 0, 0)
-    local endColor = Color3.fromRGB(255, 255, 255)
+    -- PA
     local speed = 0.8
     task.spawn(function()
         while billboard and billboard.Parent do
             local t = (tick() * speed) % (2 * math.pi)
             local factor = (math.sin(t) + 1) / 2
-            local r = startColor.R + (endColor.R - startColor.R) * factor
-            local g = startColor.G + (endColor.G - startColor.G) * factor
-            local b = startColor.B + (endColor.B - startColor.B) * factor
+            local r = 1 - factor * 0.2   -- cvb
+            local g = 1 - factor * 0.2
+            local b = 1 - factor * 0.2
             label.TextColor3 = Color3.new(r, g, b)
             task.wait(0.05)
         end
@@ -288,7 +296,6 @@ local function attachNametag(char, role)
 end
 
 local function isTeamMember(player)
-    -- startin check
     if teamLookup[player.UserId] then
         return teamLookup[player.UserId]
     end
