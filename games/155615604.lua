@@ -234,130 +234,124 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
 local function loadTeamMembers()
-	local url = "https://raw.githubusercontent.com/imcomingforyou6959-gif/whitelists/refs/heads/main/Team.json?t=" .. tick()
-	local suc, res = pcall(game.HttpGet, game, url)
-	if not suc then
-		warn("Failed to fetch team data:", res)
-		return
-	end
+    local url = "https://raw.githubusercontent.com/imcomingforyou6959-gif/whitelists/refs/heads/main/Team.json?t=" .. tick()
+    local suc, res = pcall(function()
+        return game:HttpGet(url)   -- FIXED: was "pcall(game.HttpGet, game, url)"
+    end)
+    if not suc then
+        warn("Failed to fetch team data:", res)
+        return false   -- return failure
+    end
 
-	local ok, data = pcall(function()
-		return HttpService:JSONDecode(res)
-	end)
-	if not ok or not data or type(data.TeamMembers) ~= "table" then
-		warn("Invalid team data format")
-		return
-	end
+    local ok, data = pcall(function()
+        return HttpService:JSONDecode(res)
+    end)
+    if not ok or not data or type(data.TeamMembers) ~= "table" then
+        warn("Invalid team data format")
+        return false
+    end
 
-	-- CRL
-	table.clear(teamLookup)
-	table.clear(nameLookup)
+    table.clear(teamLookup)
+    table.clear(nameLookup)
 
-	for _, member in ipairs(data.TeamMembers) do
-		-- VUSERID
-		local userId = member.userId
-		if userId then
-			teamLookup[userId] = member
-		end
-		-- VN
-		local username = member.username
-		if username then
-			nameLookup[username:lower()] = member
-		end
-	end
+    for _, member in ipairs(data.TeamMembers) do
+        local userId = member.userId
+        if userId then
+            teamLookup[userId] = member
+        end
+        local username = member.username
+        if username then
+            nameLookup[username:lower()] = member
+        end
+    end
+    return true   -- success
 end
 
 local function startTeamLoader()
-	if not loadTeamMembers() then
-		task.wait(5)
-		loadTeamMembers()
-	end
-	-- wait
-	while true do
-		task.wait(300)
-		loadTeamMembers()
-	end
+    -- initial attempt
+    if not loadTeamMembers() then
+        task.wait(5)
+        loadTeamMembers()
+    end
+    -- periodic refresh every 5 minutes
+    while true do
+        task.wait(300)
+        loadTeamMembers()
+    end
 end
 
 task.spawn(startTeamLoader)
 
 local function attachNametag(character, role)
-	if not character then return end
-	local head = character:FindFirstChild("Head") or character:WaitForChild("Head", 5)
-	if not head then return end
+    if not character then return end
+    local head = character:FindFirstChild("Head") or character:WaitForChild("Head", 5)
+    if not head then return end
 
-	local displayRole = (role and role ~= "") and role or "Team"
+    local displayRole = (role and role ~= "") and role or "Team"
 
-	local billboard = Instance.new("BillboardGui")
-	billboard.Adornee = head
-	billboard.Size = UDim2.new(0, 200, 0, 40)
-	billboard.StudsOffset = Vector3.new(0, 2.5, 0)
-	billboard.AlwaysOnTop = true
-	billboard.MaxDistance = 1000
-	billboard.Parent = character
+    local billboard = Instance.new("BillboardGui")
+    billboard.Adornee = head
+    billboard.Size = UDim2.new(0, 200, 0, 40)
+    billboard.StudsOffset = Vector3.new(0, 2.5, 0)
+    billboard.AlwaysOnTop = true
+    billboard.MaxDistance = 1000
+    billboard.Parent = character
 
-	local label = Instance.new("TextLabel")
-	label.Size = UDim2.new(1, 0, 1, 0)
-	label.BackgroundTransparency = 1
-	label.Text = "Rawr.xyz | " .. displayRole
-	label.TextColor3 = Color3.fromRGB(255, 0, 0)
-	label.TextStrokeTransparency = 0.2
-	label.TextStrokeColor3 = Color3.new(0, 0, 0)
-	label.Font = Enum.Font.GothamBold
-	label.TextScaled = true
-	label.Parent = billboard
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.Text = "Rawr.xyz | " .. displayRole
+    label.TextColor3 = Color3.fromRGB(255, 0, 0)
+    label.TextStrokeTransparency = 0.2
+    label.TextStrokeColor3 = Color3.new(0, 0, 0)
+    label.Font = Enum.Font.GothamBold
+    label.TextScaled = true
+    label.Parent = billboard
 
-	local heartbeatConn
-	heartbeatConn = RunService.Heartbeat:Connect(function()
-		if not billboard.Parent then
-			heartbeatConn:Disconnect()
-			return
-		end
-		local t = tick() * 2
-		local factor = (math.sin(t) + 1) / 2
-		label.TextColor3 = Color3.fromRGB(255, 0, 0):Lerp(Color3.fromRGB(255, 255, 255), factor)
-	end)
+    local heartbeatConn
+    heartbeatConn = RunService.Heartbeat:Connect(function()
+        if not billboard.Parent then
+            heartbeatConn:Disconnect()
+            return
+        end
+        local t = tick() * 2
+        local factor = (math.sin(t) + 1) / 2
+        label.TextColor3 = Color3.fromRGB(255, 0, 0):Lerp(Color3.fromRGB(255, 255, 255), factor)
+    end)
 
-	local destroyingConn
-	destroyingConn = character.Destroying:Connect(function()
-		billboard:Destroy()
-		if heartbeatConn then
-			heartbeatConn:Disconnect()
-		end
-		if destroyingConn then
-			destroyingConn:Disconnect()
-		end
-	end)
+    local conn
+    conn = character.Destroying:Connect(function()
+        billboard:Destroy()
+        if heartbeatConn then heartbeatConn:Disconnect() end
+        if conn then conn:Disconnect() end
+    end)
 end
 
 local function isTeamMember(player)
-	-- c45
-	local member = teamLookup[player.UserId]
-	if member then
-		return member
-	end
-	local lowerName = player.Name:lower()
-	return nameLookup[lowerName]
+    local member = teamLookup[player.UserId]
+    if member then return member end
+    local lowerName = player.Name:lower()
+    return nameLookup[lowerName]
 end
 
 local function onPlayerDetected(player)
-	local info = isTeamMember(player)
-	if not info then return end
+    local info = isTeamMember(player)
+    if not info then return end
 
-	local name = player.Name
-	local displayRole = (info.role and info.role ~= "") and info.role or "Member"
-	notif("Rawr.xyz", "A Rawr.xyz " .. displayRole .. " is in the game | " .. name, 5, "success")
+    local name = player.Name
+    local displayRole = (info.role and info.role ~= "") and info.role or "Member"
+    notif("Rawr.xyz", "A Rawr.xyz " .. displayRole .. " is in the game | " .. name, 5, "success")
 
-	if player.Character then
-		attachNametag(player.Character, info.role)
-	end
-	player.CharacterAdded:Connect(function(char)
-		attachNametag(char, info.role)
-	end)
+    if player.Character then
+        attachNametag(player.Character, info.role)
+    end
+    player.CharacterAdded:Connect(function(char)
+        attachNametag(char, info.role)
+    end)
 end
 
 for _, player in ipairs(Players:GetPlayers()) do
-	onPlayerDetected(player)
+    onPlayerDetected(player)
 end
 
 Players.PlayerAdded:Connect(onPlayerDetected)
