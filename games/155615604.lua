@@ -1499,7 +1499,7 @@ run(function()
     local defaultFOV = 70
     local stretchConnection = nil
     local vertFOV = defaultFOV
-    local horizScale = 1.0   -- 1.0 = no stretch
+    local horizScale = 1.0
 
     local function applyStretch()
         camera.FieldOfView = vertFOV
@@ -1534,18 +1534,20 @@ run(function()
                 camera.FieldOfView = val
             end
         end,
-        Suffix = "°"
+        Suffix = "°",
+        Tooltip = "Vertical field of view (clamped to 120° by Roblox)"
     })
 
     FOVModule:CreateSlider({
         Name = "Horizontal Scale",
         Min = 50,
-        Max = 150,
+        Max = 120,
         Default = 100,
         Function = function(val)
             horizScale = val / 100
         end,
-        Suffix = "%"
+        Suffix = "%",
+        Tooltip = "Stretches the view horizontally."
     })
 end)
 
