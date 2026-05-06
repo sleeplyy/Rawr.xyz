@@ -1493,6 +1493,61 @@ run(function()
         end
     end
 end)
+                                                                                                                            
+run(function()
+    local camera = workspace.CurrentCamera
+    local defaultFOV = 70
+    local stretchConnection = nil
+    local vertFOV = defaultFOV
+    local horizScale = 1.0   -- 1.0 = no stretch
+
+    local function applyStretch()
+        camera.FieldOfView = vertFOV
+        if horizScale ~= 1.0 then
+            camera.CFrame = camera.CFrame * CFrame.new(0,0,0, 1,0,0, 0, horizScale, 0, 0,0,1)
+        end
+    end
+
+    local FOVModule = vape.Categories.Utility:CreateModule({
+        Name = "Field of View",
+        Function = function(callback)
+            if callback then
+                stretchConnection = runService.RenderStepped:Connect(applyStretch)
+            else
+                if stretchConnection then
+                    stretchConnection:Disconnect()
+                    stretchConnection = nil
+                end
+                camera.FieldOfView = defaultFOV
+            end
+        end
+    })
+
+    FOVModule:CreateSlider({
+        Name = "Vertical Scale",
+        Min = 10,
+        Max = 120,
+        Default = defaultFOV,
+        Function = function(val)
+            vertFOV = val
+            if FOVModule.Enabled then
+                camera.FieldOfView = val
+            end
+        end,
+        Suffix = "°"
+    })
+
+    FOVModule:CreateSlider({
+        Name = "Horizontal Scale",
+        Min = 50,
+        Max = 150,
+        Default = 100,
+        Function = function(val)
+            horizScale = val / 100
+        end,
+        Suffix = "%"
+    })
+end)
 
 run(function()
     local meleeEvent = replicatedStorageService:WaitForChild("meleeEvent")
