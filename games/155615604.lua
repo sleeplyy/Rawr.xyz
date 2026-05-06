@@ -120,7 +120,7 @@ local t = {
     bt = {m = false, q = false, p = Vector3.new()},
     sa = {hooks = {}, toggle = nil},
     hn = {e = false},
-    ka = {}   -- KillAura storage
+    ka = {}
 }
 
 run(function()
@@ -230,10 +230,7 @@ run(function()
         if typeof(args[1]) == "table" then
             if t.sa and t.sa.redirect then
                 t.sa.redirect(args)
-            elseif t.ka and t.ka.redirect then
-                t.ka.redirect(args)
             else
-                -- default hit notifications
                 if t.hn.e then
                     for _, v in ipairs(args[1]) do
                         local part = v[3]
@@ -1241,7 +1238,7 @@ run(function()
         Tooltip = 'Silently adjusts your aim towards the enemy'
     })
 
-    t.sa.redirect = silentAimRedirect   -- assign redirect for central hook
+    t.sa.redirect = silentAimRedirect
 
     Target = SilentAim:CreateTargets({Players = true})
     Mode = SilentAim:CreateDropdown({
@@ -1523,7 +1520,7 @@ run(function()
     local Particles, Boxes = {}, {}
     local AttackDelay = tick()
     local renderStepConnection
-    local attackMode = "Punch"   -- 2
+    local attackMode = "Punch"
 
     local lastShotTime = 0
 
@@ -1768,7 +1765,6 @@ run(function()
         List = {'Punch', 'Shoot'},
         Function = function(val)
             attackMode = val
-            -- If module is on replace
             if Killaura.Enabled then
                 if renderStepConnection then
                     renderStepConnection:Disconnect()
@@ -1876,7 +1872,7 @@ run(function()
     ParticleSize = Killaura:CreateSlider({ Name='Size', Min=0, Max=1, Default=0.2, Decimal=100, Function=function(val) for _,v in pairs(Particles) do v.ParticleEmitter.Size = NumberSequence.new(val) end end, Darker=true, Visible=false })
     Face = Killaura:CreateToggle({ Name='Face target' })
 end)
-                                                                                                                                                                
+
 run(function()
     local ArrestPlayer = remotes:WaitForChild("ArrestPlayer")
     local InteractWithItem = remotes:WaitForChild("InteractWithItem")
@@ -2152,4 +2148,4 @@ run(function()
     })
 end)
 
-print("Hello, V4.9.6")
+print("Hello, V4.9.7")
