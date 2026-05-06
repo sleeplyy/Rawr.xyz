@@ -1999,4 +1999,4 @@ run(function()
     })
 end)
 
-print("Hello, V" .. SCRIPT_VERSION)
+print("Hello, V4.9.6)
