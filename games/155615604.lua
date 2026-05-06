@@ -878,6 +878,129 @@ run(function()
 end)
 
 run(function()
+    local GiverPressed = remotes:WaitForChild("GiverPressed")
+    
+    -- Helper: find a TouchGiver by its ToolName attribute
+    local function findGiver(toolName)
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj.Name == "TouchGiver" and obj:GetAttribute("ToolName") == toolName then
+                return obj
+            end
+        end
+        return nil
+    end
+
+    -- Simple inventory check (works for tools)
+    local function checkInv(v, name)
+        if not entitylib or not entitylib.isAlive then return false end
+        local backpack = lplr and lplr:FindFirstChildOfClass("Backpack")
+        local character = entitylib.character and entitylib.character.Character
+        if not backpack or not character then return false end
+        for _, tool in ipairs(backpack:GetChildren()) do
+            if tool:IsA("Tool") and tool.Name == (name or v.Name) then return true end
+        end
+        for _, tool in ipairs(character:GetChildren()) do
+            if tool:IsA("Tool") and tool.Name == (name or v.Name) then return true end
+        end
+        return false
+    end
+
+    -- Grab a weapon using the same desync + fire loop as AutoPickup
+    local function pickupWeapon(giverObj, toolName)
+        if not entitylib or not entitylib.isAlive then return end
+        if checkInv(giverObj, toolName) then return end   -- already have it
+        local handle = giverObj:FindFirstChildWhichIsA("MeshPart") 
+                    or giverObj:FindFirstChildWhichIsA("BasePart") 
+                    or giverObj.PrimaryPart
+        if handle then
+            local pos = handle.CFrame
+            local target = CFrame.new(pos.X, pos.Y - 5, pos.Z)
+            repeat
+                t.d.s = target
+                safeCall('GiverPressed', function() GiverPressed:FireServer(giverObj) end)
+                task.wait(0.5)
+            until not entitylib or not entitylib.isAlive or checkInv(giverObj, toolName)
+            t.d.s = CFrame.new()
+        end
+    end
+
+    -- Grab a clothing item (just fire the remote a few times)
+    local function pickupClothing(itemPart)
+        if not entitylib or not entitylib.isAlive then return end
+        local handle = itemPart:IsA("BasePart") and itemPart or itemPart:FindFirstChildWhichIsA("BasePart")
+        if handle then
+            local pos = handle.CFrame
+            local target = CFrame.new(pos.X, pos.Y - 5, pos.Z)
+            for _ = 1, 3 do   -- try 3 times
+                if not entitylib or not entitylib.isAlive then break end
+                t.d.s = target
+                safeCall('GiverPressed', function() GiverPressed:FireServer(itemPart) end)
+                task.wait(0.5)
+            end
+            t.d.s = CFrame.new()
+        end
+    end
+
+    local presets = {
+        Swat = {
+            clothing = {
+                workspace:WaitForChild("Prison_ITEMS", 5) and workspace.Prison_ITEMS:WaitForChild("giver", 5) and workspace.Prison_ITEMS.giver:FindFirstChild("Riot Shield") and workspace.Prison_ITEMS.giver["Riot Shield"]:FindFirstChild("ITEMPICKUP"),
+                workspace:WaitForChild("Prison_ITEMS", 5) and workspace.Prison_ITEMS:WaitForChild("clothes", 5) and workspace.Prison_ITEMS.clothes:FindFirstChild("Riot Police") and workspace.Prison_ITEMS.clothes["Riot Police"]:FindFirstChild("Torso")
+            },
+            weapons = {"M4A1"}
+        },
+        Criminal = {
+            clothing = {
+                workspace:WaitForChild("Prison_ITEMS", 5) and workspace.Prison_ITEMS:WaitForChild("clothes", 5) and workspace.Prison_ITEMS.clothes:FindFirstChild("Mafia") and workspace.Prison_ITEMS.clothes.Mafia:FindFirstChild("ITEMPICKUP"),
+                workspace:WaitForChild("Prison_ITEMS", 5) and workspace.Prison_ITEMS:WaitForChild("clothes", 5) and workspace.Prison_ITEMS.clothes:GetChildren()[4] and workspace.Prison_ITEMS.clothes:GetChildren()[4]:FindFirstChild("vest")
+            },
+            weapons = {"M700", "Revolver"}
+        }
+    }
+
+    local LoadoutModule = vape.Categories.Utility:CreateModule({
+        Name = "Loadout",
+        Function = function(callback) end
+    })
+
+    local selectedPreset = "Swat"
+    LoadoutModule:CreateDropdown({
+        Name = "Preset",
+        List = {"Swat", "Criminal"},
+        Function = function(val) selectedPreset = val end
+    })
+
+    LoadoutModule:CreateButton({
+        Name = "Apply Loadout",
+        Function = function()
+            if not entitylib or not entitylib.isAlive then
+                notif('Rawr.xyz', 'Must be alive to apply loadout', 3, 'alert')
+                return
+            end
+            local preset = presets[selectedPreset]
+            if not preset then return end
+
+            for _, cloth in ipairs(preset.clothing) do
+                if cloth and cloth.Parent then
+                    pickupClothing(cloth)
+                    task.wait(0.2)
+                end
+            end
+
+            for _, weapName in ipairs(preset.weapons) do
+                local giver = findGiver(weapName)
+                if giver then
+                    pickupWeapon(giver, weapName)
+                    task.wait(0.2)
+                end
+            end
+
+            notif('Rawr.xyz', selectedPreset .. ' loadout applied!', 2, 'success')
+        end
+    })
+end)
+
+run(function()
     local faces = {"Front", "Back", "Bottom", "Top", "Right", "Left"}
     local defaultMaterials = {
         {"Wood", "3258599312"}, {"WoodPlanks", "8676581022"},
