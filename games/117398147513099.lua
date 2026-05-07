@@ -20,7 +20,6 @@ local runService = cloneref(game:GetService('RunService'))
 local inputService = cloneref(game:GetService('UserInputService'))
 local coreGui = cloneref(game:GetService('CoreGui'))
 local guiService = cloneref(game:GetService('GuiService'))
-local replicatedStorage = cloneref(game:GetService('ReplicatedStorage'))
 
 local gameCamera = workspace.CurrentCamera
 local lplr = playersService.LocalPlayer
@@ -70,143 +69,179 @@ end
 for _, v in {'SilentAim', 'Reach', 'AntiFall', 'Killaura', 'AntiRagdoll', 'Blink',
     'Disabler', 'SafeWalk', 'MurderMystery', 'TriggerBot'} do vape:Remove(v) end
 
-local t = { sa = { redirect = nil } }
+local t = { sa = { target = nil, enabled = false } }
 
--- ============== SILENT AIM (bullets only, no camera lock) ==============
+-- ============== SILENT AIM (camera lock + auto-click) ==============
 run(function()
     local SilentAim
-    local Target, Mode, Range, HitChance, HeadshotChance
+    local AimPart, Smoothness, ClickInterval
     local CircleColor, CircleTransparency, CircleFilled, CircleObject
-    local filterTeamSA, TeamFilterSA
+    local renderConnection, autoClickConnection = nil, nil
+    local isLeftDown, isRightDown = false, false
+    local lastClickTime = 0
+    local aimPart = "Head"
+    local smoothness = 1   -- 1 = instant, 0.1 = slow
+    local clickInterval = 0.10
     local rand = Random.new()
-    local delayCheck = tick()
 
-    -- find shoot remote
-    local shootRemote = nil
-    local function findShootRemote()
-        local gunRemotes = replicatedStorage:FindFirstChild("GunRemotes")
-        if gunRemotes then
-            return gunRemotes:FindFirstChild("ShootEvent")
-        end
-        for _, obj in ipairs(replicatedStorage:GetDescendants()) do
-            if obj:IsA("RemoteEvent") and string.find(obj.Name:lower(), "shoot") then
-                return obj
-            end
-        end
-        return nil
-    end
-    shootRemote = findShootRemote()
-    if not shootRemote then
-        notif('Rawr.xyz', 'Could not find Shoot remote. Silent Aim may not work.', 5, 'alert')
-    end
-
-    local function passesTeamCheck(player)
-        if not filterTeamSA then return true end
-        return player and player.Team == filterTeamSA
-    end
-
-    local function getTarget(origin)
-        local chance = HitChance and HitChance.Value or 100
-        if not rand or rand.NextNumber(rand, 0, 100) > chance then return end
-        local headshotChance = HeadshotChance and HeadshotChance.Value or 100
-        local targetPart = (rand.NextNumber(rand, 0, 100) < headshotChance) and 'Head' or 'RootPart'
-        local ent = entitylib['Entity' .. (Mode and Mode.Value or 'Mouse')]({
-            Range = Range and Range.Value or 200,
-            Wallcheck = Target and Target.Walls and Target.Walls.Enabled or nil,
-            Part = targetPart,
-            Origin = origin,
-            Players = Target and Target.Players and Target.Players.Enabled,
-            NPCs = Target and Target.NPCs and Target.NPCs.Enabled
-        })
-        if ent and targetinfo then targetinfo.Targets[ent] = tick() + 1 end
-        if ent and ent.Player and not passesTeamCheck(ent.Player) then
-            return nil
-        end
-        return ent, ent and ent[targetPart], origin
-    end
-
-    local function silentAimRedirect(args)
-        if not entitylib or not entitylib.isAlive then return end
-        local head = entitylib.character and entitylib.character.Head
-        if not head then return end
-        local origin = head.Position
-        local ent, targetPart = getTarget(origin)
-        if not ent or not targetPart or typeof(args[1]) ~= "table" then return end
-
-        local originalHits = args[1]
-        local count = math.clamp(#originalHits, 1, 20)
-        if SilentAim and SilentAim.Enabled then
-            local newHits = table.create(count)
-            for i = 1, count do
-                newHits[i] = {origin, targetPart.Position, targetPart}
-            end
-            args[1] = newHits
-        end
-    end
-
-    -- Hook the remote
-    if shootRemote then
-        local oldNamecall
-        oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
-            local method = getnamecallmethod()
-            if method == "FireServer" and self == shootRemote and not checkcaller() then
-                local args = {...}
-                if typeof(args[1]) == "table" and t.sa.redirect then
-                    t.sa.redirect(args)
+    local function isLobbyVisible()
+        local mainGui = lplr.PlayerGui:FindFirstChild("MainGui")
+        if mainGui then
+            local mainFrame = mainGui:FindFirstChild("MainFrame")
+            if mainFrame then
+                local lobby = mainFrame:FindFirstChild("Lobby")
+                if lobby then
+                    local currency = lobby:FindFirstChild("Currency")
+                    return currency and currency.Visible == true
                 end
-                return oldNamecall(self, unpack(args))
             end
-            return oldNamecall(self, ...)
-        end))
-        vape:Clean(function() hookmetamethod(game, "__namecall", oldNamecall) end)
+        end
+        return false
     end
+
+    local function getClosestPlayerToMouse()
+        local closest = nil
+        local shortest = math.huge
+        local mousePos = inputService:GetMouseLocation()
+        for _, player in ipairs(playersService:GetPlayers()) do
+            if player ~= lplr and player.Character and player.Character:FindFirstChild("Head") then
+                local head = player.Character.Head
+                local screenPos, onScreen = gameCamera:WorldToViewportPoint(head.Position)
+                if onScreen then
+                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                    if dist < shortest then
+                        closest = player
+                        shortest = dist
+                    end
+                end
+            end
+        end
+        return closest
+    end
+
+    local function getAimPart(player, partName)
+        if not player or not player.Character then return nil end
+        if partName == "Head" then
+            return player.Character:FindFirstChild("Head")
+        elseif partName == "Body" then
+            return player.Character:FindFirstChild("HumanoidRootPart") or player.Character:FindFirstChild("Torso")
+        elseif partName == "Random" then
+            local parts = {}
+            local h = player.Character:FindFirstChild("Head")
+            local r = player.Character:FindFirstChild("HumanoidRootPart") or player.Character:FindFirstChild("Torso")
+            if h then table.insert(parts, h) end
+            if r then table.insert(parts, r) end
+            if #parts > 0 then return parts[rand.NextInteger(rand, 1, #parts)] end
+        end
+        return player.Character:FindFirstChild("Head")
+    end
+
+    local function lockCameraToTarget()
+        local target = t.sa.target
+        if target and target.Character then
+            local part = getAimPart(target, aimPart)
+            if part then
+                local targetPos = part.Position
+                local camPos = gameCamera.CFrame.Position
+                local goalCF = CFrame.new(camPos, targetPos)
+                if smoothness >= 0.99 then
+                    gameCamera.CFrame = goalCF
+                else
+                    gameCamera.CFrame = gameCamera.CFrame:Lerp(goalCF, smoothness)
+                end
+            end
+        end
+    end
+
+    local function startAutoClick()
+        if autoClickConnection then autoClickConnection:Disconnect() end
+        autoClickConnection = runService.Heartbeat:Connect(function()
+            if (isLeftDown or isRightDown) and (tick() - lastClickTime >= clickInterval) then
+                if not isLobbyVisible() and canClick() then
+                    mouse1click()
+                    lastClickTime = tick()
+                end
+            end
+        end)
+    end
+
+    local function stopAutoClick()
+        if autoClickConnection then
+            autoClickConnection:Disconnect()
+            autoClickConnection = nil
+        end
+    end
+
+    -- Track mouse buttons
+    inputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            isLeftDown = true
+            if SilentAim and SilentAim.Enabled then startAutoClick() end
+        elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+            isRightDown = true
+            if SilentAim and SilentAim.Enabled then startAutoClick() end
+        end
+    end)
+    inputService.InputEnded:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            isLeftDown = false
+        elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+            isRightDown = false
+        end
+        if not isLeftDown and not isRightDown then
+            stopAutoClick()
+        end
+    end)
 
     SilentAim = vape.Categories.Combat:CreateModule({
-        Name = 'SilentAim',
+        Name = 'Silent Aim',
         Function = function(callback)
             if callback then
-                t.sa.redirect = silentAimRedirect
+                renderConnection = runService.RenderStepped:Connect(function()
+                    if not isLobbyVisible() then
+                        t.sa.target = getClosestPlayerToMouse()
+                        if t.sa.target then
+                            lockCameraToTarget()
+                        end
+                    end
+                end)
             else
-                t.sa.redirect = nil
+                if renderConnection then
+                    renderConnection:Disconnect()
+                    renderConnection = nil
+                end
+                stopAutoClick()
+                t.sa.target = nil
             end
         end,
-        Tooltip = 'Redirects bullets to the closest enemy without moving your camera.'
+        Tooltip = 'Locks camera to the closest enemy. Hold Mouse1/Mouse2 to fire.'
     })
 
-    Target = SilentAim:CreateTargets({Players = true})
-    Mode = SilentAim:CreateDropdown({
-        Name = 'Mode',
-        List = {'Mouse', 'Position'},
-        Default = 'Mouse',
-        Function = function(val) end,
-        Tooltip = 'Mouse - target near cursor, Position - target near player'
+    AimPart = SilentAim:CreateDropdown({
+        Name = 'Aim Part',
+        List = {'Head', 'Body', 'Random'},
+        Default = 'Head',
+        Function = function(val) aimPart = val end,
+        Tooltip = 'Part of the body to lock onto'
     })
-    Range = SilentAim:CreateSlider({
-        Name = 'Range', Min = 1, Max = 1000, Default = 200,
-        Suffix = function(val) return val == 1 and 'stud' or 'studs' end
+    Smoothness = SilentAim:CreateSlider({
+        Name = 'Smoothness',
+        Min = 1, Max = 100, Default = 100,
+        Function = function(val) smoothness = val / 100 end,
+        Suffix = '%',
+        Tooltip = '100 = instant, lower = smoother'
     })
-    HitChance = SilentAim:CreateSlider({
-        Name = 'Hit Chance', Min = 0, Max = 100, Default = 100,
-        Suffix = '%', Tooltip = 'Chance to hit the target'
+    ClickInterval = SilentAim:CreateSlider({
+        Name = 'Click Interval',
+        Min = 1, Max = 50, Default = 10,
+        Function = function(val) clickInterval = val / 100 end,
+        Suffix = 'ms',
+        Tooltip = 'Time between auto-clicks'
     })
-    HeadshotChance = SilentAim:CreateSlider({
-        Name = 'Headshot Chance', Min = 0, Max = 100, Default = 100,
-        Suffix = '%', Tooltip = 'Chance to aim for the head'
-    })
-    TeamFilterSA = SilentAim:CreateDropdown({
-        Name = 'Team Filter',
-        List = {'All', 'Criminals', 'Inmates', 'Guards', 'Neutral'},
-        Function = function(val)
-            local teams = game:GetService("Teams")
-            if val == 'Criminals' then filterTeamSA = teams:FindFirstChild("Criminals") or "Criminals"
-            elseif val == 'Inmates' then filterTeamSA = teams:FindFirstChild("Inmates") or "Inmates"
-            elseif val == 'Guards' then filterTeamSA = teams:FindFirstChild("Guards") or "Guards"
-            elseif val == 'Neutral' then filterTeamSA = teams:FindFirstChild("Neutral") or "Neutral"
-            else filterTeamSA = nil end
-        end,
-        Tooltip = 'Only target players on the selected team'
-    })
-    -- Range circle sub‑options
+
+    -- Circle sub-options
     CircleColor = SilentAim:CreateColorSlider({
         Name = 'Circle Color', Darker = true, Visible = false,
         Function = function(h,s,v) if CircleObject then CircleObject.Color = Color3.fromHSV(h,s,v) end end
@@ -220,14 +255,6 @@ run(function()
         Name = 'Circle Filled', Darker = true, Visible = false,
         Function = function(callback) if CircleObject then CircleObject.Filled = callback end end
     })
-    SilentAim:CreateSlider({
-        Name = 'Circle Spin Speed', Min = 0, Max = 360, Default = 0,
-        Darker = true, Visible = false,
-        Function = function(val)
-            if CircleObject then CircleObject.Radius = val end
-        end,
-        Suffix = '°/s'
-    })
     SilentAim:CreateToggle({
         Name = 'Range Circle',
         Function = function(callback)
@@ -236,7 +263,7 @@ run(function()
                 CircleObject.Filled = CircleFilled and CircleFilled.Enabled
                 CircleObject.Color = Color3.fromHSV(CircleColor and CircleColor.Hue or 0, CircleColor and CircleColor.Sat or 1, CircleColor and CircleColor.Value or 1)
                 CircleObject.Position = vape.gui.AbsoluteSize / 2
-                CircleObject.Radius = Range and Range.Value or 200
+                CircleObject.Radius = 150
                 CircleObject.NumSides = 100
                 CircleObject.Transparency = 1 - (CircleTransparency and CircleTransparency.Value or 0.5)
                 CircleObject.Visible = SilentAim.Enabled
@@ -259,7 +286,6 @@ run(function()
     local crosshairLength = 10
     local crosshairRadius = 11
     local crosshairWidth = 1.5
-    local crosshairStyle = "Cross"
     local dotSize = 0
     local outlineEnabled = false
     local outlineColor = Color3.new(0,0,0)
@@ -289,14 +315,13 @@ run(function()
         drawings.dot.Visible = crosshairEnabled and dotSize > 0
 
         if crosshairEnabled then
-            -- texts
+            if text_x == 0 then text_x = drawings.texts[1].TextBounds.X + drawings.texts[2].TextBounds.X end
             drawings.texts[1].Position = pos + Vector2.new(-text_x/2, crosshairRadius+crosshairLength+15)
             drawings.texts[2].Position = drawings.texts[1].Position + Vector2.new(drawings.texts[1].TextBounds.X, 0)
             drawings.texts[2].Color = crosshairColor
 
             if crosshairSpin then lastSpinAngle = (tick()*360) % 360 end
 
-            -- dot
             if dotSize > 0 then
                 drawings.dot.Position = pos
                 drawings.dot.Radius = dotSize
@@ -305,7 +330,6 @@ run(function()
                 drawings.dot.Transparency = 0
             end
 
-            -- lines
             for idx = 1, 4 do
                 local inline = drawings.lines[idx+4]
                 local outline = drawings.outlines[idx]
@@ -370,7 +394,6 @@ run(function()
     local origFogStart = Lighting.FogStart
     local origGlobalShadows = Lighting.GlobalShadows
     local origOutdoorAmbient = Lighting.OutdoorAmbient
-
     vape.Categories.World:CreateModule({
         Name = "Fullbright",
         Function = function(callback)
@@ -396,17 +419,14 @@ end)
 -- ============== NO FOG ==============
 run(function()
     local Lighting = game:GetService("Lighting")
-    local origFogEnd = Lighting.FogEnd
-    local origFogStart = Lighting.FogStart
+    local origFogEnd = Lighting.FogEnd; local origFogStart = Lighting.FogStart
     vape.Categories.World:CreateModule({
         Name = "No Fog",
         Function = function(callback)
             if callback then
-                Lighting.FogEnd = 100000
-                Lighting.FogStart = 100000
+                Lighting.FogEnd = 100000; Lighting.FogStart = 100000
             else
-                Lighting.FogEnd = origFogEnd
-                Lighting.FogStart = origFogStart
+                Lighting.FogEnd = origFogEnd; Lighting.FogStart = origFogStart
             end
         end
     })
