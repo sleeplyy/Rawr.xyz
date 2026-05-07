@@ -1,5 +1,3 @@
---This watermark is used to delete the file if its cached, remove it to make the file persist after vape updates.
-
 -- FB
 if not mouse1click then mouse1click = function() return false end end
 if not isrbxactive then isrbxactive = function() return true end end
@@ -71,7 +69,6 @@ for _, v in {'SilentAim', 'Reach', 'AntiFall', 'Killaura', 'AntiRagdoll', 'Blink
 
 local t = { sa = { target = nil, enabled = false } }
 
--- ============== SILENT AIM (camera lock + auto-click) ==============
 run(function()
     local SilentAim
     local AimPart, Smoothness, ClickInterval
@@ -80,7 +77,7 @@ run(function()
     local isLeftDown, isRightDown = false, false
     local lastClickTime = 0
     local aimPart = "Head"
-    local smoothness = 1   -- 1 = instant, 0.1 = slow
+    local smoothness = 1
     local clickInterval = 0.10
     local rand = Random.new()
 
@@ -172,7 +169,6 @@ run(function()
         end
     end
 
-    -- Track mouse buttons
     inputService.InputBegan:Connect(function(input, gameProcessed)
         if gameProcessed then return end
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -432,7 +428,6 @@ run(function()
     })
 end)
 
--- ============== FOV CHANGER ==============
 run(function()
     local camera = workspace.CurrentCamera
     local defaultFOV = 70
@@ -463,7 +458,6 @@ run(function()
     FovModule:CreateSlider({Name="Horizontal Scale", Min=50, Max=150, Default=100, Function=function(v) horizScale=v/100 end, Suffix="%", Tooltip="Stretches view horizontally"})
 end)
 
--- ============== SPEED (WalkSpeed + CFrame Boost) ==============
 run(function()
     local SpeedModule = vape.Categories.Utility:CreateModule({
         Name = "Speed",
