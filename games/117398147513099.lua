@@ -1,3 +1,5 @@
+--This watermark is used to delete the file if its cached, remove it to make the file persist after vape updates.
+
 -- FB
 if not mouse1click then mouse1click = function() return false end end
 if not isrbxactive then isrbxactive = function() return true end end
@@ -71,11 +73,11 @@ local t = { sa = { target = nil, enabled = false } }
 
 run(function()
     local SilentAim
-    local AimPart, Smoothness, ClickInterval
+    local AimPart, Smoothness, ClickInterval, ShowTarget
     local CircleColor, CircleTransparency, CircleFilled, CircleObject
     local renderConnection, autoClickConnection = nil, nil
-    local isLeftDown, isRightDown = false, false
-    local lastClickTime = 0
+    local isRightDown = false
+    local lastRightClick = 0
     local aimPart = "Head"
     local smoothness = 1
     local clickInterval = 0.10
@@ -118,10 +120,8 @@ run(function()
 
     local function getAimPart(player, partName)
         if not player or not player.Character then return nil end
-        if partName == "Head" then
-            return player.Character:FindFirstChild("Head")
-        elseif partName == "Body" then
-            return player.Character:FindFirstChild("HumanoidRootPart") or player.Character:FindFirstChild("Torso")
+        if partName == "Head" then return player.Character:FindFirstChild("Head")
+        elseif partName == "Body" then return player.Character:FindFirstChild("HumanoidRootPart") or player.Character:FindFirstChild("Torso")
         elseif partName == "Random" then
             local parts = {}
             local h = player.Character:FindFirstChild("Head")
@@ -138,9 +138,7 @@ run(function()
         if target and target.Character then
             local part = getAimPart(target, aimPart)
             if part then
-                local targetPos = part.Position
-                local camPos = gameCamera.CFrame.Position
-                local goalCF = CFrame.new(camPos, targetPos)
+                local goalCF = CFrame.new(gameCamera.CFrame.Position, part.Position)
                 if smoothness >= 0.99 then
                     gameCamera.CFrame = goalCF
                 else
@@ -150,19 +148,19 @@ run(function()
         end
     end
 
-    local function startAutoClick()
+    local function startRightAutoClick()
         if autoClickConnection then autoClickConnection:Disconnect() end
         autoClickConnection = runService.Heartbeat:Connect(function()
-            if (isLeftDown or isRightDown) and (tick() - lastClickTime >= clickInterval) then
+            if isRightDown and (tick() - lastRightClick >= clickInterval) then
                 if not isLobbyVisible() and canClick() then
                     mouse1click()
-                    lastClickTime = tick()
+                    lastRightClick = tick()
                 end
             end
         end)
     end
 
-    local function stopAutoClick()
+    local function stopRightAutoClick()
         if autoClickConnection then
             autoClickConnection:Disconnect()
             autoClickConnection = nil
@@ -172,22 +170,24 @@ run(function()
     inputService.InputBegan:Connect(function(input, gameProcessed)
         if gameProcessed then return end
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            isLeftDown = true
-            if SilentAim and SilentAim.Enabled then startAutoClick() end
+            -- Single shot
+            if SilentAim and SilentAim.Enabled and not isLobbyVisible() and canClick() then
+                mouse1click()
+            end
         elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
-            isRightDown = true
-            if SilentAim and SilentAim.Enabled then startAutoClick() end
+            if not isRightDown then
+                isRightDown = true
+                if SilentAim and SilentAim.Enabled then
+                    startRightAutoClick()
+                end
+            end
         end
     end)
     inputService.InputEnded:Connect(function(input, gameProcessed)
         if gameProcessed then return end
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            isLeftDown = false
-        elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+        if input.UserInputType == Enum.UserInputType.MouseButton2 then
             isRightDown = false
-        end
-        if not isLeftDown and not isRightDown then
-            stopAutoClick()
+            stopRightAutoClick()
         end
     end)
 
@@ -200,6 +200,9 @@ run(function()
                         t.sa.target = getClosestPlayerToMouse()
                         if t.sa.target then
                             lockCameraToTarget()
+                            if ShowTarget and ShowTarget.Enabled and targetinfo then
+                                targetinfo.Targets[t.sa.target] = tick() + 1
+                            end
                         end
                     end
                 end)
@@ -208,11 +211,11 @@ run(function()
                     renderConnection:Disconnect()
                     renderConnection = nil
                 end
-                stopAutoClick()
+                stopRightAutoClick()
                 t.sa.target = nil
             end
         end,
-        Tooltip = 'Locks camera to the closest enemy. Hold Mouse1/Mouse2 to fire.'
+        Tooltip = 'Left‑click = single bullet, Right‑click = full‑auto. Locks camera on closest enemy.'
     })
 
     AimPart = SilentAim:CreateDropdown({
@@ -227,17 +230,21 @@ run(function()
         Min = 1, Max = 100, Default = 100,
         Function = function(val) smoothness = val / 100 end,
         Suffix = '%',
-        Tooltip = '100 = instant, lower = smoother'
+        Tooltip = '100 = instant, lower = smoother lock'
     })
     ClickInterval = SilentAim:CreateSlider({
         Name = 'Click Interval',
         Min = 1, Max = 50, Default = 10,
         Function = function(val) clickInterval = val / 100 end,
         Suffix = 'ms',
-        Tooltip = 'Time between auto-clicks'
+        Tooltip = 'Time between auto‑clicks (right‑click hold)'
+    })
+    ShowTarget = SilentAim:CreateToggle({
+        Name = 'Show Target Info',
+        Default = true,
+        Tooltip = 'Display detection box on the locked player'
     })
 
-    -- Circle sub-options
     CircleColor = SilentAim:CreateColorSlider({
         Name = 'Circle Color', Darker = true, Visible = false,
         Function = function(h,s,v) if CircleObject then CircleObject.Color = Color3.fromHSV(h,s,v) end end
@@ -274,7 +281,6 @@ run(function()
     })
 end)
 
--- ============== CROSSHAIR ==============
 run(function()
     local crosshairEnabled = false
     local crosshairColor = Color3.fromRGB(128,128,128)
@@ -381,7 +387,6 @@ run(function()
     CrosshairModule:CreateSlider({Name="Outline Thickness", Min=0,Max=3,Default=0.5,Decimal=10, Visible=false, Function=function(v) outlineThickness=v end, Suffix="px"})
 end)
 
--- ============== FULLBRIGHT ==============
 run(function()
     local Lighting = game:GetService("Lighting")
     local origBrightness = Lighting.Brightness
@@ -412,7 +417,6 @@ run(function()
     })
 end)
 
--- ============== NO FOG ==============
 run(function()
     local Lighting = game:GetService("Lighting")
     local origFogEnd = Lighting.FogEnd; local origFogStart = Lighting.FogStart
@@ -485,32 +489,33 @@ run(function()
     local cframeEnabled = false
     local cframeMultiplier = 2
     local cframeConnection
-
-    local function cframeBoost()
-        if not cframeEnabled then return end
-        if entitylib and entitylib.isAlive and entitylib.character and entitylib.character.RootPart then
-            local root = entitylib.character.RootPart
-            local moveDir = root.CFrame.LookVector * cframeMultiplier * 0.1
-            root.CFrame = root.CFrame + moveDir
-        end
-    end
+    local cframeSpeedSlider
 
     SpeedModule:CreateToggle({
         Name = "CFrame Speed",
         Default = false,
         Function = function(callback)
             cframeEnabled = callback
+            if cframeSpeedSlider then
+                cframeSpeedSlider.Object.Visible = callback
+            end
             if callback then
-                cframeConnection = runService.Heartbeat:Connect(cframeBoost)
+                cframeConnection = runService.Heartbeat:Connect(function()
+                    if entitylib and entitylib.isAlive and entitylib.character and entitylib.character.RootPart then
+                        local root = entitylib.character.RootPart
+                        local moveDir = root.CFrame.LookVector * cframeMultiplier * 0.1
+                        root.CFrame = root.CFrame + moveDir
+                    end
+                end)
             else
                 if cframeConnection then cframeConnection:Disconnect(); cframeConnection = nil end
             end
         end
     })
 
-    SpeedModule:CreateSlider({
+    cframeSpeedSlider = SpeedModule:CreateSlider({
         Name = "CFrame Multiplier", Min = 1, Max = 10, Default = 2,
-        Darker = true,
+        Darker = true, Visible = false,
         Function = function(v) cframeMultiplier = v end,
         Suffix = "x"
     })
@@ -518,4 +523,4 @@ end)
 
 entitylib.start()
 
-print("Rawr.xyz V4.1.3")
+print("Rivals V4.1.4")
