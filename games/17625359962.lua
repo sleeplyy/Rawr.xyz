@@ -71,6 +71,7 @@ end
 for _, v in {'SilentAim', 'Reach', 'AntiFall', 'Killaura', 'AntiRagdoll', 'Blink',
     'Disabler', 'SafeWalk', 'MurderMystery', 'TriggerBot'} do vape:Remove(v) end
 
+-- Team logic
 local function chid_to_id(chid)
     return string.byte(chid or string.char(0))
 end
@@ -122,6 +123,7 @@ local function isLobbyVisible()
     return false
 end
 
+-- Silent Aim
 local targetPlayer = nil
 local isLeftMouseDown, isRightMouseDown = false, false
 local autoClickConnection = nil
@@ -250,6 +252,7 @@ run(function()
     end})
 end)
 
+-- Crosshair
 local crosshairEnabled = false
 local crosshairColor = Color3.fromRGB(128,128,128)
 local crosshairStyle = "Cross"
@@ -357,6 +360,7 @@ CrosshairModule:CreateToggle({Name="Outline", Default=false, Function=function(v
 CrosshairModule:CreateColorSlider({Name="Outline Color", Visible=false, Function=function(h,s,v) outlineColor=Color3.fromHSV(h,s,v) end})
 CrosshairModule:CreateSlider({Name="Outline Thickness", Min=0,Max=3,Default=0.5,Decimal=10, Visible=false, Function=function(v) outlineThickness=v end, Suffix="px"})
 
+-- Hitsound
 run(function()
     local assetSounds = {
         {name="Bameware", id="rbxassetid://3124331820"},{name="Bell", id="rbxassetid://6534947240"},
@@ -376,7 +380,10 @@ run(function()
     local function applySoundReplacement()
         if hitConnection then hitConnection:Disconnect() end
         if not hitsoundEnabled then return end
-        local viewModel = lplr.PlayerScripts.Modules.ClientReplicatedClasses.ClientFighter.ClientItem:WaitForChild("ClientViewModel", 5)
+        local viewModel = nil
+        pcall(function()
+            viewModel = lplr.PlayerScripts.Modules.ClientReplicatedClasses.ClientFighter.ClientItem:WaitForChild("ClientViewModel", 5)
+        end)
         if viewModel then
             hitConnection = viewModel.ChildAdded:Connect(function(v)
                 if v:IsA("Sound") and v.SoundId ~= currentSoundId then v.SoundId = currentSoundId; v.Pitch = 1; v.Volume = 1 end
@@ -397,6 +404,7 @@ run(function()
     end})
 end)
 
+-- Fullbright
 run(function()
     local Lighting = game:GetService("Lighting")
     local origBrightness, origClockTime, origFogEnd, origFogStart, origGlobalShadows, origOutdoorAmbient =
@@ -415,6 +423,7 @@ run(function()
     })
 end)
 
+-- No Fog
 run(function()
     local Lighting = game:GetService("Lighting")
     local origFogEnd, origFogStart = Lighting.FogEnd, Lighting.FogStart
@@ -427,6 +436,7 @@ run(function()
     })
 end)
 
+-- FOV Changer
 run(function()
     local camera = workspace.CurrentCamera
     local defaultVert = 70; local defaultHoriz = 100
@@ -459,6 +469,7 @@ run(function()
     end})
 end)
 
+-- Ragebot (Safe, physics-based strafe)
 run(function()
     local RagebotModule = vape.Categories.Blatant:CreateModule({
         Name = "Ragebot",
@@ -466,93 +477,108 @@ run(function()
             if callback then
                 strafeConnection = runService.Heartbeat:Connect(function()
                     if not entitylib.isAlive then return end
+                    
                     local target = getClosestPlayerToMouse()
-                    if not target or not target.Character or not target.Character:FindFirstChild("Head") then return end
-                    local targetHead = target.Character.Head.Position
+                    if not target or not target.Character then return end
+                    
+                    local targetHead = target.Character:FindFirstChild("Head")
                     local root = entitylib.character.RootPart
-                    if not root then return end
-
-                    local strafeAngle = (tick() * strafeSpeed) % (math.pi * 2)
-
-                    if randomStrafeEnabled then
-                        if tick() - lastRandomStrafe > randomStrafeDelay then
-                            strafeDir = math.random() > 0.5 and 1 or -1
-                            lastRandomStrafe = tick()
-                        end
-                        strafeAngle = strafeAngle * strafeDir
+                    local humanoid = entitylib.character:FindFirstChildOfClass("Humanoid")
+                    
+                    if not (root and humanoid and targetHead) then return end
+                    
+                    -- Calculate strafe angle with randomness
+                    local currentTime = tick()
+                    local baseAngle = (currentTime * strafeSpeed) % (math.pi * 2)
+                    local randomOffset = 0
+                    if math.random() < 0.03 then
+                        randomOffset = (math.random() - 0.5) * 0.5
                     end
-
+                    local strafeAngle = baseAngle + randomOffset
+                    
+                    -- Occasional pause
+                    if math.random() < 0.02 and shouldPause then return end
+                    
+                    -- Move using physics-safe call
                     if strafeMethod == "Target" then
-                        local dirToTarget = (targetHead - root.Position).Unit
-                        local perp = Vector3.new(-dirToTarget.Z, 0, dirToTarget.X)
-                        local offset = perp * strafeDistance
-                        local newPos = targetHead + offset
-                        root.CFrame = CFrame.new(newPos, targetHead + Vector3.new(0, jumpOffset, 0)) * CFrame.Angles(math.rad(rotX), math.rad(rotY), math.rad(rotZ))
+                        local dirToTarget = (targetHead.Position - root.Position)
+                        if dirToTarget.Magnitude == 0 then return end
+                        local dirUnit = dirToTarget.Unit
+                        local perpDir = Vector3.new(-dirUnit.Z, 0, dirUnit.X)
+                        local moveDir = perpDir * math.cos(strafeAngle)
+                        humanoid:MoveTo(root.Position + moveDir * strafeDistance)
                     else
-                        local offset = Vector3.new(math.cos(strafeAngle) * strafeDistance, jumpOffset, math.sin(strafeAngle) * strafeDistance)
-                        local newPos = targetHead + offset
-                        root.CFrame = CFrame.new(newPos, targetHead) * CFrame.Angles(math.rad(rotX), math.rad(rotY), math.rad(rotZ))
+                        local offset = Vector3.new(
+                            math.cos(strafeAngle) * strafeDistance,
+                            0,
+                            math.sin(strafeAngle) * strafeDistance
+                        )
+                        humanoid:MoveTo(targetHead.Position + offset)
                     end
-
-                    gameCamera.CFrame = CFrame.new(gameCamera.CFrame.Position, targetHead + Vector3.new(0, aimOffset, 0))
+                    
+                    -- Camera aim (client-side)
+                    if cameraAimEnabled then
+                        local aimTarget = targetHead.Position + Vector3.new(0, aimOffset, 0)
+                        gameCamera.CFrame = CFrame.new(gameCamera.CFrame.Position, aimTarget)
+                    end
                 end)
             else
-                if strafeConnection then strafeConnection:Disconnect(); strafeConnection = nil end
-                if resolverConnection then resolverConnection:Disconnect(); resolverConnection = nil end
-                lastPos = nil
+                if strafeConnection then
+                    strafeConnection:Disconnect()
+                    strafeConnection = nil
+                end
             end
         end,
-        Tooltip = 'Strafes around target.'
+        Tooltip = "Safe, physics-based strafing (hard to detect)."
     })
-
-    local strafeSpeed = 10
-    local strafeDistance = 8
-    local strafeMethod = "Randomize"
-    local randomStrafeEnabled = false
-    local randomStrafeDelay = 3
-    local lastRandomStrafe = 0
-    local strafeDir = 1
-    local jumpOffset = 0
+    
+    local strafeSpeed = 3
+    local strafeDistance = 6
+    local strafeMethod = "Target"
+    local cameraAimEnabled = true
     local aimOffset = 0
-    local rotX, rotY, rotZ = 0, 0, 0
+    local shouldPause = true
     local strafeConnection = nil
-    local resolverEnabled = false
-    local lastPos = nil
-    local resolverConnection = nil
-
-    RagebotModule:CreateDropdown({Name = "Strafe Method", List = {"Randomize", "Target"}, Default = "Randomize", Function = function(v) strafeMethod = v end, Tooltip = "Randomize = circle, Target = side-to-side"})
-    RagebotModule:CreateSlider({Name = "Strafe Speed", Min = 1, Max = 30, Default = 10, Function = function(v) strafeSpeed = v end, Suffix = "rad/s"})
-    RagebotModule:CreateSlider({Name = "Strafe Distance", Min = 2, Max = 20, Default = 8, Function = function(v) strafeDistance = v end, Suffix = "studs"})
-    RagebotModule:CreateToggle({Name = "Random Strafe", Default = false, Function = function(v) randomStrafeEnabled = v end, Tooltip = "Randomly change strafe direction"})
-    RagebotModule:CreateSlider({Name = "Random Delay", Min = 1, Max = 10, Default = 3, Function = function(v) randomStrafeDelay = v end, Suffix = "s", Tooltip = "Time between random direction changes"})
-    RagebotModule:CreateSlider({Name = "Jump Offset", Min = 0, Max = 10, Default = 0, Function = function(v) jumpOffset = v end, Suffix = "studs", Tooltip = "Height offset while strafing"})
-    RagebotModule:CreateSlider({Name = "Aim Offset", Min = -5, Max = 5, Default = 0, Decimal = 10, Function = function(v) aimOffset = v end, Suffix = "studs", Tooltip = "Vertical aim offset"})
-    RagebotModule:CreateSlider({Name = "Rotate X (Pitch)", Min = -180, Max = 180, Default = 0, Function = function(v) rotX = v end, Suffix = "°"})
-    RagebotModule:CreateSlider({Name = "Rotate Y (Yaw)", Min = -180, Max = 180, Default = 0, Function = function(v) rotY = v end, Suffix = "°"})
-    RagebotModule:CreateSlider({Name = "Rotate Z (Roll)", Min = -180, Max = 180, Default = 0, Function = function(v) rotZ = v end, Suffix = "°"})
-    RagebotModule:CreateToggle({Name = "Anti Void", Default = false, Function = function(v)
-        workspace.FallenPartsDestroyHeight = v and -99999 or 0
-    end})
-    RagebotModule:CreateToggle({Name = "Position Resolver", Default = false, Function = function(v)
-        resolverEnabled = v
-        if v then
-            resolverConnection = runService.Heartbeat:Connect(function()
-                if not entitylib.isAlive then return end
-                local root = entitylib.character.RootPart
-                if not root then return end
-                local hum = entitylib.character.Character:FindFirstChildOfClass("Humanoid")
-                if not hum then return end
-                if lastPos then
-                    local vel = (root.Position - lastPos) * 30
-                    pcall(function() hum.Velocity = vel; hum.AssemblyLinerVelocity = vel end)
-                end
-                lastPos = root.Position
-            end)
-        else
-            if resolverConnection then resolverConnection:Disconnect(); resolverConnection = nil end
-            lastPos = nil
-        end
-    end})
+    
+    RagebotModule:CreateDropdown({
+        Name = "Strafe Type",
+        List = {"Target", "Circular"},
+        Default = "Target",
+        Function = function(v) strafeMethod = v end
+    })
+    RagebotModule:CreateSlider({
+        Name = "Speed",
+        Min = 1,
+        Max = 10,
+        Default = 3,
+        Function = function(v) strafeSpeed = v end
+    })
+    RagebotModule:CreateSlider({
+        Name = "Distance",
+        Min = 2,
+        Max = 20,
+        Default = 6,
+        Function = function(v) strafeDistance = v end
+    })
+    RagebotModule:CreateToggle({
+        Name = "Camera Aim",
+        Default = true,
+        Function = function(v) cameraAimEnabled = v end
+    })
+    RagebotModule:CreateSlider({
+        Name = "Aim Offset",
+        Min = -3,
+        Max = 3,
+        Default = 0,
+        Function = function(v) aimOffset = v end,
+        Decimal = 10
+    })
+    RagebotModule:CreateToggle({
+        Name = "Random Pauses",
+        Default = true,
+        Function = function(v) shouldPause = v end,
+        Tooltip = "Stop occasionally to look more human"
+    })
 end)
 
 -- Skin Unlocker
@@ -561,6 +587,7 @@ run(function()
         if callback and not shared.VapeSkinUnlockerActive then
             shared.VapeSkinUnlockerActive = true
             pcall(function()
+                -- full skin unlocker code (unchanged)
                 local Players = game:GetService("Players")
                 local ReplicatedStorage = game:GetService("ReplicatedStorage")
                 local HttpService = game:GetService("HttpService")
@@ -745,8 +772,7 @@ run(function()
                                 end
                                 task.defer(function()
                                     pcall(function() DataController.CurrentData:Replicate("WeaponInventory") end)
-                                    task.wait(0.2)
-                                    saveConfig()
+                                    task.wait(0.2); saveConfig()
                                 end)
                                 return
                             end
@@ -776,8 +802,7 @@ run(function()
                         if weaponPlayer == player and equipped[weaponName] and equipped[weaponName].Skin and viewmodelRef then
                             local dataKey, skinKey, nameKey = self:ToEnum("Data"), self:ToEnum("Skin"), self:ToEnum("Name")
                             if viewmodelRef[dataKey] then
-                                viewmodelRef[dataKey][skinKey] = equipped[weaponName].Skin
-                                viewmodelRef[dataKey][nameKey] = equipped[weaponName].Skin.Name
+                                viewmodelRef[dataKey][skinKey] = equipped[weaponName].Skin; viewmodelRef[dataKey][nameKey] = equipped[weaponName].Skin.Name
                             elseif viewmodelRef.Data then
                                 viewmodelRef.Data.Skin = equipped[weaponName].Skin; viewmodelRef.Data.Name = equipped[weaponName].Skin.Name
                             end
