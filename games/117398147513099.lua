@@ -71,14 +71,13 @@ end
 for _, v in {'SilentAim', 'Reach', 'AntiFall', 'Killaura', 'AntiRagdoll', 'Blink',
     'Disabler', 'SafeWalk', 'MurderMystery', 'TriggerBot'} do vape:Remove(v) end
 
+-- Team logic
 local function if_player_is_on_round_or_another(player)
     return player:GetAttribute("EnvironmentID") ~= nil
 end
-
 local function chid_to_id(chid)
     return string.byte(chid or string.char(0))
 end
-
 local function isEnemy(player)
     if not player or player == lplr then return false end
     local myEnv = lplr:GetAttribute("EnvironmentID")
@@ -127,6 +126,7 @@ local function isLobbyVisible()
     return false
 end
 
+-- Silent Aim (full options, auto‑click with interval)
 local targetPlayer = nil
 local isLeftMouseDown, isRightMouseDown = false, false
 local autoClickConnection = nil
@@ -140,37 +140,35 @@ local wallCheckSA = true
 local ShowTargetSA = nil
 local CircleObject = nil
 local CircleColor, CircleTransparency, CircleFilled
+local lastRightClick = 0
 
 local function lockCameraToHead()
-    if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("Head") then
-        local head = targetPlayer.Character.Head
-        if wallCheckSA then
-            local rayParams = RaycastParams.new()
-            rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-            rayParams.FilterDescendantsInstances = {lplr.Character, targetPlayer.Character}
-            local origin = gameCamera.CFrame.Position
-            local direction = (head.Position - origin) * 0.999
-            local result = workspace:Raycast(origin, direction, rayParams)
-            if result then return end
+    if not targetPlayer or not targetPlayer.Character then return end
+    local part = targetPlayer.Character:FindFirstChild(aimPartSA == "Head" and "Head" or "HumanoidRootPart")
+    if not part then return end
+    if wallCheckSA then
+        local rayParams = RaycastParams.new()
+        rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+        rayParams.FilterDescendantsInstances = {lplr.Character, targetPlayer.Character}
+        local origin = gameCamera.CFrame.Position
+        local direction = (part.Position - origin) * 0.999
+        if workspace:Raycast(origin, direction, rayParams) then return end
+    end
+    local headPosition = gameCamera:WorldToViewportPoint(part.Position)
+    if headPosition and headPosition.Z > 0 then
+        local goalCF = CFrame.new(gameCamera.CFrame.Position, part.Position)
+        if smoothnessSA >= 0.99 then
+            gameCamera.CFrame = goalCF
+        else
+            gameCamera.CFrame = gameCamera.CFrame:Lerp(goalCF, smoothnessSA)
         end
-        local headPosition = gameCamera:WorldToViewportPoint(head.Position)
-        if headPosition.Z > 0 then
-            local cameraPosition = gameCamera.CFrame.Position
-            local direction = (head.Position - cameraPosition).Unit
-            local goalCF = CFrame.new(cameraPosition, head.Position)
-            if smoothnessSA >= 0.99 then
-                gameCamera.CFrame = goalCF
-            else
-                gameCamera.CFrame = gameCamera.CFrame:Lerp(goalCF, smoothnessSA)
-            end
-            if ShowTargetSA and ShowTargetSA.Enabled and targetinfo then
-                targetinfo.Targets[targetPlayer] = tick() + 1
-            end
+        if ShowTargetSA and ShowTargetSA.Enabled and targetinfo then
+            targetinfo.Targets[targetPlayer] = tick() + 1
         end
     end
 end
 
-local function autoClick()
+local function startAutoClick()
     if autoClickConnection then autoClickConnection:Disconnect() end
     autoClickConnection = runService.Heartbeat:Connect(function()
         if (isLeftMouseDown or isRightMouseDown) and silentAimEnabled then
@@ -179,26 +177,22 @@ local function autoClick()
                 lastRightClick = tick()
             end
         else
-            if autoClickConnection then
-                autoClickConnection:Disconnect()
-                autoClickConnection = nil
-            end
+            if autoClickConnection then autoClickConnection:Disconnect(); autoClickConnection = nil end
         end
     end)
 end
 
-local lastRightClick = 0
 inputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
         if not isLeftMouseDown then
             isLeftMouseDown = true
-            if silentAimEnabled then autoClick() end
+            if silentAimEnabled then startAutoClick() end
         end
     elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
         if not isRightMouseDown then
             isRightMouseDown = true
-            if silentAimEnabled then autoClick() end
+            if silentAimEnabled then startAutoClick() end
         end
     end
 end)
@@ -232,73 +226,37 @@ run(function()
                 targetPlayer = nil
             end
         end,
-        Tooltip = 'Simple camera lock auto-aim with auto-click.'
+        Tooltip = 'Camera lock + auto‑click. Hold Mouse1/Mouse2.'
     })
 
-    SilentAim:CreateDropdown({
-        Name = 'Aim Part', List = {'Head', 'Body', 'Random'}, Default = 'Head',
-        Function = function(val) aimPartSA = val end,
-        Tooltip = 'Part of the body to lock onto'
-    })
-    SilentAim:CreateSlider({
-        Name = 'Smoothness', Min = 1, Max = 100, Default = 100,
-        Function = function(val) smoothnessSA = val / 100 end,
-        Suffix = '%', Tooltip = 'Lock smoothness'
-    })
-    SilentAim:CreateToggle({
-        Name = 'Wall Check', Default = true,
-        Function = function(val) wallCheckSA = val end,
-        Tooltip = 'Only lock when target is visible'
-    })
-    SilentAim:CreateSlider({
-        Name = 'Hit Chance', Min = 0, Max = 100, Default = 100,
-        Function = function(val) lockChance = val end,
-        Suffix = '%', Tooltip = 'Chance to Hit Target'
-    })
-    SilentAim:CreateSlider({
-        Name = 'Click Interval', Min = 1, Max = 50, Default = 10,
-        Function = function(val) clickInterval = val / 100 end,
-        Suffix = 's', Tooltip = 'Time between auto shoot'
-    })
-    ShowTargetSA = SilentAim:CreateToggle({
-        Name = 'Show Target Info', Default = true
-    })
-    CircleColor = SilentAim:CreateColorSlider({
-        Name = 'Circle Color', Darker = true, Visible = false,
-        Function = function(h,s,v) if CircleObject then CircleObject.Color = Color3.fromHSV(h,s,v) end end
-    })
-    CircleTransparency = SilentAim:CreateSlider({
-        Name = 'Transparency', Min = 0, Max = 1, Decimal = 10, Default = 0.5,
-        Darker = true, Visible = false,
-        Function = function(val) if CircleObject then CircleObject.Transparency = 1 - val end end
-    })
-    CircleFilled = SilentAim:CreateToggle({
-        Name = 'Circle Filled', Darker = true, Visible = false,
-        Function = function(callback) if CircleObject then CircleObject.Filled = callback end end
-    })
-    SilentAim:CreateToggle({
-        Name = 'Range Circle',
-        Function = function(callback)
-            if callback then
-                CircleObject = Drawing.new('Circle')
-                CircleObject.Filled = CircleFilled and CircleFilled.Enabled
-                CircleObject.Color = Color3.fromHSV(CircleColor and CircleColor.Hue or 0, CircleColor and CircleColor.Sat or 1, CircleColor and CircleColor.Value or 1)
-                CircleObject.Position = vape.gui.AbsoluteSize / 2
-                CircleObject.Radius = 150
-                CircleObject.NumSides = 100
-                CircleObject.Transparency = 1 - (CircleTransparency and CircleTransparency.Value or 0.5)
-                CircleObject.Visible = silentAimEnabled
-            else
-                pcall(function() CircleObject:Remove() end)
-                CircleObject = nil
-            end
-            if CircleColor then CircleColor.Object.Visible = callback end
-            if CircleTransparency then CircleTransparency.Object.Visible = callback end
-            if CircleFilled then CircleFilled.Object.Visible = callback end
+    SilentAim:CreateDropdown({Name='Aim Part', List={'Head','Body','Random'}, Default='Head', Function=function(v) aimPartSA=v end, Tooltip='Part to lock onto'})
+    SilentAim:CreateSlider({Name='Smoothness', Min=1, Max=100, Default=100, Function=function(v) smoothnessSA=v/100 end, Suffix='%', Tooltip='Lock smoothness'})
+    SilentAim:CreateToggle({Name='Wall Check', Default=true, Function=function(v) wallCheckSA=v end, Tooltip='Only lock when visible'})
+    SilentAim:CreateSlider({Name='Hit Chance', Min=0, Max=100, Default=100, Function=function(v) lockChance=v end, Suffix='%', Tooltip='Chance to lock per check'})
+    SilentAim:CreateSlider({Name='Click Interval', Min=1, Max=50, Default=10, Function=function(v) clickInterval=v/100 end, Suffix='s', Tooltip='Time between auto‑clicks'})
+    ShowTargetSA = SilentAim:CreateToggle({Name='Show Target Info', Default=true})
+    CircleColor = SilentAim:CreateColorSlider({Name='Circle Color', Darker=true, Visible=false, Function=function(h,s,v) if CircleObject then CircleObject.Color=Color3.fromHSV(h,s,v) end end})
+    CircleTransparency = SilentAim:CreateSlider({Name='Transparency', Min=0, Max=1, Decimal=10, Default=0.5, Darker=true, Visible=false, Function=function(v) if CircleObject then CircleObject.Transparency=1-v end end})
+    CircleFilled = SilentAim:CreateToggle({Name='Circle Filled', Darker=true, Visible=false, Function=function(c) if CircleObject then CircleObject.Filled=c end end})
+    SilentAim:CreateToggle({Name='Range Circle', Function=function(c)
+        if c then
+            CircleObject = Drawing.new('Circle')
+            CircleObject.Filled = CircleFilled and CircleFilled.Enabled
+            CircleObject.Color = Color3.fromHSV(CircleColor and CircleColor.Hue or 0, 1, 1)
+            CircleObject.Position = vape.gui.AbsoluteSize/2
+            CircleObject.Radius = 150; CircleObject.NumSides = 100
+            CircleObject.Transparency = 1-(CircleTransparency and CircleTransparency.Value or 0.5)
+            CircleObject.Visible = silentAimEnabled
+        else
+            pcall(function() CircleObject:Remove() end); CircleObject = nil
         end
-    })
+        if CircleColor then CircleColor.Object.Visible=c end
+        if CircleTransparency then CircleTransparency.Object.Visible=c end
+        if CircleFilled then CircleFilled.Object.Visible=c end
+    end})
 end)
 
+-- Crosshair
 local crosshairEnabled = false
 local crosshairColor = Color3.fromRGB(128,128,128)
 local crosshairStyle = "Cross"
@@ -320,7 +278,6 @@ local function solve(angle, radius)
     local rad = math.rad(angle)
     return Vector2.new(math.sin(rad)*radius, math.cos(rad)*radius)
 end
-
 local function createDrawings()
     if drawingsCreated then return end
     for i = 1, 8 do drawings.lines[i] = Drawing.new('Line') end
@@ -330,7 +287,6 @@ local function createDrawings()
     drawings.texts[2] = Drawing.new('Text', {Size=13,Font=2,Outline=true,Text='Rawr.xyz',Color=crosshairColor})
     drawingsCreated = true
 end
-
 local function updateCrosshair()
     local pos = inputService:GetMouseLocation()
     if drawings.texts[1] then drawings.texts[1].Visible = crosshairEnabled end
@@ -349,45 +305,30 @@ local function updateCrosshair()
 
         if crosshairStyle == "Cross" then
             for idx = 1, 4 do
-                local inline = drawings.lines[idx+4]
-                local outline = drawings.outlines[idx]
-                local angle = (idx-1)*90 + lastSpinAngle
-                local dir = solve(angle,1)
-                local fromPos = pos + dir * crosshairRadius
-                local toPos = pos + dir * (crosshairRadius + crosshairLength)
-                inline.Visible = true; inline.Color = crosshairColor
-                inline.From = fromPos; inline.To = toPos; inline.Thickness = crosshairWidth
+                local inline = drawings.lines[idx+4]; local outline = drawings.outlines[idx]
+                local angle = (idx-1)*90 + lastSpinAngle; local dir = solve(angle,1)
+                local fromPos = pos + dir * crosshairRadius; local toPos = pos + dir * (crosshairRadius + crosshairLength)
+                inline.Visible = true; inline.Color = crosshairColor; inline.From = fromPos; inline.To = toPos; inline.Thickness = crosshairWidth
                 if outlineEnabled then
-                    outline.Visible = true
-                    outline.From = pos + dir * (crosshairRadius - outlineThickness)
+                    outline.Visible = true; outline.From = pos + dir * (crosshairRadius - outlineThickness)
                     outline.To = pos + dir * (crosshairRadius + crosshairLength + outlineThickness)
-                    outline.Thickness = crosshairWidth + 1.2
-                    outline.Color = outlineColor
+                    outline.Thickness = crosshairWidth + 1.2; outline.Color = outlineColor
                 end
             end
         elseif crosshairStyle == "Dot" then
-            drawings.dot.Visible = true
-            drawings.dot.Position = pos
-            drawings.dot.Radius = dotSize
-            drawings.dot.Filled = true
-            drawings.dot.Color = crosshairColor
-            drawings.dot.Transparency = 0
+            drawings.dot.Visible = true; drawings.dot.Position = pos; drawings.dot.Radius = dotSize; drawings.dot.Filled = true
+            drawings.dot.Color = crosshairColor; drawings.dot.Transparency = 0
         elseif crosshairStyle == "Diagonal" then
             local angles = {45, 135}
             for i = 1, 2 do
-                local inline = drawings.lines[i]
-                local outline = drawings.outlines[i]
-                local angle = angles[i] + lastSpinAngle
-                local dir = solve(angle,1)
-                inline.Visible = true; inline.Color = crosshairColor
-                inline.From = pos + dir * crosshairRadius; inline.To = pos + dir * (crosshairRadius + crosshairLength)
+                local inline = drawings.lines[i]; local outline = drawings.outlines[i]
+                local angle = angles[i] + lastSpinAngle; local dir = solve(angle,1)
+                inline.Visible = true; inline.Color = crosshairColor; inline.From = pos + dir * crosshairRadius; inline.To = pos + dir * (crosshairRadius + crosshairLength)
                 inline.Thickness = crosshairWidth
                 if outlineEnabled then
-                    outline.Visible = true
-                    outline.From = pos + dir * (crosshairRadius - outlineThickness)
+                    outline.Visible = true; outline.From = pos + dir * (crosshairRadius - outlineThickness)
                     outline.To = pos + dir * (crosshairRadius + crosshairLength + outlineThickness)
-                    outline.Thickness = crosshairWidth + 1.2
-                    outline.Color = outlineColor
+                    outline.Thickness = crosshairWidth + 1.2; outline.Color = outlineColor
                 end
             end
         end
@@ -414,7 +355,7 @@ local CrosshairModule = vape.Categories.Utility:CreateModule({
     end
 })
 
-CrosshairModule:CreateDropdown({ Name = "Style", List = {"Cross", "Dot", "Diagonal"}, Default = "Cross", Function = function(v) crosshairStyle = v end })
+CrosshairModule:CreateDropdown({Name="Style", List={"Cross","Dot","Diagonal"}, Default="Cross", Function=function(v) crosshairStyle=v end})
 CrosshairModule:CreateColorSlider({Name="Color", Function=function(h,s,v) crosshairColor=Color3.fromHSV(h,s,v) end})
 CrosshairModule:CreateToggle({Name="Spin", Default=true, Function=function(v) crosshairSpin=v end})
 CrosshairModule:CreateSlider({Name="Length", Min=1,Max=30,Default=10, Function=function(v) crosshairLength=v end, Suffix="px"})
@@ -428,51 +369,45 @@ CrosshairModule:CreateSlider({Name="Outline Thickness", Min=0,Max=3,Default=0.5,
 -- Hitsound
 run(function()
     local assetSounds = {
-        {name = "Bameware", id = "rbxassetid://3124331820"}, {name = "Bell", id = "rbxassetid://6534947240"},
-        {name = "Bubble", id = "rbxassetid://6534947588"}, {name = "Pick", id = "rbxassetid://1347140027"},
-        {name = "Pop", id = "rbxassetid://198598793"}, {name = "Rust", id = "rbxassetid://1255040462"},
-        {name = "Sans", id = "rbxassetid://3188795283"}, {name = "Fart", id = "rbxassetid://130833677"},
-        {name = "Big", id = "rbxassetid://5332005053"}, {name = "Vine", id = "rbxassetid://5332680810"},
-        {name = "Bruh", id = "rbxassetid://4578740568"}, {name = "Skeet", id = "rbxassetid://5633695679"},
-        {name = "Neverlose", id = "rbxassetid://6534948092"}, {name = "Fatality", id = "rbxassetid://6534947869"},
-        {name = "Bonk", id = "rbxassetid://5766898159"}, {name = "Minecraft", id = "rbxassetid://4018616850"},
+        {name="Bameware", id="rbxassetid://3124331820"},{name="Bell", id="rbxassetid://6534947240"},
+        {name="Bubble", id="rbxassetid://6534947588"},{name="Pick", id="rbxassetid://1347140027"},
+        {name="Pop", id="rbxassetid://198598793"},{name="Rust", id="rbxassetid://1255040462"},
+        {name="Sans", id="rbxassetid://3188795283"},{name="Fart", id="rbxassetid://130833677"},
+        {name="Big", id="rbxassetid://5332005053"},{name="Vine", id="rbxassetid://5332680810"},
+        {name="Bruh", id="rbxassetid://4578740568"},{name="Skeet", id="rbxassetid://5633695679"},
+        {name="Neverlose", id="rbxassetid://6534948092"},{name="Fatality", id="rbxassetid://6534947869"},
+        {name="Bonk", id="rbxassetid://5766898159"},{name="Minecraft", id="rbxassetid://4018616850"},
     }
     local soundNames, soundMap = {}, {}
     for _, s in ipairs(assetSounds) do table.insert(soundNames, s.name); soundMap[s.name] = s.id end
-
     local hitsoundEnabled = false
     local currentSoundId = soundMap["Bell"]
     local hitConnection = nil
-
     local function applySoundReplacement()
         if hitConnection then hitConnection:Disconnect() end
         if not hitsoundEnabled then return end
         local viewModel = lplr.PlayerScripts.Modules.ClientReplicatedClasses.ClientFighter.ClientItem:WaitForChild("ClientViewModel", 5)
         if viewModel then
             hitConnection = viewModel.ChildAdded:Connect(function(v)
-                if v:IsA("Sound") and v.SoundId ~= currentSoundId then
-                    v.SoundId = currentSoundId; v.Pitch = 1; v.Volume = 1
-                end
+                if v:IsA("Sound") and v.SoundId ~= currentSoundId then v.SoundId = currentSoundId; v.Pitch = 1; v.Volume = 1 end
             end)
         end
     end
-
     local HitsoundModule = vape.Categories.Utility:CreateModule({
         Name = "Hitsound",
         Function = function(callback)
-            hitsoundEnabled = callback
-            applySoundReplacement()
+            hitsoundEnabled = callback; applySoundReplacement()
             if not callback and hitConnection then hitConnection:Disconnect(); hitConnection = nil end
         end
     })
-    HitsoundModule:CreateToggle({Name = "Hitsound", Default = false, Function = function(callback) hitsoundEnabled = callback; applySoundReplacement() end})
-    HitsoundModule:CreateDropdown({Name = "Select Sound", List = soundNames, Function = function(val)
-        currentSoundId = soundMap[val] or currentSoundId
-        applySoundReplacement()
-        notif('Hitsound', 'Selected: ' .. val, 2, 'success')
+    HitsoundModule:CreateToggle({Name="Hitsound", Default=false, Function=function(c) hitsoundEnabled=c; applySoundReplacement() end})
+    HitsoundModule:CreateDropdown({Name="Select Sound", List=soundNames, Function=function(val)
+        currentSoundId = soundMap[val] or currentSoundId; applySoundReplacement()
+        notif('Hitsound', 'Selected: '..val, 2, 'success')
     end})
 end)
 
+-- Fullbright
 run(function()
     local Lighting = game:GetService("Lighting")
     local origBrightness, origClockTime, origFogEnd, origFogStart, origGlobalShadows, origOutdoorAmbient =
@@ -491,6 +426,7 @@ run(function()
     })
 end)
 
+-- No Fog
 run(function()
     local Lighting = game:GetService("Lighting")
     local origFogEnd, origFogStart = Lighting.FogEnd, Lighting.FogStart
@@ -503,23 +439,20 @@ run(function()
     })
 end)
 
+-- FOV Changer
 run(function()
     local camera = workspace.CurrentCamera
-    local defaultVert = 70
-    local defaultHoriz = 100
-    local vertFOV = defaultVert
-    local horizScale = 1.0
+    local defaultVert = 70; local defaultHoriz = 100
+    local vertFOV = defaultVert; local horizScale = 1.0
     local fovConnection = nil
-
     local function applyFOV()
         if camera then
             camera.FieldOfView = vertFOV
             if horizScale ~= 1.0 then
-                camera.CFrame = camera.CFrame * CFrame.new(0,0,0, 1,0,0, 0, horizScale, 0, 0,0,1)
+                camera.CFrame = camera.CFrame * CFrame.new(0,0,0,1,0,0,0,horizScale,0,0,0,1)
             end
         end
     end
-
     local FovModule = vape.Categories.Utility:CreateModule({
         Name = "FOV",
         Function = function(callback)
@@ -531,45 +464,19 @@ run(function()
             end
         end
     })
-
-    FovModule:CreateSlider({Name = "Vertical FOV", Min = 10, Max = 120, Default = defaultVert,
-        Function = function(v) vertFOV = v end, Suffix = "°"})
-    FovModule:CreateSlider({Name = "Horizontal FOV", Min = 50, Max = 120, Default = defaultHoriz,
-        Function = function(v) horizScale = v / 100 end, Suffix = "%"})
-    FovModule:CreateButton({Name = "Reset FOV", Function = function()
+    FovModule:CreateSlider({Name="Vertical FOV", Min=10, Max=120, Default=defaultVert, Function=function(v) vertFOV=v end, Suffix="°"})
+    FovModule:CreateSlider({Name="Horizontal FOV", Min=50, Max=120, Default=defaultHoriz, Function=function(v) horizScale=v/100 end, Suffix="%"})
+    FovModule:CreateButton({Name="Reset FOV", Function=function()
         vertFOV = defaultVert; horizScale = 1.0
-        notif('FOV', 'Reset to default (70°, 100%)', 2, 'success')
+        notif('FOV', 'Reset to default', 2, 'success')
     end})
 end)
 
+-- Ragebot (strafe *on main toggle*, improved stability)
 run(function()
     local RagebotModule = vape.Categories.Blatant:CreateModule({
         Name = "Ragebot",
         Function = function(callback)
-            if not callback then
-                if strafeConnection then strafeConnection:Disconnect(); strafeConnection = nil end
-                if resolverConnection then resolverConnection:Disconnect(); resolverConnection = nil end
-                lastPos = nil
-            end
-        end
-    })
-
-    local strafeEnabled = false
-    local strafeSpeed = 10
-    local strafeDistance = 8
-    local rotX = 0
-    local rotY = 0
-    local rotZ = 0
-    local strafeConnection = nil
-    local resolverEnabled = false
-    local lastPos = nil
-    local resolverConnection = nil
-
-    RagebotModule:CreateToggle({
-        Name = "Target Strafe",
-        Default = false,
-        Function = function(callback)
-            strafeEnabled = callback
             if callback then
                 strafeConnection = runService.Heartbeat:Connect(function()
                     if not entitylib.isAlive then return end
@@ -577,33 +484,39 @@ run(function()
                     if not target or not target.Character or not target.Character:FindFirstChild("Head") then return end
                     local targetHead = target.Character.Head.Position
                     local root = entitylib.character.RootPart
-                    local angle = tick() * strafeSpeed % (math.pi * 2)
-                    local offset = Vector3.new(math.sin(angle) * strafeDistance, 0, math.cos(angle) * strafeDistance)
+                    if not root then return end
+                    local angle = (tick() * strafeSpeed) % (math.pi * 2)
+                    local offset = Vector3.new(math.cos(angle) * strafeDistance, 0, math.sin(angle) * strafeDistance)
                     local newPos = targetHead + offset
-                    local lookDir = (targetHead - newPos).Unit
-                    local baseCF = CFrame.new(newPos, newPos + lookDir)
-                    local rotCF = CFrame.Angles(math.rad(rotX), math.rad(rotY), math.rad(rotZ))
-                    root.CFrame = baseCF * rotCF
+                    root.CFrame = CFrame.new(newPos, targetHead) * CFrame.Angles(math.rad(rotX), math.rad(rotY), math.rad(rotZ))
                     gameCamera.CFrame = CFrame.new(gameCamera.CFrame.Position, targetHead)
                 end)
             else
                 if strafeConnection then strafeConnection:Disconnect(); strafeConnection = nil end
+                if resolverConnection then resolverConnection:Disconnect(); resolverConnection = nil end
+                lastPos = nil
             end
         end,
-        Tooltip = 'Strafe.'
+        Tooltip = 'Strafes around the nearest target.'
     })
 
-    RagebotModule:CreateSlider({Name = "Strafe Speed", Min = 1, Max = 30, Default = 10, Function = function(v) strafeSpeed = v end, Suffix = "rad/s"})
-    RagebotModule:CreateSlider({Name = "Strafe Distance", Min = 2, Max = 20, Default = 8, Function = function(v) strafeDistance = v end, Suffix = "studs"})
-    RagebotModule:CreateSlider({Name = "Rotate X (Pitch)", Min = -180, Max = 180, Default = 0, Function = function(v) rotX = v end, Suffix = "°"})
-    RagebotModule:CreateSlider({Name = "Rotate Y (Yaw)", Min = -180, Max = 180, Default = 0, Function = function(v) rotY = v end, Suffix = "°"})
-    RagebotModule:CreateSlider({Name = "Rotate Z (Roll)", Min = -180, Max = 180, Default = 0, Function = function(v) rotZ = v end, Suffix = "°"})
+    local strafeSpeed = 10
+    local strafeDistance = 8
+    local rotX, rotY, rotZ = 0, 0, 0
+    local strafeConnection = nil
+    local resolverEnabled = false
+    local lastPos = nil
+    local resolverConnection = nil
 
-    RagebotModule:CreateToggle({Name = "Anti Void", Default = false, Function = function(v)
+    RagebotModule:CreateSlider({Name = "Strafe Speed", Min=1, Max=30, Default=10, Function=function(v) strafeSpeed = v end, Suffix = "rad/s"})
+    RagebotModule:CreateSlider({Name = "Strafe Distance", Min=2, Max=20, Default=8, Function=function(v) strafeDistance = v end, Suffix = "studs"})
+    RagebotModule:CreateSlider({Name = "Rotate X", Min=-180, Max=180, Default=0, Function=function(v) rotX=v end, Suffix="°"})
+    RagebotModule:CreateSlider({Name = "Rotate Y", Min=-180, Max=180, Default=0, Function=function(v) rotY=v end, Suffix="°"})
+    RagebotModule:CreateSlider({Name = "Rotate Z", Min=-180, Max=180, Default=0, Function=function(v) rotZ=v end, Suffix="°"})
+    RagebotModule:CreateToggle({Name = "Anti Void", Default=false, Function=function(v)
         workspace.FallenPartsDestroyHeight = v and -99999 or 0
     end})
-
-    RagebotModule:CreateToggle({Name = "Position Resolver", Default = false, Function = function(v)
+    RagebotModule:CreateToggle({Name = "Position Resolver", Default=false, Function=function(v)
         resolverEnabled = v
         if v then
             resolverConnection = runService.Heartbeat:Connect(function()
@@ -614,10 +527,7 @@ run(function()
                 if not hum then return end
                 if lastPos then
                     local vel = (root.Position - lastPos) * 30
-                    pcall(function()
-                        hum.Velocity = vel
-                        hum.AssemblyLinerVelocity = vel
-                    end)
+                    pcall(function() hum.Velocity = vel; hum.AssemblyLinerVelocity = vel end)
                 end
                 lastPos = root.Position
             end)
@@ -628,12 +538,12 @@ run(function()
     end})
 end)
 
+-- Skin Unlocker
 run(function()
     local SkinModule = vape.Categories.Utility:CreateModule({Name = "Skin Unlocker", Function = function(callback)
         if callback and not shared.VapeSkinUnlockerActive then
             shared.VapeSkinUnlockerActive = true
             pcall(function()
-                -- sks
                 local Players = game:GetService("Players")
                 local ReplicatedStorage = game:GetService("ReplicatedStorage")
                 local HttpService = game:GetService("HttpService")
