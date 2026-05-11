@@ -7,7 +7,6 @@ if not iswindowactive then iswindowactive = function() return true end end
 if not mouse1press then mouse1press = function() end end
 if not mouse1release then mouse1release = function() end end
 
--- Environment fallbacks
 local isfile = isfile or function(file) local ok,res = pcall(readfile,file) return ok and res ~= nil and res ~= '' end
 local writefile = writefile or function(file,data) end
 local isfolder = isfolder or function(folder) return false end
@@ -79,6 +78,7 @@ local t = { sa = { enabled = false } }
 local targetPlayer = nil
 local aimPart = "Head"
 local smoothness = 1
+local wallCheckEnabled = true
 local ShowTarget = nil
 local CircleObject = nil
 local CircleColor, CircleTransparency, CircleFilled
@@ -135,21 +135,41 @@ local function getAimPart(player, partName)
     return player.Character:FindFirstChild("Head")
 end
 
+local function isTargetVisible(player)
+    if not player or not player.Character then return false end
+    local part = getAimPart(player, aimPart)
+    if not part then return false end
+    local camPos = gameCamera.CFrame.Position
+    local origin = camPos
+    local direction = (part.Position - origin).Unit * (part.Position - origin).Magnitude
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Blacklist
+    params.FilterDescendantsInstances = {lplr.Character, player.Character}
+    local result = workspace:Raycast(origin, direction, params)
+    return result == nil
+end
+
 local function lockCameraToTarget()
     local target = targetPlayer
-    if target and target.Character then
-        local part = getAimPart(target, aimPart)
-        if part then
-            local goalCF = CFrame.new(gameCamera.CFrame.Position, part.Position)
-            if smoothness >= 0.99 then
-                gameCamera.CFrame = goalCF
-            else
-                gameCamera.CFrame = gameCamera.CFrame:Lerp(goalCF, smoothness)
-            end
-            if ShowTarget and ShowTarget.Enabled and targetinfo then
-                targetinfo.Targets[target] = tick() + 1
-            end
+    if not target or not target.Character then return end
+
+    if wallCheckEnabled then
+        if not isTargetVisible(target) then
+            targetPlayer = nil
+            return
         end
+    end
+
+    local part = getAimPart(target, aimPart)
+    if not part then return end
+    local goalCF = CFrame.new(gameCamera.CFrame.Position, part.Position)
+    if smoothness >= 0.99 then
+        gameCamera.CFrame = goalCF
+    else
+        gameCamera.CFrame = gameCamera.CFrame:Lerp(goalCF, smoothness)
+    end
+    if ShowTarget and ShowTarget.Enabled and targetinfo then
+        targetinfo.Targets[target] = tick() + 1
     end
 end
 
@@ -174,7 +194,7 @@ run(function()
                 targetPlayer = nil
             end
         end,
-        Tooltip = 'Locks camera on the closest enemy. No auto‑fire.'
+        Tooltip = 'Camera lock. Wall check, aim part, and smoothness included.'
     })
 
     SilentAim:CreateDropdown({
@@ -189,9 +209,16 @@ run(function()
         Suffix = '%',
         Tooltip = '100 = instant, lower = smoother lock'
     })
+    SilentAim:CreateToggle({
+        Name = 'Wall Check',
+        Default = true,
+        Function = function(val) wallCheckEnabled = val end,
+        Tooltip = 'Only lock onto targets with clear line of sight'
+    })
     ShowTarget = SilentAim:CreateToggle({
-        Name = 'Show Target Info', Default = true,
-        Tooltip = 'Display ESP box on target'
+        Name = 'Show Target Info',
+        Default = true,
+        Tooltip = 'ESP box on target'
     })
     CircleColor = SilentAim:CreateColorSlider({
         Name = 'Circle Color', Darker = true, Visible = false,
@@ -217,7 +244,7 @@ run(function()
                 CircleObject.Radius = 150
                 CircleObject.NumSides = 100
                 CircleObject.Transparency = 1 - (CircleTransparency and CircleTransparency.Value or 0.5)
-                CircleObject.Visible = t.sa.enabled
+                CircleObject.Visible = SilentAim.Enabled
             else
                 pcall(function() CircleObject:Remove() end)
                 CircleObject = nil
@@ -240,8 +267,7 @@ local dotSize = 0
 local outlineEnabled = false
 local outlineColor = Color3.new(0,0,0)
 local outlineThickness = 0.5
-local circleThickness = 1.5
-local drawings = { lines = {}, texts = {}, dot = nil, outlines = {}, circle = nil }
+local drawings = { lines = {}, texts = {}, dot = nil, outlines = {} }
 local crosshairRenderConnection
 local text_x = 0
 local lastSpinAngle = 0
@@ -257,9 +283,8 @@ local function createDrawings()
     for i = 1, 8 do drawings.lines[i] = Drawing.new('Line') end
     for i = 1, 4 do drawings.outlines[i] = Drawing.new('Line') end
     drawings.dot = Drawing.new('Circle')
-    drawings.circle = Drawing.new('Circle')
     drawings.texts[1] = Drawing.new('Text', {Size=13,Font=2,Outline=true,Text='Rawr.xyz',Color=Color3.new(1,1,1)})
-    drawings.texts[2] = Drawing.new('Text', {Size=13,Font=2,Outline=true,Text='Rivals',Color=crosshairColor})
+    drawings.texts[2] = Drawing.new('Text', {Size=13,Font=2,Outline=true,Text='Rawr.xyz',Color=crosshairColor})
     drawingsCreated = true
 end
 
@@ -278,7 +303,6 @@ local function updateCrosshair()
         for i = 1, 8 do if drawings.lines[i] then drawings.lines[i].Visible = false end end
         for i = 1, 4 do if drawings.outlines[i] then drawings.outlines[i].Visible = false end end
         if drawings.dot then drawings.dot.Visible = false end
-        if drawings.circle then drawings.circle.Visible = false end
 
         if crosshairStyle == "Cross" then
             for idx = 1, 4 do
@@ -298,14 +322,6 @@ local function updateCrosshair()
                     outline.Color = outlineColor
                 end
             end
-        elseif crosshairStyle == "Circle" then
-            drawings.circle.Visible = true
-            drawings.circle.Position = pos
-            drawings.circle.Radius = crosshairRadius
-            drawings.circle.Filled = false
-            drawings.circle.Color = crosshairColor
-            drawings.circle.Thickness = circleThickness
-            drawings.circle.Transparency = 0
         elseif crosshairStyle == "Dot" then
             drawings.dot.Visible = true
             drawings.dot.Position = pos
@@ -313,12 +329,30 @@ local function updateCrosshair()
             drawings.dot.Filled = true
             drawings.dot.Color = crosshairColor
             drawings.dot.Transparency = 0
+        elseif crosshairStyle == "Diagonal" then
+            local angles = {45, 135}
+            for i = 1, 2 do
+                local inline = drawings.lines[i]
+                local outline = drawings.outlines[i]
+                local angle = angles[i] + lastSpinAngle
+                local dir = solve(angle,1)
+                local fromPos = pos + dir * crosshairRadius
+                local toPos = pos + dir * (crosshairRadius + crosshairLength)
+                inline.Visible = true; inline.Color = crosshairColor
+                inline.From = fromPos; inline.To = toPos; inline.Thickness = crosshairWidth
+                if outlineEnabled then
+                    outline.Visible = true
+                    outline.From = pos + dir * (crosshairRadius - outlineThickness)
+                    outline.To = pos + dir * (crosshairRadius + crosshairLength + outlineThickness)
+                    outline.Thickness = crosshairWidth + 1.2
+                    outline.Color = outlineColor
+                end
+            end
         end
     else
         for i = 1, 8 do if drawings.lines[i] then drawings.lines[i].Visible = false end end
         for i = 1, 4 do if drawings.outlines[i] then drawings.outlines[i].Visible = false end end
         if drawings.dot then drawings.dot.Visible = false end
-        if drawings.circle then drawings.circle.Visible = false end
     end
 end
 
@@ -334,20 +368,19 @@ local CrosshairModule = vape.Categories.Utility:CreateModule({
             for i = 1, 8 do if drawings.lines[i] then drawings.lines[i].Visible = false end end
             for i = 1, 4 do if drawings.outlines[i] then drawings.outlines[i].Visible = false end end
             if drawings.dot then drawings.dot.Visible = false end
-            if drawings.circle then drawings.circle.Visible = false end
         end
     end
 })
 
 CrosshairModule:CreateDropdown({
-    Name = "Style", List = {"Cross", "Circle", "Dot"}, Default = "Cross",
+    Name = "Style", List = {"Cross", "Dot", "Diagonal"}, Default = "Cross",
     Function = function(v) crosshairStyle = v end
 })
 CrosshairModule:CreateColorSlider({Name="Color", Function=function(h,s,v) crosshairColor=Color3.fromHSV(h,s,v) end})
 CrosshairModule:CreateToggle({Name="Spin", Default=true, Function=function(v) crosshairSpin=v end})
 CrosshairModule:CreateSlider({Name="Length", Min=1,Max=30,Default=10, Function=function(v) crosshairLength=v end, Suffix="px"})
 CrosshairModule:CreateSlider({Name="Radius", Min=0,Max=30,Default=11, Function=function(v) crosshairRadius=v end, Suffix="px"})
-CrosshairModule:CreateSlider({Name="Thickness", Min=0.5,Max=5,Default=1.5,Decimal=10, Function=function(v) crosshairWidth = v; circleThickness = v end, Suffix="px"})
+CrosshairModule:CreateSlider({Name="Thickness", Min=0.5,Max=5,Default=1.5,Decimal=10, Function=function(v) crosshairWidth=v end, Suffix="px"})
 CrosshairModule:CreateSlider({Name="Dot Size", Min=0,Max=10,Default=0, Function=function(v) dotSize=v end, Suffix="px", Tooltip="0 = no dot"})
 CrosshairModule:CreateToggle({Name="Outline", Default=false, Function=function(v) outlineEnabled=v end})
 CrosshairModule:CreateColorSlider({Name="Outline Color", Visible=false, Function=function(h,s,v) outlineColor=Color3.fromHSV(h,s,v) end})
@@ -481,6 +514,7 @@ run(function()
     local targetFOV = defaultFOV
     local currentFOV = defaultFOV
     local FOV_LERP_SPEED = 0.1
+    local horizontalScale = 1.0
     local fovConnection = nil
 
     local function applyFOV()
@@ -491,6 +525,9 @@ run(function()
             else
                 camera.FieldOfView = targetFOV
                 currentFOV = targetFOV
+            end
+            if horizontalScale ~= 1.0 then
+                camera.CFrame = camera.CFrame * CFrame.new(0,0,0, 1,0,0, 0, horizontalScale, 0, 0,0,1)
             end
         end
     end
@@ -512,6 +549,14 @@ run(function()
         Min = 10, Max = 120, Default = defaultFOV,
         Function = function(v) targetFOV = v end,
         Suffix = "°"
+    })
+
+    FovModule:CreateSlider({
+        Name = "Horizontal FOV",
+        Min = 50, Max = 150, Default = 100,
+        Function = function(v) horizontalScale = v / 100 end,
+        Suffix = "%",
+        Tooltip = "Stretches the view horizontally"
     })
 end)
 
