@@ -76,175 +76,118 @@ for _, v in {'SilentAim', 'Reach', 'AntiFall', 'Killaura', 'AntiRagdoll', 'Blink
 
 local t = { sa = { enabled = false } }
 
--- Cached target detection
-local lastTargetUpdate = 0
-local cachedTarget = nil
-local TARGET_UPDATE_INTERVAL = 0.1
-
-local function scanWorkspace()
-    local targets = {}
-    for _, v in ipairs(workspace:GetChildren()) do
-        if v:FindFirstChildOfClass("Humanoid") then
-            table.insert(targets, v)
-        elseif v.Name == "HurtEffect" then
-            for _, p in ipairs(v:GetChildren()) do
-                if p.ClassName ~= "Highlight" then
-                    table.insert(targets, p)
-                end
-            end
-        end
-    end
-    return targets
-end
-
-local function getPredictedPosition(player)
-    local head = player:FindFirstChild("Head")
-    local root = player:FindFirstChild("HumanoidRootPart")
-    if not (head and root) then return nil end
-    return head.Position
-end
-
-local function getClosestTarget()
-    if tick() - lastTargetUpdate < TARGET_UPDATE_INTERVAL then
-        return cachedTarget
-    end
-    local target, min = nil, math.huge
-    local char = lplr.Character
-    if not char then return nil end
-    local targets = scanWorkspace()
-    for _, p in ipairs(targets) do
-        if p ~= char and p:FindFirstChild("HumanoidRootPart") then
-            local pos = getPredictedPosition(p)
-            if not pos then continue end
-            local screen, vis = gameCamera:WorldToViewportPoint(pos)
-            if not screen or not vis then continue end
-            local screenVec = Vector2.new(screen.X, screen.Y)
-            local centerVec = Vector2.new(gameCamera.ViewportSize.X/2, gameCamera.ViewportSize.Y/2)
-            local mag = (centerVec - screenVec).Magnitude
-            if mag < min then
-                target, min = p, mag
-            end
-        end
-    end
-    lastTargetUpdate = tick()
-    cachedTarget = target
-    return target
-end
-
-local function showDamage(position, amount)
-    local drawing = Drawing.new("Text")
-    drawing.Text = tostring(amount)
-    drawing.Font = 2
-    drawing.Size = 20
-    drawing.Color = Color3.fromRGB(255, 80, 80)
-    drawing.Position = gameCamera:WorldToViewportPoint(position) + Vector2.new(0, -30)
-    drawing.Outline = true
-    drawing.Transparency = 1
-    drawing.Visible = true
-    local tw = tweenService:Create(drawing, TweenInfo.new(1.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Transparency = 1, Position = drawing.Position + Vector2.new(0, -40)})
-    tw:Play()
-    tw.Completed:Connect(function() drawing:Remove() end)
-end
-
--- Silent Aim (Raycast hook)
-local ShowTarget = nil
+local targetPlayer = nil
 local aimPart = "Head"
-local hitChance = 100
-local clickInterval = 0.10
-local autoClickConnection = nil
-local isRightDown = false
-local lastRightClick = 0
+local smoothness = 1
+local ShowTarget = nil
 local CircleObject = nil
 local CircleColor, CircleTransparency, CircleFilled
+local cameraConnection = nil
+local rand = Random.new()
 
-run(function()
-    local oldRaycast = gameCamera.Raycast
-    gameCamera.Raycast = function(...)
-        local args = {...}
-        if t.sa.enabled and args[4] == 999 then
-            if hitChance < 100 and math.random(1, 100) > hitChance then
-                return oldRaycast(unpack(args))
+local function isLobbyVisible()
+    local mainGui = lplr.PlayerGui:FindFirstChild("MainGui")
+    if mainGui then
+        local mainFrame = mainGui:FindFirstChild("MainFrame")
+        if mainFrame then
+            local lobby = mainFrame:FindFirstChild("Lobby")
+            if lobby then
+                local currency = lobby:FindFirstChild("Currency")
+                return currency and currency.Visible == true
             end
-            local target = getClosestTarget()
-            if target then
-                local pos = getPredictedPosition(target)
-                if pos then
-                    args[3] = pos
-                    local tool = lplr.Character and lplr.Character:FindFirstChildOfClass("Tool")
-                    local dmg = tool and tool:GetAttribute("Damage") or 20
-                    showDamage(pos, dmg)
-                    if ShowTarget and ShowTarget.Enabled and targetinfo then
-                        targetinfo.Targets[target] = tick() + 1
-                    end
+        end
+    end
+    return false
+end
+
+local function getClosestPlayerToMouse()
+    local closest = nil
+    local shortest = math.huge
+    local mousePos = inputService:GetMouseLocation()
+    for _, player in ipairs(playersService:GetPlayers()) do
+        if player ~= lplr and player.Character and player.Character:FindFirstChild("Head") then
+            local head = player.Character.Head
+            local screenPos, onScreen = gameCamera:WorldToViewportPoint(head.Position)
+            if onScreen then
+                local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                if dist < shortest then
+                    closest = player
+                    shortest = dist
                 end
             end
         end
-        return oldRaycast(unpack(args))
     end
-    vape:Clean(function()
-        gameCamera.Raycast = oldRaycast
-    end)
-end)
+    return closest
+end
 
-local function startRightAutoClick()
-    if autoClickConnection then autoClickConnection:Disconnect() end
-    autoClickConnection = runService.Heartbeat:Connect(function()
-        if isRightDown and (tick() - lastRightClick >= clickInterval) then
-            if canClick() then
-                mouse1click()
-                lastRightClick = tick()
+local function getAimPart(player, partName)
+    if not player or not player.Character then return nil end
+    if partName == "Head" then return player.Character:FindFirstChild("Head")
+    elseif partName == "Body" then return player.Character:FindFirstChild("HumanoidRootPart") or player.Character:FindFirstChild("Torso")
+    elseif partName == "Random" then
+        local parts = {}
+        local h = player.Character:FindFirstChild("Head")
+        local r = player.Character:FindFirstChild("HumanoidRootPart") or player.Character:FindFirstChild("Torso")
+        if h then table.insert(parts, h) end
+        if r then table.insert(parts, r) end
+        if #parts > 0 then return parts[rand.NextInteger(rand, 1, #parts)] end
+    end
+    return player.Character:FindFirstChild("Head")
+end
+
+local function lockCameraToTarget()
+    local target = targetPlayer
+    if target and target.Character then
+        local part = getAimPart(target, aimPart)
+        if part then
+            local goalCF = CFrame.new(gameCamera.CFrame.Position, part.Position)
+            if smoothness >= 0.99 then
+                gameCamera.CFrame = goalCF
+            else
+                gameCamera.CFrame = gameCamera.CFrame:Lerp(goalCF, smoothness)
+            end
+            if ShowTarget and ShowTarget.Enabled and targetinfo then
+                targetinfo.Targets[target] = tick() + 1
             end
         end
-    end)
+    end
 end
 
-local function stopRightAutoClick()
-    if autoClickConnection then autoClickConnection:Disconnect(); autoClickConnection = nil end
-end
-
-inputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        if t.sa.enabled and canClick() then mouse1click() end
-    elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
-        if not isRightDown then
-            isRightDown = true
-            if t.sa.enabled then startRightAutoClick() end
+local function cameraStep()
+    if not isLobbyVisible() then
+        targetPlayer = getClosestPlayerToMouse()
+        if targetPlayer then
+            lockCameraToTarget()
         end
     end
-end)
-inputService.InputEnded:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.UserInputType == Enum.UserInputType.MouseButton2 then
-        isRightDown = false
-        stopRightAutoClick()
-    end
-end)
+end
 
 run(function()
     local SilentAim
     SilentAim = vape.Categories.Combat:CreateModule({
         Name = 'Silent Aim',
         Function = function(callback)
-            t.sa.enabled = callback and true or false
-            if not callback then stopRightAutoClick() end
+            if callback then
+                cameraConnection = runService.Heartbeat:Connect(cameraStep)
+            else
+                if cameraConnection then cameraConnection:Disconnect(); cameraConnection = nil end
+                targetPlayer = nil
+            end
         end,
-        Tooltip = 'Fake camera aim – bullets go to the nearest enemy. Left‑click = single, Right‑click = auto.'
+        Tooltip = 'Locks camera on the closest enemy. No auto‑fire.'
     })
+
     SilentAim:CreateDropdown({
         Name = 'Aim Part', List = {'Head', 'Body', 'Random'}, Default = 'Head',
         Function = function(val) aimPart = val end,
-        Tooltip = 'Part of the body to aim at'
+        Tooltip = 'Part of the body to lock onto'
     })
     SilentAim:CreateSlider({
-        Name = 'Hit Chance', Min = 0, Max = 100, Default = 100,
-        Function = function(val) hitChance = val end,
-        Suffix = '%', Tooltip = 'Chance to redirect bullets'
-    })
-    SilentAim:CreateSlider({
-        Name = 'Click Interval', Min = 1, Max = 50, Default = 10,
-        Function = function(val) clickInterval = val / 100 end,
-        Suffix = 'ms', Tooltip = 'Time between auto‑clicks'
+        Name = 'Smoothness',
+        Min = 1, Max = 100, Default = 100,
+        Function = function(val) smoothness = val / 100 end,
+        Suffix = '%',
+        Tooltip = '100 = instant, lower = smoother lock'
     })
     ShowTarget = SilentAim:CreateToggle({
         Name = 'Show Target Info', Default = true,
@@ -286,7 +229,6 @@ run(function()
     })
 end)
 
--- Crosshair
 local crosshairEnabled = false
 local crosshairColor = Color3.fromRGB(128,128,128)
 local crosshairStyle = "Cross"
@@ -500,7 +442,6 @@ run(function()
     })
 end)
 
--- Fullbright
 run(function()
     local Lighting = game:GetService("Lighting")
     local origBrightness = Lighting.Brightness; local origClockTime = Lighting.ClockTime
@@ -522,7 +463,6 @@ run(function()
     })
 end)
 
--- No Fog
 run(function()
     local Lighting = game:GetService("Lighting")
     local origFogEnd = Lighting.FogEnd; local origFogStart = Lighting.FogStart
@@ -535,7 +475,6 @@ run(function()
     })
 end)
 
--- FOV Changer
 run(function()
     local camera = workspace.CurrentCamera
     local defaultFOV = 70
