@@ -71,18 +71,89 @@ end
 for _, v in {'SilentAim', 'Reach', 'AntiFall', 'Killaura', 'AntiRagdoll', 'Blink',
     'Disabler', 'SafeWalk', 'MurderMystery', 'TriggerBot'} do vape:Remove(v) end
 
-local t = { sa = { enabled = false } }
+local function if_player_is_on_round_or_another(player)
+    return player:GetAttribute("EnvironmentID") ~= nil
+end
 
--- Silent Aim
-local aimPart = "Head"
-local smoothness = 1
-local wallCheckEnabled = true
-local lockChanceSA = 100
-local ShowTarget = nil
-local CircleObject = nil
-local CircleColor, CircleTransparency, CircleFilled
-local cameraConnection = nil
-local rand = Random.new()
+local function chid_to_id(chid)
+    return string.byte(chid or string.char(0))
+end
+
+local function get_every_player_in_Environment(id)
+    local output = {}
+    for _, v in pairs(game:GetService("Players"):GetChildren()) do
+        if v:IsA("Player") and if_player_is_on_round_or_another(v) and chid_to_id(v:GetAttribute("EnvironmentID")) == id then
+            table.insert(output, {["chidteam"] = v:GetAttribute("TeamID"), ["player"] = v})
+        end
+    end
+    return output
+end
+
+local function isEnemy(player)
+    if not player or player == lplr then return false end
+    local myEnv = lplr:GetAttribute("EnvironmentID")
+    local myTeam = lplr:GetAttribute("TeamID")
+    if not myEnv or not myTeam then return true end
+    local targetEnv = player:GetAttribute("EnvironmentID")
+    local targetTeam = player:GetAttribute("TeamID")
+    if not targetEnv or not targetTeam then return false end
+    if chid_to_id(myEnv) ~= chid_to_id(targetEnv) then return false end
+    if chid_to_id(myTeam) == chid_to_id(targetTeam) then return false end
+    return true
+end
+
+-- Silent Aim (simple version with team check)
+local targetPlayer = nil
+local isLeftMouseDown, isRightMouseDown = false, false
+local autoClickConnection = nil
+local cameraLockConnection = nil
+local silentAimEnabled = false
+
+local function getClosestPlayerToMouse()
+    local closest = nil
+    local shortest = math.huge
+    local mousePos = inputService:GetMouseLocation()
+    for _, player in ipairs(playersService:GetPlayers()) do
+        if player ~= lplr and player.Character and player.Character:FindFirstChild("Head") and isEnemy(player) then
+            local head = player.Character.Head
+            local screenPos, onScreen = gameCamera:WorldToViewportPoint(head.Position)
+            if onScreen then
+                local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                if dist < shortest then
+                    closest = player
+                    shortest = dist
+                end
+            end
+        end
+    end
+    return closest
+end
+
+local function lockCameraToHead()
+    if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("Head") then
+        local head = targetPlayer.Character.Head
+        local headPosition = gameCamera:WorldToViewportPoint(head.Position)
+        if headPosition.Z > 0 then
+            local cameraPosition = gameCamera.CFrame.Position
+            local direction = (head.Position - cameraPosition).Unit
+            gameCamera.CFrame = CFrame.new(cameraPosition, head.Position)
+        end
+    end
+end
+
+local function autoClick()
+    if autoClickConnection then autoClickConnection:Disconnect() end
+    autoClickConnection = runService.Heartbeat:Connect(function()
+        if (isLeftMouseDown or isRightMouseDown) and silentAimEnabled then
+            if not isLobbyVisible() and canClick() then
+                mouse1click()
+            end
+        else
+            autoClickConnection:Disconnect()
+            autoClickConnection = nil
+        end
+    end)
+end
 
 local function isLobbyVisible()
     local mainGui = lplr.PlayerGui:FindFirstChild("MainGui")
@@ -99,149 +170,49 @@ local function isLobbyVisible()
     return false
 end
 
-local function getClosestPlayerToMouse()
-    local closest = nil
-    local shortest = math.huge
-    local mousePos = inputService:GetMouseLocation()
-    for _, player in ipairs(playersService:GetPlayers()) do
-        if player ~= lplr and player.Character and player.Character:FindFirstChild("Head") then
-            local head = player.Character.Head
-            local screenPos, onScreen = gameCamera:WorldToViewportPoint(head.Position)
-            if onScreen then
-                local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
-                if dist < shortest then
-                    closest = player
-                    shortest = dist
-                end
-            end
+inputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        if not isLeftMouseDown then
+            isLeftMouseDown = true
+            if silentAimEnabled then autoClick() end
+        end
+    elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+        if not isRightMouseDown then
+            isRightMouseDown = true
+            if silentAimEnabled then autoClick() end
         end
     end
-    return closest
-end
+end)
 
-local function getAimPart(player, partName)
-    if not player or not player.Character then return nil end
-    if partName == "Head" then return player.Character:FindFirstChild("Head")
-    elseif partName == "Body" then return player.Character:FindFirstChild("HumanoidRootPart") or player.Character:FindFirstChild("Torso")
-    elseif partName == "Random" then
-        local parts = {}
-        local h = player.Character:FindFirstChild("Head")
-        local r = player.Character:FindFirstChild("HumanoidRootPart") or player.Character:FindFirstChild("Torso")
-        if h then table.insert(parts, h) end
-        if r then table.insert(parts, r) end
-        if #parts > 0 then return parts[rand.NextInteger(rand, 1, #parts)] end
+inputService.InputEnded:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        isLeftMouseDown = false
+    elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+        isRightMouseDown = false
     end
-    return player.Character:FindFirstChild("Head")
-end
-
-local function isTargetVisible(player)
-    if not player or not player.Character then return false end
-    local part = getAimPart(player, aimPart)
-    if not part then return false end
-    local camPos = gameCamera.CFrame.Position
-    local origin = camPos
-    local direction = (part.Position - origin) * 0.999
-    local rayParams = RaycastParams.new()
-    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-    rayParams.FilterDescendantsInstances = {lplr.Character, player.Character}
-    local result = workspace:Raycast(origin, direction, rayParams)
-    return result == nil
-end
-
-local function lockCameraToTarget(player)
-    if not player or not player.Character then return end
-    if wallCheckEnabled and not isTargetVisible(player) then return end
-    local part = getAimPart(player, aimPart)
-    if not part then return end
-    local goalCF = CFrame.new(gameCamera.CFrame.Position, part.Position)
-    if smoothness >= 0.99 then
-        gameCamera.CFrame = goalCF
-    else
-        gameCamera.CFrame = gameCamera.CFrame:Lerp(goalCF, smoothness)
-    end
-    if ShowTarget and ShowTarget.Enabled and targetinfo then
-        targetinfo.Targets[player] = tick() + 1
-    end
-end
-
-local function cameraStep()
-    if isLobbyVisible() then return end
-    local target = getClosestPlayerToMouse()
-    if target and rand.NextNumber(rand, 0, 100) <= lockChanceSA then
-        lockCameraToTarget(target)
-    end
-end
+end)
 
 run(function()
-    local SilentAim
-    SilentAim = vape.Categories.Combat:CreateModule({
+    vape.Categories.Combat:CreateModule({
         Name = 'Silent Aim',
         Function = function(callback)
+            silentAimEnabled = callback
             if callback then
-                cameraConnection = runService.Heartbeat:Connect(cameraStep)
+                cameraLockConnection = runService.Heartbeat:Connect(function()
+                    if not isLobbyVisible() then
+                        targetPlayer = getClosestPlayerToMouse()
+                        if targetPlayer then lockCameraToHead() end
+                    end
+                end)
             else
-                if cameraConnection then cameraConnection:Disconnect(); cameraConnection = nil end
+                if cameraLockConnection then cameraLockConnection:Disconnect(); cameraLockConnection = nil end
+                if autoClickConnection then autoClickConnection:Disconnect(); autoClickConnection = nil end
+                targetPlayer = nil
             end
         end,
-        Tooltip = 'Aims camera at closest enemy.'
-    })
-
-    SilentAim:CreateDropdown({
-        Name = 'Aim Part', List = {'Head', 'Body', 'Random'}, Default = 'Head',
-        Function = function(val) aimPart = val end,
-        Tooltip = 'Body part to lock onto'
-    })
-    SilentAim:CreateSlider({
-        Name = 'Smoothness', Min = 1, Max = 100, Default = 100,
-        Function = function(val) smoothness = val / 100 end,
-        Suffix = '%', Tooltip = 'Lock smoothness'
-    })
-    SilentAim:CreateToggle({
-        Name = 'Wall Check', Default = true,
-        Function = function(val) wallCheckEnabled = val end,
-        Tooltip = 'Only lock when target is visible'
-    })
-    SilentAim:CreateSlider({
-        Name = 'Hit Chance', Min = 0, Max = 100, Default = 100,
-        Function = function(val) lockChanceSA = val end,
-        Suffix = '%', Tooltip = 'Chance to lock onto target each check'
-    })
-    ShowTarget = SilentAim:CreateToggle({
-        Name = 'Show Target Info', Default = true
-    })
-    CircleColor = SilentAim:CreateColorSlider({
-        Name = 'Circle Color', Darker = true, Visible = false,
-        Function = function(h,s,v) if CircleObject then CircleObject.Color = Color3.fromHSV(h,s,v) end end
-    })
-    CircleTransparency = SilentAim:CreateSlider({
-        Name = 'Transparency', Min = 0, Max = 1, Decimal = 10, Default = 0.5,
-        Darker = true, Visible = false,
-        Function = function(val) if CircleObject then CircleObject.Transparency = 1 - val end end
-    })
-    CircleFilled = SilentAim:CreateToggle({
-        Name = 'Circle Filled', Darker = true, Visible = false,
-        Function = function(callback) if CircleObject then CircleObject.Filled = callback end end
-    })
-    SilentAim:CreateToggle({
-        Name = 'Range Circle',
-        Function = function(callback)
-            if callback then
-                CircleObject = Drawing.new('Circle')
-                CircleObject.Filled = CircleFilled and CircleFilled.Enabled
-                CircleObject.Color = Color3.fromHSV(CircleColor and CircleColor.Hue or 0, CircleColor and CircleColor.Sat or 1, CircleColor and CircleColor.Value or 1)
-                CircleObject.Position = vape.gui.AbsoluteSize / 2
-                CircleObject.Radius = 150
-                CircleObject.NumSides = 100
-                CircleObject.Transparency = 1 - (CircleTransparency and CircleTransparency.Value or 0.5)
-                CircleObject.Visible = SilentAim.Enabled
-            else
-                pcall(function() CircleObject:Remove() end)
-                CircleObject = nil
-            end
-            if CircleColor then CircleColor.Object.Visible = callback end
-            if CircleTransparency then CircleTransparency.Object.Visible = callback end
-            if CircleFilled then CircleFilled.Object.Visible = callback end
-        end
+        Tooltip = 'Simple camera lock auto-aim with auto-click.'
     })
 end)
 
@@ -492,7 +463,7 @@ run(function()
     end})
 end)
 
--- Ragebot (target strafe now built into main toggle)
+-- Ragebot
 run(function()
     local RagebotModule = vape.Categories.Blatant:CreateModule({
         Name = "Ragebot",
@@ -511,8 +482,6 @@ run(function()
                     local baseCF = CFrame.new(newPos, newPos + lookDir)
                     local rotCF = CFrame.Angles(math.rad(rotX), math.rad(rotY), math.rad(rotZ))
                     root.CFrame = baseCF * rotCF
-
-                    -- Perfect camera lock onto head
                     gameCamera.CFrame = CFrame.new(gameCamera.CFrame.Position, targetHead)
                 end)
             else
@@ -535,12 +504,10 @@ run(function()
     RagebotModule:CreateSlider({Name = "Rotate Y (Yaw)", Min = -180, Max = 180, Default = 0, Function = function(v) rotY = v end, Suffix = "°"})
     RagebotModule:CreateSlider({Name = "Rotate Z (Roll)", Min = -180, Max = 180, Default = 0, Function = function(v) rotZ = v end, Suffix = "°"})
 
-    -- Anti Void
     RagebotModule:CreateToggle({Name = "Anti Void", Default = false, Function = function(v)
         workspace.FallenPartsDestroyHeight = v and -99999 or 0
     end})
 
-    -- Position Resolver
     local resolverEnabled = false
     local lastPos = nil
     local resolverConnection = nil
@@ -569,7 +536,7 @@ run(function()
     end})
 end)
 
--- Skin Unlocker (Vape module)
+-- Skin Unlocker
 run(function()
     local SkinModule = vape.Categories.Utility:CreateModule({Name = "Skin Unlocker", Function = function(callback)
         if callback and not shared.VapeSkinUnlockerActive then
@@ -1284,4 +1251,4 @@ end)
 
 entitylib.start()
 
-print("Rawr.xyz V4.2.3")
+print("Rawr.xyz V4.2.5")
