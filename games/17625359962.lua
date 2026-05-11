@@ -466,6 +466,20 @@ run(function()
     local ragebotEnabled = false
     local strafeEnabled = false
     local strafeConnection = nil
+    local targetPlayer = nil
+
+    local function buildPlayerList()
+        local list = {}
+        for _, player in ipairs(playersService:GetPlayers()) do
+            if player ~= lplr and isEnemy(player) then
+                table.insert(list, player.Name)
+            end
+        end
+        if player and player.Character and player.Character:FindFirstChild("Head") then
+            table.insert(list, player.Name)
+        end
+        return list
+    end
 
     local RagebotModule = vape.Categories.Blatant:CreateModule({
         Name = "Ragebot",
@@ -474,19 +488,59 @@ run(function()
             if not callback then
                 if strafeConnection then strafeConnection:Disconnect(); strafeConnection = nil end
             else
-                if strafeEnabled then
+                if strafeEnabled and targetPlayer then
                     strafeConnection = runService.Heartbeat:Connect(strafeLoop)
                 end
             end
         end,
-        Tooltip = "Safe physics‑based strafing."
+        Tooltip = "save yourself not love."
+    })
+
+    local playerDropdown = RagebotModule:CreateDropdown({
+        Name = "Target Player",
+        List = buildPlayerList(),
+        Function = function(val)
+            -- object 
+            for _, p in ipairs(playersService:GetPlayers()) do
+                if p.Name == val and isEnemy(p) then
+                    targetPlayer = p
+                    break
+                end
+            end
+            -- disconnection
+            if strafeConnection then
+                strafeConnection:Disconnect()
+                if ragebotEnabled and strafeEnabled and targetPlayer then
+                    strafeConnection = runService.Heartbeat:Connect(strafeLoop)
+                else
+                    strafeConnection = nil
+                end
+            end
+        end
+    })
+
+    RagebotModule:CreateToggle({
+        Name = "Strafe Enabled",
+        Default = false,
+        Function = function(callback)
+            strafeEnabled = callback
+            if ragebotEnabled and callback and targetPlayer then
+                if strafeConnection then strafeConnection:Disconnect() end
+                strafeConnection = runService.Heartbeat:Connect(strafeLoop)
+            else
+                if strafeConnection then
+                    strafeConnection:Disconnect()
+                    strafeConnection = nil
+                end
+            end
+        end,
+        Tooltip = "Turn strafing on/off while module stays active"
     })
 
     local function strafeLoop()
         if not entitylib.isAlive then return end
-        local target = getClosestPlayerToMouse()
-        if not target or not target.Character then return end
-        local targetHead = target.Character:FindFirstChild("Head")
+        if not targetPlayer or not targetPlayer.Character then return end
+        local targetHead = targetPlayer.Character:FindFirstChild("Head")
         local root = entitylib.character.RootPart
         local humanoid = entitylib.character:FindFirstChildOfClass("Humanoid")
         if not (root and humanoid and targetHead) then return end
@@ -523,24 +577,7 @@ run(function()
         end
     end
 
-    RagebotModule:CreateToggle({
-        Name = "Strafe Enabled",
-        Default = false,
-        Function = function(callback)
-            strafeEnabled = callback
-            if ragebotEnabled and callback then
-                if strafeConnection then strafeConnection:Disconnect() end
-                strafeConnection = runService.Heartbeat:Connect(strafeLoop)
-            else
-                if strafeConnection then
-                    strafeConnection:Disconnect()
-                    strafeConnection = nil
-                end
-            end
-        end,
-        Tooltip = "Turn strafing on/off"
-    })
-
+    -- Sliders / Options
     local strafeSpeed = 3
     local strafeDistance = 6
     local strafeMethod = "Target"
@@ -580,7 +617,6 @@ run(function()
         Function = function(v) shouldPause = v end
     })
 end)
-
 run(function()
     local SkinModule = vape.Categories.Utility:CreateModule({Name = "Skin Unlocker", Function = function(callback)
         if callback and not shared.VapeSkinUnlockerActive then
