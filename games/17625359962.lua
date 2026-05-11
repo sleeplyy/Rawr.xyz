@@ -71,9 +71,6 @@ end
 for _, v in {'SilentAim', 'Reach', 'AntiFall', 'Killaura', 'AntiRagdoll', 'Blink',
     'Disabler', 'SafeWalk', 'MurderMystery', 'TriggerBot'} do vape:Remove(v) end
 
-local function if_player_is_on_round_or_another(player)
-    return player:GetAttribute("EnvironmentID") ~= nil
-end
 local function chid_to_id(chid)
     return string.byte(chid or string.char(0))
 end
@@ -224,9 +221,8 @@ run(function()
                 targetPlayer = nil
             end
         end,
-        Tooltip = 'Redirects your bullets to the choosen part.'
+        Tooltip = 'Camera lock + auto‑click. Hold Mouse1/Mouse2.'
     })
-
     SilentAim:CreateDropdown({Name='Aim Part', List={'Head','Body','Random'}, Default='Head', Function=function(v) aimPartSA=v end, Tooltip='Part to lock onto'})
     SilentAim:CreateSlider({Name='Smoothness', Min=1, Max=100, Default=100, Function=function(v) smoothnessSA=v/100 end, Suffix='%', Tooltip='Lock smoothness'})
     SilentAim:CreateToggle({Name='Wall Check', Default=true, Function=function(v) wallCheckSA=v end, Tooltip='Only lock when visible'})
@@ -299,7 +295,6 @@ local function updateCrosshair()
         for i = 1, 8 do if drawings.lines[i] then drawings.lines[i].Visible = false end end
         for i = 1, 4 do if drawings.outlines[i] then drawings.outlines[i].Visible = false end end
         if drawings.dot then drawings.dot.Visible = false end
-
         if crosshairStyle == "Cross" then
             for idx = 1, 4 do
                 local inline = drawings.lines[idx+4]; local outline = drawings.outlines[idx]
@@ -351,14 +346,13 @@ local CrosshairModule = vape.Categories.Utility:CreateModule({
         end
     end
 })
-
 CrosshairModule:CreateDropdown({Name="Style", List={"Cross","Dot","Diagonal"}, Default="Cross", Function=function(v) crosshairStyle=v end})
 CrosshairModule:CreateColorSlider({Name="Color", Function=function(h,s,v) crosshairColor=Color3.fromHSV(h,s,v) end})
 CrosshairModule:CreateToggle({Name="Spin", Default=true, Function=function(v) crosshairSpin=v end})
 CrosshairModule:CreateSlider({Name="Length", Min=1,Max=30,Default=10, Function=function(v) crosshairLength=v end, Suffix="px"})
 CrosshairModule:CreateSlider({Name="Radius", Min=0,Max=30,Default=11, Function=function(v) crosshairRadius=v end, Suffix="px"})
 CrosshairModule:CreateSlider({Name="Thickness", Min=0.5,Max=5,Default=1.5,Decimal=10, Function=function(v) crosshairWidth=v end, Suffix="px"})
-CrosshairModule:CreateSlider({Name="Dot Size", Min=0,Max=10,Default=0, Function=function(v) dotSize=v end, Suffix="px", Tooltip="0 = no dot"})
+CrosshairModule:CreateSlider({Name="Dot Size", Min=0,Max=10,Default=0, Function=function(v) dotSize=v end, Suffix="px"})
 CrosshairModule:CreateToggle({Name="Outline", Default=false, Function=function(v) outlineEnabled=v end})
 CrosshairModule:CreateColorSlider({Name="Outline Color", Visible=false, Function=function(h,s,v) outlineColor=Color3.fromHSV(h,s,v) end})
 CrosshairModule:CreateSlider({Name="Outline Thickness", Min=0,Max=3,Default=0.5,Decimal=10, Visible=false, Function=function(v) outlineThickness=v end, Suffix="px"})
@@ -421,7 +415,6 @@ run(function()
     })
 end)
 
--- Fog Controller
 run(function()
     local Lighting = game:GetService("Lighting")
     local origFogEnd, origFogStart = Lighting.FogEnd, Lighting.FogStart
@@ -478,11 +471,30 @@ run(function()
                     local targetHead = target.Character.Head.Position
                     local root = entitylib.character.RootPart
                     if not root then return end
-                    local angle = (tick() * strafeSpeed) % (math.pi * 2)
-                    local offset = Vector3.new(math.cos(angle) * strafeDistance, 0, math.sin(angle) * strafeDistance)
-                    local newPos = targetHead + offset
-                    root.CFrame = CFrame.new(newPos, targetHead) * CFrame.Angles(math.rad(rotX), math.rad(rotY), math.rad(rotZ))
-                    gameCamera.CFrame = CFrame.new(gameCamera.CFrame.Position, targetHead)
+
+                    local strafeAngle = (tick() * strafeSpeed) % (math.pi * 2)
+
+                    if randomStrafeEnabled then
+                        if tick() - lastRandomStrafe > randomStrafeDelay then
+                            strafeDir = math.random() > 0.5 and 1 or -1
+                            lastRandomStrafe = tick()
+                        end
+                        strafeAngle = strafeAngle * strafeDir
+                    end
+
+                    if strafeMethod == "Target" then
+                        local dirToTarget = (targetHead - root.Position).Unit
+                        local perp = Vector3.new(-dirToTarget.Z, 0, dirToTarget.X)
+                        local offset = perp * strafeDistance
+                        local newPos = targetHead + offset
+                        root.CFrame = CFrame.new(newPos, targetHead + Vector3.new(0, jumpOffset, 0)) * CFrame.Angles(math.rad(rotX), math.rad(rotY), math.rad(rotZ))
+                    else
+                        local offset = Vector3.new(math.cos(strafeAngle) * strafeDistance, jumpOffset, math.sin(strafeAngle) * strafeDistance)
+                        local newPos = targetHead + offset
+                        root.CFrame = CFrame.new(newPos, targetHead) * CFrame.Angles(math.rad(rotX), math.rad(rotY), math.rad(rotZ))
+                    end
+
+                    gameCamera.CFrame = CFrame.new(gameCamera.CFrame.Position, targetHead + Vector3.new(0, aimOffset, 0))
                 end)
             else
                 if strafeConnection then strafeConnection:Disconnect(); strafeConnection = nil end
@@ -490,26 +502,38 @@ run(function()
                 lastPos = nil
             end
         end,
-        Tooltip = 'Strafes around the nearest target.'
+        Tooltip = 'Strafes around target.'
     })
 
     local strafeSpeed = 10
     local strafeDistance = 8
+    local strafeMethod = "Randomize"
+    local randomStrafeEnabled = false
+    local randomStrafeDelay = 3
+    local lastRandomStrafe = 0
+    local strafeDir = 1
+    local jumpOffset = 0
+    local aimOffset = 0
     local rotX, rotY, rotZ = 0, 0, 0
     local strafeConnection = nil
     local resolverEnabled = false
     local lastPos = nil
     local resolverConnection = nil
 
-    RagebotModule:CreateSlider({Name = "Strafe Speed", Min=1, Max=30, Default=10, Function=function(v) strafeSpeed = v end, Suffix = "rad/s"})
-    RagebotModule:CreateSlider({Name = "Strafe Distance", Min=2, Max=20, Default=8, Function=function(v) strafeDistance = v end, Suffix = "studs"})
-    RagebotModule:CreateSlider({Name = "Rotate X", Min=-180, Max=180, Default=0, Function=function(v) rotX=v end, Suffix="°"})
-    RagebotModule:CreateSlider({Name = "Rotate Y", Min=-180, Max=180, Default=0, Function=function(v) rotY=v end, Suffix="°"})
-    RagebotModule:CreateSlider({Name = "Rotate Z", Min=-180, Max=180, Default=0, Function=function(v) rotZ=v end, Suffix="°"})
-    RagebotModule:CreateToggle({Name = "Anti Void", Default=false, Function=function(v)
+    RagebotModule:CreateDropdown({Name = "Strafe Method", List = {"Randomize", "Target"}, Default = "Randomize", Function = function(v) strafeMethod = v end, Tooltip = "Randomize = circle, Target = side-to-side"})
+    RagebotModule:CreateSlider({Name = "Strafe Speed", Min = 1, Max = 30, Default = 10, Function = function(v) strafeSpeed = v end, Suffix = "rad/s"})
+    RagebotModule:CreateSlider({Name = "Strafe Distance", Min = 2, Max = 20, Default = 8, Function = function(v) strafeDistance = v end, Suffix = "studs"})
+    RagebotModule:CreateToggle({Name = "Random Strafe", Default = false, Function = function(v) randomStrafeEnabled = v end, Tooltip = "Randomly change strafe direction"})
+    RagebotModule:CreateSlider({Name = "Random Delay", Min = 1, Max = 10, Default = 3, Function = function(v) randomStrafeDelay = v end, Suffix = "s", Tooltip = "Time between random direction changes"})
+    RagebotModule:CreateSlider({Name = "Jump Offset", Min = 0, Max = 10, Default = 0, Function = function(v) jumpOffset = v end, Suffix = "studs", Tooltip = "Height offset while strafing"})
+    RagebotModule:CreateSlider({Name = "Aim Offset", Min = -5, Max = 5, Default = 0, Decimal = 10, Function = function(v) aimOffset = v end, Suffix = "studs", Tooltip = "Vertical aim offset"})
+    RagebotModule:CreateSlider({Name = "Rotate X (Pitch)", Min = -180, Max = 180, Default = 0, Function = function(v) rotX = v end, Suffix = "°"})
+    RagebotModule:CreateSlider({Name = "Rotate Y (Yaw)", Min = -180, Max = 180, Default = 0, Function = function(v) rotY = v end, Suffix = "°"})
+    RagebotModule:CreateSlider({Name = "Rotate Z (Roll)", Min = -180, Max = 180, Default = 0, Function = function(v) rotZ = v end, Suffix = "°"})
+    RagebotModule:CreateToggle({Name = "Anti Void", Default = false, Function = function(v)
         workspace.FallenPartsDestroyHeight = v and -99999 or 0
     end})
-    RagebotModule:CreateToggle({Name = "Position Resolver", Default=false, Function=function(v)
+    RagebotModule:CreateToggle({Name = "Position Resolver", Default = false, Function = function(v)
         resolverEnabled = v
         if v then
             resolverConnection = runService.Heartbeat:Connect(function()
@@ -531,6 +555,7 @@ run(function()
     end})
 end)
 
+-- Skin Unlocker
 run(function()
     local SkinModule = vape.Categories.Utility:CreateModule({Name = "Skin Unlocker", Function = function(callback)
         if callback and not shared.VapeSkinUnlockerActive then
@@ -579,9 +604,7 @@ run(function()
                             config.equipped[weapon] = {}
                             for cosmeticType, cosmeticData in pairs(cosmetics) do
                                 if cosmeticData and cosmeticData.Name then
-                                    config.equipped[weapon][cosmeticType] = {
-                                        name = cosmeticData.Name, seed = cosmeticData.Seed, inverted = cosmeticData.Inverted
-                                    }
+                                    config.equipped[weapon][cosmeticType] = {name = cosmeticData.Name, seed = cosmeticData.Seed, inverted = cosmeticData.Inverted}
                                 end
                             end
                         end
@@ -636,7 +659,7 @@ run(function()
                     local data = originalGet(self, key)
                     if key == "CosmeticInventory" then
                         local proxy = {}
-                        if data then for k, v in pairs(data) do 
+                        if data then for k, v in pairs(data) do
                             local cosmetic = CosmeticLibrary.Cosmetics[k]
                             if cosmetic and cosmetic.Type == "Skin" then proxy[k] = v end
                         end end
@@ -650,7 +673,7 @@ run(function()
                         local result = data and table.clone(data) or {}
                         for weapon, favs in pairs(favorites) do
                             result[weapon] = result[weapon] or {}
-                            for name, isFav in pairs(favs) do 
+                            for name, isFav in pairs(favs) do
                                 local cosmetic = CosmeticLibrary.Cosmetics[name]
                                 if cosmetic and cosmetic.Type == "Skin" then result[weapon][name] = isFav end
                             end
@@ -668,7 +691,7 @@ run(function()
                     for key, value in pairs(data) do merged[key] = value end
                     merged.Name = weaponName
                     if equipped[weaponName] then
-                        for cosmeticType, cosmeticData in pairs(equipped[weaponName]) do 
+                        for cosmeticType, cosmeticData in pairs(equipped[weaponName]) do
                             if cosmeticType == "Skin" then merged[cosmeticType] = cosmeticData end
                         end
                     end
@@ -686,7 +709,7 @@ run(function()
                     local replicationRemotes = remotes and remotes:FindFirstChild("Replication")
                     local fighterRemotes = replicationRemotes and replicationRemotes:FindFirstChild("Fighter")
                     local useItemRemote = fighterRemotes and fighterRemotes:FindFirstChild("UseItem")
-                    
+
                     if equipRemote then
                         local oldNamecall
                         oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
@@ -744,7 +767,6 @@ run(function()
 
                 local ClientItem
                 pcall(function() ClientItem = require(player.PlayerScripts.Modules.ClientReplicatedClasses.ClientFighter.ClientItem) end)
-
                 if ClientItem and ClientItem._CreateViewModel then
                     local originalCreateViewModel = ClientItem._CreateViewModel
                     ClientItem._CreateViewModel = function(self, viewmodelRef)
@@ -757,8 +779,7 @@ run(function()
                                 viewmodelRef[dataKey][skinKey] = equipped[weaponName].Skin
                                 viewmodelRef[dataKey][nameKey] = equipped[weaponName].Skin.Name
                             elseif viewmodelRef.Data then
-                                viewmodelRef.Data.Skin = equipped[weaponName].Skin
-                                viewmodelRef.Data.Name = equipped[weaponName].Skin.Name
+                                viewmodelRef.Data.Skin = equipped[weaponName].Skin; viewmodelRef.Data.Name = equipped[weaponName].Skin.Name
                             end
                         end
                         local result = originalCreateViewModel(self, viewmodelRef)
@@ -806,13 +827,12 @@ run(function()
                     if cosmetic and (cosmetic.Type == "Charm" or name:lower():find("charm")) then return true end
                     return originalOwnsCosmeticCharm(self, inventory, name, weapon)
                 end
-
                 local originalGetCharm = DataController.Get
                 DataController.Get = function(self, key)
                     local data = originalGetCharm(self, key)
                     if key == "CosmeticInventory" then
                         local proxy = {}
-                        if data then for k, v in pairs(data) do 
+                        if data then for k, v in pairs(data) do
                             local cosmetic = CosmeticLibrary.Cosmetics[k]
                             if cosmetic and (cosmetic.Type == "Charm" or k:lower():find("charm")) then proxy[k] = v end
                         end end
@@ -826,7 +846,7 @@ run(function()
                         local result = data and table.clone(data) or {}
                         for weapon, favs in pairs(favorites) do
                             result[weapon] = result[weapon] or {}
-                            for name, isFav in pairs(favs) do 
+                            for name, isFav in pairs(favs) do
                                 local cosmetic = CosmeticLibrary.Cosmetics[name]
                                 if cosmetic and (cosmetic.Type == "Charm" or name:lower():find("charm")) then result[weapon][name] = isFav end
                             end
@@ -835,7 +855,6 @@ run(function()
                     end
                     return data
                 end
-
                 local originalGetWeaponDataCharm = DataController.GetWeaponData
                 DataController.GetWeaponData = function(self, weaponName)
                     local data = originalGetWeaponDataCharm(self, weaponName)
@@ -844,19 +863,17 @@ run(function()
                     for key, value in pairs(data) do merged[key] = value end
                     merged.Name = weaponName
                     if equipped[weaponName] then
-                        for cosmeticType, cosmeticData in pairs(equipped[weaponName]) do 
+                        for cosmeticType, cosmeticData in pairs(equipped[weaponName]) do
                             if cosmeticType == "Charm" then merged[cosmeticType] = cosmeticData end
                         end
                     end
                     return merged
                 end
-
                 if hookmetamethod then
                     local remotes = ReplicatedStorage:FindFirstChild("Remotes")
                     local dataRemotes = remotes and remotes:FindFirstChild("Data")
                     local equipRemote = dataRemotes and dataRemotes:FindFirstChild("EquipCosmetic")
                     local favoriteRemote = dataRemotes and dataRemotes:FindFirstChild("FavoriteCosmetic")
-                    
                     if equipRemote then
                         local oldNamecall
                         oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
@@ -879,8 +896,7 @@ run(function()
                                 end
                                 task.defer(function()
                                     pcall(function() DataController.CurrentData:Replicate("WeaponInventory") end)
-                                    task.wait(0.2)
-                                    saveConfig()
+                                    task.wait(0.2); saveConfig()
                                 end)
                                 return
                             end
@@ -898,7 +914,6 @@ run(function()
                         end)
                     end
                 end
-
                 if ClientItem and ClientItem._CreateViewModel then
                     local originalCreateViewModelCharm = ClientItem._CreateViewModel
                     ClientItem._CreateViewModel = function(self, viewmodelRef)
@@ -908,44 +923,13 @@ run(function()
                         if weaponPlayer == player and equipped[weaponName] and equipped[weaponName].Charm and viewmodelRef then
                             local dataKey, charmKey, nameKey = self:ToEnum("Data"), self:ToEnum("Charm"), self:ToEnum("Name")
                             if viewmodelRef[dataKey] then
-                                viewmodelRef[dataKey][charmKey] = equipped[weaponName].Charm
-                                viewmodelRef[dataKey][nameKey] = equipped[weaponName].Charm.Name
+                                viewmodelRef[dataKey][charmKey] = equipped[weaponName].Charm; viewmodelRef[dataKey][nameKey] = equipped[weaponName].Charm.Name
                             elseif viewmodelRef.Data then
-                                viewmodelRef.Data.Charm = equipped[weaponName].Charm
-                                viewmodelRef.Data.Name = equipped[weaponName].Charm.Name
+                                viewmodelRef.Data.Charm = equipped[weaponName].Charm; viewmodelRef.Data.Name = equipped[weaponName].Charm.Name
                             end
                         end
                         local result = originalCreateViewModelCharm(self, viewmodelRef)
                         constructingWeapon = nil
-                        return result
-                    end
-                end
-
-                if viewModelModule then
-                    local ClientViewModel = require(viewModelModule)
-                    if ClientViewModel.GetCharm then
-                        local originalGetCharmFunc = ClientViewModel.GetCharm
-                        ClientViewModel.GetCharm = function(self)
-                            local weaponName = self.ClientItem and self.ClientItem.Name
-                            local weaponPlayer = self.ClientItem and self.ClientItem.ClientFighter and self.ClientItem.ClientFighter.Player
-                            if weaponName and weaponPlayer == player and equipped[weaponName] and equipped[weaponName].Charm then
-                                return equipped[weaponName].Charm
-                            end
-                            return originalGetCharmFunc(self)
-                        end
-                    end
-                    local originalNewCharm = ClientViewModel.new
-                    ClientViewModel.new = function(replicatedData, clientItem)
-                        local weaponPlayer = clientItem.ClientFighter and clientItem.ClientFighter.Player
-                        local weaponName = constructingWeapon or clientItem.Name
-                        if weaponPlayer == player and equipped[weaponName] then
-                            local ReplicatedClass = require(ReplicatedStorage.Modules.ReplicatedClass)
-                            local dataKey = ReplicatedClass:ToEnum("Data")
-                            replicatedData[dataKey] = replicatedData[dataKey] or {}
-                            local cosmetics = equipped[weaponName]
-                            if cosmetics.Charm then replicatedData[dataKey][ReplicatedClass:ToEnum("Charm")] = cosmetics.Charm end
-                        end
-                        local result = originalNewCharm(replicatedData, clientItem)
                         return result
                     end
                 end
@@ -958,13 +942,12 @@ run(function()
                     if cosmetic and (cosmetic.Type == "Dance" or cosmetic.Type == "Emote" or name:lower():find("dance") or name:lower():find("emote")) then return true end
                     return originalOwnsCosmeticDance(self, inventory, name, weapon)
                 end
-
                 local originalGetDance = DataController.Get
                 DataController.Get = function(self, key)
                     local data = originalGetDance(self, key)
                     if key == "CosmeticInventory" then
                         local proxy = {}
-                        if data then for k, v in pairs(data) do 
+                        if data then for k, v in pairs(data) do
                             local cosmetic = CosmeticLibrary.Cosmetics[k]
                             if cosmetic and (cosmetic.Type == "Dance" or cosmetic.Type == "Emote" or k:lower():find("dance") or k:lower():find("emote")) then proxy[k] = v end
                         end end
@@ -978,7 +961,7 @@ run(function()
                         local result = data and table.clone(data) or {}
                         for weapon, favs in pairs(favorites) do
                             result[weapon] = result[weapon] or {}
-                            for name, isFav in pairs(favs) do 
+                            for name, isFav in pairs(favs) do
                                 local cosmetic = CosmeticLibrary.Cosmetics[name]
                                 if cosmetic and (cosmetic.Type == "Dance" or cosmetic.Type == "Emote" or name:lower():find("dance") or name:lower():find("emote")) then result[weapon][name] = isFav end
                             end
@@ -987,7 +970,6 @@ run(function()
                     end
                     return data
                 end
-
                 local originalGetWeaponDataDance = DataController.GetWeaponData
                 DataController.GetWeaponData = function(self, weaponName)
                     local data = originalGetWeaponDataDance(self, weaponName)
@@ -997,13 +979,11 @@ run(function()
                     merged.Name = weaponName
                     return merged
                 end
-
                 if hookmetamethod then
                     local remotes = ReplicatedStorage:FindFirstChild("Remotes")
                     local dataRemotes = remotes and remotes:FindFirstChild("Data")
                     local equipRemote = dataRemotes and dataRemotes:FindFirstChild("EquipCosmetic")
                     local favoriteRemote = dataRemotes and dataRemotes:FindFirstChild("FavoriteCosmetic")
-                    
                     if equipRemote then
                         local oldNamecall
                         oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
@@ -1013,16 +993,14 @@ run(function()
                                 local weaponName, cosmeticType, cosmeticName, options = args[1], args[2], args[3], args[4] or {}
                                 if cosmeticType == "Dance" or cosmeticType == "Emote" or (cosmeticName and (cosmeticName:lower():find("dance") or cosmeticName:lower():find("emote"))) then
                                     equipped.Dances = equipped.Dances or {}
-                                    if not cosmeticName or cosmeticName == "None" or cosmeticName == "" then
-                                        equipped.Dances[cosmeticType] = nil
+                                    if not cosmeticName or cosmeticName == "None" or cosmeticName == "" then equipped.Dances[cosmeticType] = nil
                                     else
                                         local cloned = cloneCosmetic(cosmeticName, cosmeticType, {inverted = options.IsInverted, favoritesOnly = options.OnlyUseFavorites})
                                         if cloned then equipped.Dances[cosmeticType] = cloned end
                                     end
                                     task.defer(function()
                                         pcall(function() DataController.CurrentData:Replicate("CosmeticInventory") end)
-                                        task.wait(0.2)
-                                        saveConfig()
+                                        task.wait(0.2); saveConfig()
                                     end)
                                     return
                                 end
@@ -1043,30 +1021,6 @@ run(function()
                     end
                 end
 
-                local EmoteController
-                pcall(function() 
-                    EmoteController = require(controllers:WaitForChild("EmoteController", 10))
-                    if EmoteController and EmoteController.GetEmotes then
-                        local originalGetEmotes = EmoteController.GetEmotes
-                        EmoteController.GetEmotes = function(self)
-                            local emotes = originalGetEmotes(self)
-                            for name, cosmetic in pairs(CosmeticLibrary.Cosmetics) do
-                                if cosmetic and (cosmetic.Type == "Dance" or cosmetic.Type == "Emote" or name:lower():find("dance") or name:lower():find("emote")) then
-                                    if not emotes[name] then
-                                        emotes[name] = {
-                                            Name = name,
-                                            Type = cosmetic.Type,
-                                            ObjectID = cosmetic.ObjectID,
-                                            Enum = cosmetic.Enum
-                                        }
-                                    end
-                                end
-                            end
-                            return emotes
-                        end
-                    end
-                end)
-
                 -- VERSION WRAPS
                 local originalOwnsCosmeticWrap = CosmeticLibrary.OwnsCosmetic
                 CosmeticLibrary.OwnsCosmetic = function(self, inventory, name, weapon)
@@ -1075,13 +1029,12 @@ run(function()
                     if cosmetic and (cosmetic.Type == "Wrap" or cosmetic.Type == "Wrapping" or name:lower():find("wrap")) then return true end
                     return originalOwnsCosmeticWrap(self, inventory, name, weapon)
                 end
-
                 local originalGetWrapVer = DataController.Get
                 DataController.Get = function(self, key)
                     local data = originalGetWrapVer(self, key)
                     if key == "CosmeticInventory" then
                         local proxy = {}
-                        if data then for k, v in pairs(data) do 
+                        if data then for k, v in pairs(data) do
                             local cosmetic = CosmeticLibrary.Cosmetics[k]
                             if cosmetic and (cosmetic.Type == "Wrap" or cosmetic.Type == "Wrapping" or k:lower():find("wrap")) then proxy[k] = v end
                         end end
@@ -1095,7 +1048,7 @@ run(function()
                         local result = data and table.clone(data) or {}
                         for weapon, favs in pairs(favorites) do
                             result[weapon] = result[weapon] or {}
-                            for name, isFav in pairs(favs) do 
+                            for name, isFav in pairs(favs) do
                                 local cosmetic = CosmeticLibrary.Cosmetics[name]
                                 if cosmetic and (cosmetic.Type == "Wrap" or cosmetic.Type == "Wrapping" or name:lower():find("wrap")) then result[weapon][name] = isFav end
                             end
@@ -1104,7 +1057,6 @@ run(function()
                     end
                     return data
                 end
-
                 local originalGetWeaponDataWrap = DataController.GetWeaponData
                 DataController.GetWeaponData = function(self, weaponName)
                     local data = originalGetWeaponDataWrap(self, weaponName)
@@ -1113,19 +1065,17 @@ run(function()
                     for key, value in pairs(data) do merged[key] = value end
                     merged.Name = weaponName
                     if equipped[weaponName] then
-                        for cosmeticType, cosmeticData in pairs(equipped[weaponName]) do 
+                        for cosmeticType, cosmeticData in pairs(equipped[weaponName]) do
                             if cosmeticType == "Wrap" or cosmeticType == "Wrapping" then merged[cosmeticType] = cosmeticData end
                         end
                     end
                     return merged
                 end
-
                 if hookmetamethod then
                     local remotes = ReplicatedStorage:FindFirstChild("Remotes")
                     local dataRemotes = remotes and remotes:FindFirstChild("Data")
                     local equipRemote = dataRemotes and dataRemotes:FindFirstChild("EquipCosmetic")
                     local favoriteRemote = dataRemotes and dataRemotes:FindFirstChild("FavoriteCosmetic")
-                    
                     if equipRemote then
                         local oldNamecall
                         oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
@@ -1148,8 +1098,7 @@ run(function()
                                 end
                                 task.defer(function()
                                     pcall(function() DataController.CurrentData:Replicate("WeaponInventory") end)
-                                    task.wait(0.2)
-                                    saveConfig()
+                                    task.wait(0.2); saveConfig()
                                 end)
                                 return
                             end
@@ -1167,7 +1116,6 @@ run(function()
                         end)
                     end
                 end
-
                 if ClientItem and ClientItem._CreateViewModel then
                     local originalCreateViewModelWrap = ClientItem._CreateViewModel
                     ClientItem._CreateViewModel = function(self, viewmodelRef)
@@ -1177,48 +1125,13 @@ run(function()
                         if weaponPlayer == player and equipped[weaponName] and equipped[weaponName].Wrap and viewmodelRef then
                             local dataKey, wrapKey, nameKey = self:ToEnum("Data"), self:ToEnum("Wrap"), self:ToEnum("Name")
                             if viewmodelRef[dataKey] then
-                                viewmodelRef[dataKey][wrapKey] = equipped[weaponName].Wrap
-                                viewmodelRef[dataKey][nameKey] = equipped[weaponName].Wrap.Name
+                                viewmodelRef[dataKey][wrapKey] = equipped[weaponName].Wrap; viewmodelRef[dataKey][nameKey] = equipped[weaponName].Wrap.Name
                             elseif viewmodelRef.Data then
-                                viewmodelRef.Data.Wrap = equipped[weaponName].Wrap
-                                viewmodelRef.Data.Name = equipped[weaponName].Wrap.Name
+                                viewmodelRef.Data.Wrap = equipped[weaponName].Wrap; viewmodelRef.Data.Name = equipped[weaponName].Wrap.Name
                             end
                         end
                         local result = originalCreateViewModelWrap(self, viewmodelRef)
                         constructingWeapon = nil
-                        return result
-                    end
-                end
-
-                if viewModelModule then
-                    local ClientViewModel = require(viewModelModule)
-                    if ClientViewModel.GetWrap then
-                        local originalGetWrapFunc = ClientViewModel.GetWrap
-                        ClientViewModel.GetWrap = function(self)
-                            local weaponName = self.ClientItem and self.ClientItem.Name
-                            local weaponPlayer = self.ClientItem and self.ClientItem.ClientFighter and self.ClientItem.ClientFighter.Player
-                            if weaponName and weaponPlayer == player and equipped[weaponName] and equipped[weaponName].Wrap then
-                                return equipped[weaponName].Wrap
-                            end
-                            return originalGetWrapFunc(self)
-                        end
-                    end
-                    local originalNewWrap = ClientViewModel.new
-                    ClientViewModel.new = function(replicatedData, clientItem)
-                        local weaponPlayer = clientItem.ClientFighter and clientItem.ClientFighter.Player
-                        local weaponName = constructingWeapon or clientItem.Name
-                        if weaponPlayer == player and equipped[weaponName] then
-                            local ReplicatedClass = require(ReplicatedStorage.Modules.ReplicatedClass)
-                            local dataKey = ReplicatedClass:ToEnum("Data")
-                            replicatedData[dataKey] = replicatedData[dataKey] or {}
-                            local cosmetics = equipped[weaponName]
-                            if cosmetics.Wrap then replicatedData[dataKey][ReplicatedClass:ToEnum("Wrap")] = cosmetics.Wrap end
-                        end
-                        local result = originalNewWrap(replicatedData, clientItem)
-                        if weaponPlayer == player and equipped[weaponName] and equipped[weaponName].Wrap and result._UpdateWrap then
-                            result:_UpdateWrap()
-                            task.delay(0.1, function() if not result._destroyed then result:_UpdateWrap() end end)
-                        end
                         return result
                     end
                 end
@@ -1234,7 +1147,6 @@ run(function()
                         end
                     end
                 end)
-
                 loadConfig()
             end)
         end
@@ -1242,5 +1154,4 @@ run(function()
 end)
 
 entitylib.start()
-
-print("Rawr.xyz V4.2.6")
+print("Rawr.xyz V4.2.7")
