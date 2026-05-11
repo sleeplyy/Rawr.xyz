@@ -7,6 +7,14 @@ if not iswindowactive then iswindowactive = function() return true end end
 if not mouse1press then mouse1press = function() end end
 if not mouse1release then mouse1release = function() end end
 
+-- Environment fallbacks
+local isfile = isfile or function(file) local ok,res = pcall(readfile,file) return ok and res ~= nil and res ~= '' end
+local writefile = writefile or function(file,data) end
+local isfolder = isfolder or function(folder) return false end
+local makefolder = makefolder or function(folder) end
+local readfile = readfile or function(file) return '' end
+local getcustomaudio = getcustomaudio or function(path) return nil end
+
 local run = function(func, issue)
     if issue then return end
     pcall(func)
@@ -288,6 +296,7 @@ run(function()
     })
 end)
 
+-- ============== CROSSHAIR ==============
 run(function()
     local crosshairEnabled = false
     local crosshairColor = Color3.fromRGB(128,128,128)
@@ -395,6 +404,7 @@ run(function()
 end)
 
 run(function()
+    -- sound list
     local soundList = {
         {name = "1nn", ext = ".mp3"}, {name = "67", ext = ".mp3"}, {name = "BatHit", ext = ".mp3"},
         {name = "Beep", ext = ".mp3"}, {name = "Bonk", ext = ".mp3"}, {name = "Bow", ext = ".mp3"},
@@ -481,7 +491,7 @@ run(function()
             if fullName then
                 currentSoundPath = "newvape/assets/sounds/" .. fullName
                 if not isfile(currentSoundPath) then
-                    local rawUrl = baseUrl .. fullName
+                    local rawUrl = baseUrl .. fullName .. "?t=" .. tick()
                     local suc, res = pcall(function()
                         return game:HttpGet(rawUrl)
                     end)
@@ -540,6 +550,7 @@ run(function()
     })
 end)
 
+-- ============== NO FOG ==============
 run(function()
     local Lighting = game:GetService("Lighting")
     local origFogEnd = Lighting.FogEnd; local origFogStart = Lighting.FogStart
