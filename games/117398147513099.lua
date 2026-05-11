@@ -19,24 +19,6 @@ local run = function(func, issue)
     pcall(func)
 end
 
-local blacklistUrl = "https://raw.githubusercontent.com/imcomingforyou6959-gif/whitelists/refs/heads/main/PlayerBlacklist.json" .. "?t=" .. tick()
-local function checkBlacklist()
-    local httpService = game:GetService("HttpService")
-    local success, result = pcall(function() return game:HttpGet(blacklistUrl) end)
-    if not success then return false end
-    local ok, data = pcall(httpService.JSONDecode, httpService, result)
-    if not (ok and data and type(data.BlacklistedUsers) == "table") then return false end
-    local userId = game.Players.LocalPlayer.UserId
-    if data.BlacklistedUsers[tostring(userId)] or data.BlacklistedUsers[userId] then
-        pcall(function()
-            game.Players.LocalPlayer:Kick("Rawr.xyz | You have been blacklisted. All Appeals Must be Sent in https://discord.gg/RJj7vrNwBy")
-        end)
-        return true
-    end
-    return false
-end
-if checkBlacklist() then while true do task.wait(10) end end
-
 local cloneref = cloneref or function(obj) return obj end
 
 local playersService = cloneref(game:GetService('Players'))
