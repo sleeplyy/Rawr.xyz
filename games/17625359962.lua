@@ -1048,14 +1048,14 @@ run(function()
         Function = function(callback)
             gunModsEnabled = callback
             if callback then
-                -- Start initial attempt after 10 seconds
+                -- Start initia
                 cancelPending()   -- just in case
-                pendingTask = task.delay(10, tryApplyHook)
+                pendingTask = task.delay(15, tryApplyHook)
             else
                 removeHook()
             end
         end,
-        Tooltip = "Customize weapon stats. Waits 10s then retries until match starts."
+        Tooltip = "Your better than them <3."
     })
 
     GunModsModule:CreateSlider({
