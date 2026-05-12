@@ -951,6 +951,82 @@ run(function()
         Tooltip = "Just Shoot"
     })
 end)
+                                                                                                                                                
+run(function()
+    -- 89
+    if not hookfunction then
+        notif('Rawr.xyz says', 'Your executor does not support hookfunction.', 5, 'alert')
+        return
+    end
+
+    local gunModsEnabled = false
+    local oldInput = nil
+    local hookActive = false
+
+    local function applyHook()
+        if hookActive then return end
+        local ok, clientItemModule = pcall(function()
+            return require(lplr.PlayerScripts.Modules.ClientReplicatedClasses.ClientFighter.ClientItem)
+        end)
+        if not ok or not clientItemModule or not clientItemModule.Input then
+            notif('Gun Mods', 'ClientItem.Input not found.', 5, 'alert')
+            return
+        end
+
+        local inputFunc = clientItemModule.Input
+        oldInput = hookfunction(inputFunc, function(...)
+            local args = {...}
+            local data = args[1]
+            if type(data) == "table" then
+                local info = data.Info
+                if type(info) == "table" then
+                    info.ShootRecoil = 0
+                    info.ShootSpread = 0
+                    info.ProjectileSpeed = 99999999
+                    info.ShootCooldown = 0
+                    info.QuickShotCooldown = 0
+                end
+            end
+            return oldInput(...)
+        end)
+        hookActive = true
+    end
+
+    local function removeHook()
+        if not hookActive or not oldInput then return end
+        --
+        --
+        -- 
+        local ok, clientItemModule = pcall(function()
+            return require(lplr.PlayerScripts.Modules.ClientReplicatedClasses.ClientFighter.ClientItem)
+        end)
+        if ok and clientItemModule and clientItemModule.Input then
+            -- hookfunction (might not work)
+            pcall(function()
+                hookfunction(clientItemModule.Input, oldInput)
+            end)
+            -- Direct property
+            pcall(function()
+                clientItemModule.Input = oldInput
+            end)
+        end
+        hookActive = false
+        oldInput = nil
+    end
+
+    local GunModsModule = vape.Categories.Utility:CreateModule({
+        Name = "Gun Mods",
+        Function = function(callback)
+            gunModsEnabled = callback
+            if callback then
+                applyHook()
+            else
+                removeHook()
+            end
+        end,
+        Tooltip = "<3 hello"
+    })
+end)
                                                                                                                                                           
 run(function()
     if hookmetamethod and getnamecallmethod then
