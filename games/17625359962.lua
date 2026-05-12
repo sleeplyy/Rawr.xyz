@@ -776,10 +776,11 @@ end)
                                                                                                                                             
 run(function()
     local DesyncModule = vape.Categories.Combat:CreateModule({
-        Name = "Wallbang Method (Might be Detected)",
+        Name = "Wallbang (Might be Detected)",
         Function = function(callback)
             local pendingTask = nil
 
+            --
             local function isGameActive()
                 local mainGui = lplr.PlayerGui:FindFirstChild("MainGui")
                 if mainGui then
@@ -792,10 +793,10 @@ run(function()
                         end
                     end
                 end
-                -- 4bv
                 return true
             end
 
+            --
             local function waitForGame()
                 for _ = 1, 60 do
                     if isGameActive() and lplr.Character and lplr.Character:FindFirstChild("HumanoidRootPart") then
@@ -806,14 +807,11 @@ run(function()
                 return false
             end
 
+            --
             local function initializeWallbang()
                 if shared.__s9t0u1 then return true end
 
-                if not waitForGame() then
-                    return false  -- retry
-                end
-
-                -- Setup
+                --
                 local __a1b2c3 = setmetatable({}, {
                     __index = function(_, __g7h8i9)
                         local __j0k1l2, __m3n4o5 = pcall(function()
@@ -978,11 +976,31 @@ run(function()
                 return true
             end
 
+            --
             local function attemptInit()
                 if shared.__s9t0u1 then
                     if pendingTask then task.cancel(pendingTask); pendingTask = nil end
                     return
                 end
+                --
+                if not waitForGame() then
+                    pendingTask = task.delay(5, attemptInit)
+                    return
+                end
+                --
+                for i = 1, 10 do
+                    if not DesyncModule.Enabled then
+                        if pendingTask then task.cancel(pendingTask); pendingTask = nil end
+                        return
+                    end
+                    task.wait(1)
+                end
+                --
+                if not isGameActive() or not lplr.Character or not lplr.Character:FindFirstChild("HumanoidRootPart") then
+                    pendingTask = task.delay(5, attemptInit)
+                    return
+                end
+                --
                 local success = pcall(initializeWallbang)
                 if not success or not shared.__s9t0u1 then
                     pendingTask = task.delay(5, attemptInit)
@@ -994,7 +1012,6 @@ run(function()
             if callback then
                 attemptInit()
             else
-                -- Disable
                 if pendingTask then task.cancel(pendingTask); pendingTask = nil end
                 if shared.__s9t0u1 then
                     shared.__s9t0u1:Shutdown()
