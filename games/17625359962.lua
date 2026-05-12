@@ -1402,7 +1402,7 @@ run(function()
         Suffix = "studs"
     })
     DesyncModule:CreateToggle({
-        Name = 'Void Bullet Redirection',
+        Name = 'Bullet Redirection',
         Default = false,
         Function = function(state)
             if shared.__s9t0u1 and shared.__s9t0u1.__voidBulletEnabled then
