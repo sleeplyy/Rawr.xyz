@@ -961,8 +961,8 @@ run(function()
     local gunModsEnabled = false
     local oldInput = nil
     local hookActive = false
+    local waitingForGame = false
 
-    -- Default values
     local recoilVal = 0
     local spreadVal = 0
     local projSpeedVal = 99999999
@@ -971,6 +971,14 @@ run(function()
 
     local function applyHook()
         if hookActive then return end
+
+        -- Wait
+        while isLobbyVisible() do
+            waitingForGame = true
+            task.wait(1)
+        end
+        waitingForGame = false
+
         local ok, clientItemModule = pcall(function()
             return require(lplr.PlayerScripts.Modules.ClientReplicatedClasses.ClientFighter.ClientItem)
         end)
@@ -1004,11 +1012,9 @@ run(function()
             return require(lplr.PlayerScripts.Modules.ClientReplicatedClasses.ClientFighter.ClientItem)
         end)
         if ok and clientItemModule and clientItemModule.Input then
-            -- Restore original function
             pcall(function()
                 hookfunction(clientItemModule.Input, oldInput)
             end)
-            -- FB
             pcall(function()
                 clientItemModule.Input = oldInput
             end)
@@ -1022,55 +1028,42 @@ run(function()
         Function = function(callback)
             gunModsEnabled = callback
             if callback then
-                applyHook()
+                -- thread
+                task.spawn(applyHook)
             else
                 removeHook()
             end
         end,
-        Tooltip = "i luv u <3"
+        Tooltip = "Customize weapon stats. Waits for match to start."
     })
 
     GunModsModule:CreateSlider({
         Name = "Recoil",
-        Min = 0,
-        Max = 10,
-        Default = 0,
-        Decimal = 10,
+        Min = 0, Max = 10, Default = 0, Decimal = 10,
         Function = function(v) recoilVal = v end,
         Suffix = "x"
     })
     GunModsModule:CreateSlider({
         Name = "Spread",
-        Min = 0,
-        Max = 10,
-        Default = 0,
-        Decimal = 10,
+        Min = 0, Max = 10, Default = 0, Decimal = 10,
         Function = function(v) spreadVal = v end,
         Suffix = "x"
     })
     GunModsModule:CreateSlider({
         Name = "Projectile Speed",
-        Min = 100,
-        Max = 99999,
-        Default = 99999999,
+        Min = 100, Max = 99999, Default = 99999999,
         Function = function(v) projSpeedVal = v end,
         Suffix = "studs/s"
     })
     GunModsModule:CreateSlider({
         Name = "Shoot Cooldown",
-        Min = 0,
-        Max = 1,
-        Default = 0,
-        Decimal = 100,
+        Min = 0, Max = 1, Default = 0, Decimal = 100,
         Function = function(v) shootCooldownVal = v end,
         Suffix = "s"
     })
     GunModsModule:CreateSlider({
         Name = "Quick Shot Cooldown",
-        Min = 0,
-        Max = 1,
-        Default = 0,
-        Decimal = 100,
+        Min = 0, Max = 1, Default = 0, Decimal = 100,
         Function = function(v) quickShotCooldownVal = v end,
         Suffix = "s"
     })
