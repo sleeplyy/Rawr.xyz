@@ -433,6 +433,186 @@ run(function()
 end)
                                                                                                         
 run(function()
+    -- Starting
+    local labels = {}
+    local labelCount = 0
+    local childAddedConn, childRemovedConn, renderConn, queueConn
+    local pendingQueue = {}
+    local pendingSet = {}
+    local PROCESS_BATCH = 50
+    local MAX_LABELS = 50
+    local MAX_DIST = 300
+    local displayName = "Subspace Tripmine"
+
+    local function isTripminePart(part)
+        if not part or not part:IsA("BasePart") then return false end
+        local vm = workspace:FindFirstChild("ViewModels")
+        if vm and part:IsDescendantOf(vm) then return false end
+        local cam = workspace.CurrentCamera
+        if cam and part:IsDescendantOf(cam) then return false end
+        local name = string.lower(part.Name or "")
+        if string.find(name, "tripmine") then return true end
+        local anc = part:FindFirstAncestorOfClass("Model")
+        if anc and string.find(string.lower(anc.Name or ""), "tripmine") then return true end
+        return false
+    end
+
+    local function makeLabel(part)
+        if labels[part] then return end
+        if labelCount >= MAX_LABELS then return end
+        if lplr.Character and part:IsDescendantOf(lplr.Character) then return end
+        local cam = workspace.CurrentCamera
+        if cam and (part.Position - cam.CFrame.Position).Magnitude > MAX_DIST then return end
+
+        local txt = Drawing.new("Text")
+        part:SetAttribute("Rivals_Trap", true)
+        part:SetAttribute("Rivals_TrapName", displayName)
+        txt.Text = displayName
+        txt.Size = 18
+        txt.Color = Color3.fromRGB(255, 120, 120)   -- soft red
+        txt.Center = true
+        txt.Outline = true
+        txt.Visible = false
+        labels[part] = txt
+        labelCount = labelCount + 1
+    end
+
+    local function removeLabel(part)
+        local d = labels[part]
+        if not d then return end
+        if d.Remove then d:Remove() end
+        labels[part] = nil
+        labelCount = labelCount - 1
+        if part.SetAttribute then
+            part:SetAttribute("Rivals_Trap", nil)
+            part:SetAttribute("Rivals_TrapName", nil)
+        end
+    end
+
+    local function scanAndCreate()
+        local descs = workspace:GetDescendants()
+        task.spawn(function()
+            for i = 1, #descs do
+                if labelCount >= MAX_LABELS then break end
+                local obj = descs[i]
+                if obj and obj:IsA("BasePart") and isTripminePart(obj) then
+                    if not pendingSet[obj] and not labels[obj] then
+                        pendingSet[obj] = true
+                        pendingQueue[#pendingQueue + 1] = obj
+                    end
+                end
+                if (i % PROCESS_BATCH) == 0 then task.wait() end
+            end
+        end)
+    end
+
+    local function onDescendantAdded(desc)
+        if desc:IsA("BasePart") then
+            if isTripminePart(desc) and not pendingSet[desc] and not labels[desc] then
+                pendingSet[desc] = true
+                pendingQueue[#pendingQueue + 1] = desc
+            end
+        else
+            task.spawn(function()
+                for _, d in ipairs(desc:GetDescendants()) do
+                    if labelCount >= MAX_LABELS then break end
+                    if d:IsA("BasePart") and isTripminePart(d) and not pendingSet[d] and not labels[d] then
+                        pendingSet[d] = true
+                        pendingQueue[#pendingQueue + 1] = d
+                    end
+                end
+            end)
+        end
+    end
+
+    local function onDescendantRemoving(desc)
+        if desc:IsA("BasePart") then
+            removeLabel(desc)
+        else
+            for _, d in ipairs(desc:GetDescendants()) do
+                if d:IsA("BasePart") then removeLabel(d) end
+            end
+        end
+    end
+
+    local function enable()
+        if renderConn then return end
+        scanAndCreate()
+        childAddedConn = workspace.DescendantAdded:Connect(onDescendantAdded)
+        if workspace.DescendantRemoving then
+            childRemovedConn = workspace.DescendantRemoving:Connect(onDescendantRemoving)
+        end
+        if not queueConn then
+            queueConn = runService.Heartbeat:Connect(function()
+                if labelCount >= MAX_LABELS then return end
+                local cam = workspace.CurrentCamera
+                local camPos = cam and cam.CFrame.Position or nil
+                local toProcess = math.min(PROCESS_BATCH, #pendingQueue)
+                for i = 1, toProcess do
+                    local part = table.remove(pendingQueue, 1)
+                    if part then pendingSet[part] = nil end
+                    if not part or not part.Parent then
+                        -- skip
+                    else
+                        if isTripminePart(part) and not (camPos and (part.Position - camPos).Magnitude > MAX_DIST) then
+                            makeLabel(part)
+                        end
+                    end
+                    if labelCount >= MAX_LABELS then break end
+                end
+            end)
+        end
+        renderConn = runService.RenderStepped:Connect(function()
+            local cam = workspace.CurrentCamera
+            if not cam then
+                for _, d in pairs(labels) do d.Visible = false end
+                return
+            end
+            local camPos = cam.CFrame.Position
+            for part, draw in pairs(labels) do
+                if not part or not part.Parent then
+                    removeLabel(part)
+                else
+                    local p, onScreen = cam:WorldToViewportPoint(part.Position)
+                    if not onScreen or p.Z <= 0 or (part.Position - camPos).Magnitude > MAX_DIST then
+                        draw.Visible = false
+                    else
+                        local dist = (part.Position - camPos).Magnitude
+                        local ratio = math.clamp(50 / math.max(dist, 1), 0.125, 1)
+                        draw.Size = math.floor(math.clamp(math.floor(32 * ratio), 12, 32))
+                        draw.Position = Vector2.new(p.X, p.Y)
+                        draw.Visible = true
+                    end
+                end
+            end
+        end)
+    end
+
+    local function disable()
+        if renderConn then renderConn:Disconnect(); renderConn = nil end
+        if childAddedConn then childAddedConn:Disconnect(); childAddedConn = nil end
+        if childRemovedConn then childRemovedConn:Disconnect(); childRemovedConn = nil end
+        if queueConn then queueConn:Disconnect(); queueConn = nil end
+        pendingQueue = {}
+        for p in pairs(labels) do removeLabel(p) end
+        labels = {}
+        labelCount = 0
+    end
+
+    vape.Categories.Render:CreateModule({
+        Name = "Subspace Tripmine Detector",
+        Function = function(callback)
+            if callback then
+                enable()
+            else
+                disable()
+            end
+        end,
+        Tooltip = "ESP for subspace"
+    })
+end)
+                                                                                                        
+run(function()
     local antiSmokeRunning = false
     local workerConn = nil
 
