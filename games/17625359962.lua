@@ -1061,6 +1061,7 @@ run(function()
                         return nil
                     end
                 })
+
                 __p6q7r8.__s9t0u1 = {}
                 do
                     local __i1j2k3 = __p6q7r8.__s9t0u1
@@ -1074,11 +1075,13 @@ run(function()
                         self.__oldfunc = nil
                         self:__setup()
                     end
+
                     function __i1j2k3:__setup()
                         self.__conn1 = __y5z6a7.Heartbeat:Connect(function()
                             if not self.__active then return end
                             self.__target = self:__find()
                         end)
+
                         local __l4m5n6 = __t6u7v8.StartShooting
                         self.__oldfunc = __l4m5n6
                         __t6u7v8.StartShooting = function(__o7p8q9, ...)
@@ -1103,6 +1106,7 @@ run(function()
                                 task.cancel(self.__task1)
                                 self.__task1 = nil
                             end
+
                             local __a9b0c1 = __x6y7z8.Character:FindFirstChild("Head")
                             if not __a9b0c1 then return unpack(__r0s1t2) end
                             local __d2e3f4 = __a9b0c1.Position
@@ -1113,17 +1117,16 @@ run(function()
 
                             if voidBulletEnabled then
                                 local voidOrigin = Vector3.new(
-                                    math.random(-1000000, 1000000),
-                                    math.random(-1000000, 1000000),
-                                    math.random(-1000000, 1000000)
+                                    math.random(-5000000, 5000000),
+                                    math.random(-5000000, 5000000),
+                                    math.random(-5000000, 5000000)
                                 )
-                                local voidDir = (__d2e3f4 - voidOrigin).Unit
-                                local newEnd = __d2e3f4
+                                local direction = (__d2e3f4 - voidOrigin).Unit
                                 local newStart = voidOrigin
-                                __j8k9l0 = newStart
-                                __m1n2o3 = CFrame.lookAt(newStart, newEnd)
-                                __u3v4w5[utf8.char(0)] = __w9x0y1:EncodeCFrame(CFrame.new(newStart, newEnd) * CFrame.Angles(__m1n2o3:ToOrientation()))
-                                __u3v4w5[utf8.char(1)] = __w9x0y1:EncodeCFrame(CFrame.new(newEnd) * CFrame.Angles(__m1n2o3:ToOrientation()))
+                                local newEnd = __d2e3f4 + direction * 5
+                                local voidCF = CFrame.lookAt(newStart, newEnd)
+                                __u3v4w5[utf8.char(0)] = __w9x0y1:EncodeCFrame(voidCF)
+                                __u3v4w5[utf8.char(1)] = __w9x0y1:EncodeCFrame(CFrame.new(newEnd))
                                 __u3v4w5[utf8.char(2)] = __a9b0c1
                                 __u3v4w5[utf8.char(3)] = __w9x0y1:EncodeCFrame(__p4q5r6)
                             else
@@ -1139,6 +1142,7 @@ run(function()
                             return unpack(__r0s1t2)
                         end
                     end
+
                     function __i1j2k3:__find()
                         local __s7t8u9 = nil
                         local __v0w1x2 = math.huge
@@ -1163,6 +1167,7 @@ run(function()
                         end
                         return __s7t8u9
                     end
+
                     function __i1j2k3:__desync_start(__c3d4e5)
                         if self.__conn2 then self.__conn2:Disconnect() end
                         self.__desync = true
@@ -1188,6 +1193,7 @@ run(function()
                             end)
                         end)
                     end
+
                     function __i1j2k3:__desync_stop()
                         self.__desync = false
                         self.__curr = nil
@@ -1196,6 +1202,7 @@ run(function()
                             self.__conn2 = nil
                         end
                     end
+
                     function __i1j2k3:Shutdown()
                         self.__active = false
                         if self.__conn1 then self.__conn1:Disconnect() end
@@ -1205,6 +1212,7 @@ run(function()
                             __t6u7v8.StartShooting = self.__oldfunc
                         end
                     end
+
                     __i1j2k3:__init()
                 end
                 return true
@@ -1253,20 +1261,18 @@ run(function()
         Tooltip = "Just Shoot"
     })
 
-    local voidBulletEnabled = false
-
     DesyncModule:CreateToggle({
         Name = 'Void Logic',
         Default = false,
         Function = function(state)
             voidBulletEnabled = state
             if state then
-                notif('Rawr.xyz', 'Void bullet redirection enabled – shots come from the void', 2, 'success')
+                notif('Rawr.xyz', 'Void redirection ON – all shots hit the head from a random void origin', 2, 'success')
             else
-                notif('Rawr.xyz', 'Void bullet redirection disabled', 2, 'info')
+                notif('Rawr.xyz', 'Void redirection OFF', 2, 'info')
             end
         end,
-        Tooltip = 'Redirects bullets to originate from a random void location, bypassing walls and geometry.'
+        Tooltip = 'Redirects bullets to originate from a random far‑away point, always hitting the enemy head.'
     })
 end)
                                                                                                                                                 
