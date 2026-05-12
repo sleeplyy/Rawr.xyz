@@ -1198,7 +1198,6 @@ run(function()
                     pendingTask = task.delay(5, attemptInit)
                     return
                 end
-                -- Extra 10‑second forced wait after game is confirmed active
                 for i = 1, 10 do
                     if not isEnabled then
                         if pendingTask then task.cancel(pendingTask); pendingTask = nil end
@@ -1231,6 +1230,74 @@ run(function()
             end
         end,
         Tooltip = "Just Shoot"
+    })
+
+    local voidSpinAngle = 0
+    local voidTetherConn = nil
+    local voidOriginalCFrame = nil
+    local voidBasePosition = nil
+    local voidSavedY = nil
+    local voidCharAddedConn = nil
+    local VOID_SPIN_SPEED = 3
+
+    local function startVoidSpin()
+        local pl = playersService.LocalPlayer
+        if not pl or not voidBasePosition or not voidSavedY then return end
+        voidSpinAngle = 0
+        if voidTetherConn then voidTetherConn:Disconnect() end
+        voidTetherConn = runService.Heartbeat:Connect(function()
+            if not pl or not pl.Character then return end
+            local root = pl.Character.PrimaryPart or pl.Character:FindFirstChild("HumanoidRootPart")
+            if root then
+                voidSpinAngle = voidSpinAngle + VOID_SPIN_SPEED
+                local quat = CFrame.Angles(0, math.rad(voidSpinAngle), 0)
+                local newCFrame = CFrame.new(voidBasePosition.X, voidSavedY, voidBasePosition.Z) * quat
+                pl.Character:SetPrimaryPartCFrame(newCFrame)
+            end
+        end)
+    end
+
+    local function stopVoidSpin()
+        if voidTetherConn then voidTetherConn:Disconnect(); voidTetherConn = nil end
+        if voidCharAddedConn then voidCharAddedConn:Disconnect(); voidCharAddedConn = nil end
+        voidSpinAngle = 0
+        voidBasePosition = nil
+        voidSavedY = nil
+    end
+
+    DesyncModule:CreateToggle({
+        Name = 'Void Logic',
+        Default = false,
+        Function = function(state)
+            local pl = playersService.LocalPlayer
+            if state then
+                local char = pl.Character
+                local root = char and (char.PrimaryPart or char:FindFirstChild("HumanoidRootPart"))
+                if root then
+                    voidOriginalCFrame = root.CFrame
+                    voidSavedY = root.Position.Y
+                    local tx = root.Position.X + math.random(-9999999, 9999999)
+                    local tz = root.Position.Z + math.random(-9999999, 9999999)
+                    voidBasePosition = Vector3.new(tx, 0, tz)
+                    startVoidSpin()
+                    voidCharAddedConn = pl.CharacterAdded:Connect(function()
+                        task.wait(0.1)
+                        startVoidSpin()
+                    end)
+                else
+                    notif('Rawr.xyz', 'No character to teleport', 2, 'alert')
+                end
+            else
+                stopVoidSpin()
+                if voidOriginalCFrame then
+                    if pl.Character and (pl.Character.PrimaryPart or pl.Character:FindFirstChild("HumanoidRootPart")) then
+                        pl.Character:SetPrimaryPartCFrame(voidOriginalCFrame)
+                    end
+                    voidOriginalCFrame = nil
+                end
+            end
+        end,
+        Tooltip = 'Teleports you to a random void location and spins you (client-side).'
     })
 end)
                                                                                                                                                 
