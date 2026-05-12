@@ -773,8 +773,8 @@ run(function()
 end)
                                                                                                                                             
 run(function()
-    local DesyncModule = vape.Categories.Utility:CreateModule({
-        Name = "D78 Silent Aim (Desync)",
+    local DesyncModule = vape.Categories.Combat:CreateModule({
+        Name = "Wallbang Method (Might be Detected)",
         Function = function(callback)
             if callback then
                 -- Initialize
@@ -948,7 +948,7 @@ run(function()
                 end
             end
         end,
-        Tooltip = "test (D78 method)."
+        Tooltip = "Just Shoot"
     })
 end)
                                                                                                                                                           
