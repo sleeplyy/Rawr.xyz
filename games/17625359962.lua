@@ -953,15 +953,21 @@ run(function()
 end)
                                                                                                                                                 
 run(function()
-    -- 89
     if not hookfunction then
-        notif('Rawr.xyz says', 'Your executor does not support hookfunction.', 5, 'alert')
+        notif('Gun Mods', 'Your executor does not support hookfunction.', 5, 'alert')
         return
     end
 
     local gunModsEnabled = false
     local oldInput = nil
     local hookActive = false
+
+    -- Default values
+    local recoilVal = 0
+    local spreadVal = 0
+    local projSpeedVal = 99999999
+    local shootCooldownVal = 0
+    local quickShotCooldownVal = 0
 
     local function applyHook()
         if hookActive then return end
@@ -980,11 +986,11 @@ run(function()
             if type(data) == "table" then
                 local info = data.Info
                 if type(info) == "table" then
-                    info.ShootRecoil = 0
-                    info.ShootSpread = 0
-                    info.ProjectileSpeed = 99999999
-                    info.ShootCooldown = 0
-                    info.QuickShotCooldown = 0
+                    info.ShootRecoil = recoilVal
+                    info.ShootSpread = spreadVal
+                    info.ProjectileSpeed = projSpeedVal
+                    info.ShootCooldown = shootCooldownVal
+                    info.QuickShotCooldown = quickShotCooldownVal
                 end
             end
             return oldInput(...)
@@ -994,18 +1000,15 @@ run(function()
 
     local function removeHook()
         if not hookActive or not oldInput then return end
-        --
-        --
-        -- 
         local ok, clientItemModule = pcall(function()
             return require(lplr.PlayerScripts.Modules.ClientReplicatedClasses.ClientFighter.ClientItem)
         end)
         if ok and clientItemModule and clientItemModule.Input then
-            -- hookfunction (might not work)
+            -- Restore original function
             pcall(function()
                 hookfunction(clientItemModule.Input, oldInput)
             end)
-            -- Direct property
+            -- FB
             pcall(function()
                 clientItemModule.Input = oldInput
             end)
@@ -1024,7 +1027,52 @@ run(function()
                 removeHook()
             end
         end,
-        Tooltip = "<3 hello"
+        Tooltip = "i luv u <3"
+    })
+
+    GunModsModule:CreateSlider({
+        Name = "Recoil",
+        Min = 0,
+        Max = 10,
+        Default = 0,
+        Decimal = 10,
+        Function = function(v) recoilVal = v end,
+        Suffix = "x"
+    })
+    GunModsModule:CreateSlider({
+        Name = "Spread",
+        Min = 0,
+        Max = 10,
+        Default = 0,
+        Decimal = 10,
+        Function = function(v) spreadVal = v end,
+        Suffix = "x"
+    })
+    GunModsModule:CreateSlider({
+        Name = "Projectile Speed",
+        Min = 100,
+        Max = 99999,
+        Default = 99999999,
+        Function = function(v) projSpeedVal = v end,
+        Suffix = "studs/s"
+    })
+    GunModsModule:CreateSlider({
+        Name = "Shoot Cooldown",
+        Min = 0,
+        Max = 1,
+        Default = 0,
+        Decimal = 100,
+        Function = function(v) shootCooldownVal = v end,
+        Suffix = "s"
+    })
+    GunModsModule:CreateSlider({
+        Name = "Quick Shot Cooldown",
+        Min = 0,
+        Max = 1,
+        Default = 0,
+        Decimal = 100,
+        Function = function(v) quickShotCooldownVal = v end,
+        Suffix = "s"
     })
 end)
                                                                                                                                                           
