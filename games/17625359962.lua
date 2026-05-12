@@ -1022,6 +1022,52 @@ run(function()
                 return false
             end
 
+            local offsetX = 0
+            local offsetY = 5
+            local offsetZ = 0
+            local visualPart = nil
+            local visualConn = nil
+
+            local function createVisual()
+                if visualPart then visualPart:Destroy() end
+                visualPart = Instance.new("Part")
+                visualPart.Size = Vector3.new(1,1,1)
+                visualPart.Shape = Enum.PartType.Ball
+                visualPart.Material = Enum.Material.Neon
+                visualPart.Color = Color3.fromRGB(255,0,0)
+                visualPart.Anchored = true
+                visualPart.CanCollide = false
+                visualPart.Transparency = 0.3
+                visualPart.Parent = workspace
+            end
+
+            local function updateVisual()
+                if not visualPart then return end
+                local target = nil
+                if shared.__s9t0u1 and shared.__s9t0u1.__target then
+                    target = shared.__s9t0u1.__target
+                end
+                if target and target.Character then
+                    local targetHead = target.Character:FindFirstChild("Head") or target.Character:FindFirstChild("HumanoidRootPart")
+                    if targetHead then
+                        visualPart.Position = targetHead.Position + Vector3.new(offsetX, offsetY, offsetZ)
+                        visualPart.Visible = true
+                        return
+                    end
+                end
+                visualPart.Visible = false
+            end
+
+            local function startVisualUpdate()
+                if visualConn then visualConn:Disconnect() end
+                visualConn = runService.Heartbeat:Connect(updateVisual)
+            end
+
+            local function stopVisual()
+                if visualConn then visualConn:Disconnect(); visualConn = nil end
+                if visualPart then visualPart:Destroy(); visualPart = nil end
+            end
+
             local voidBulletEnabled = false
 
             local function initializeWallbang()
@@ -1080,6 +1126,7 @@ run(function()
                         self.__conn1 = __y5z6a7.Heartbeat:Connect(function()
                             if not self.__active then return end
                             self.__target = self:__find()
+                            updateVisual()
                         end)
 
                         local __l4m5n6 = __t6u7v8.StartShooting
@@ -1168,7 +1215,6 @@ run(function()
                         return __s7t8u9
                     end
 
-                    -- ========== MODIFIED DESYNC START – ABOVE TARGET, FACING DOWN ==========
                     function __i1j2k3:__desync_start(__c3d4e5)
                         if self.__conn2 then self.__conn2:Disconnect() end
                         self.__desync = true
@@ -1184,8 +1230,8 @@ run(function()
                             end
                             local targetHead = __c3d4e5.Character:FindFirstChild("Head") or __i9j0k1
                             local targetPos = targetHead.Position
-                            local abovePos = targetPos + Vector3.new(0, 5, 0)
-                            local lookDown = CFrame.lookAt(abovePos, targetPos)
+                            local offsetPos = targetPos + Vector3.new(offsetX, offsetY, offsetZ)
+                            local lookDown = CFrame.lookAt(offsetPos, targetPos)
                             local __l2m3n4 = __f6g7h8.CFrame
                             local __o5p6q7 = __f6g7h8.Velocity
                             local __r8s9t0 = __f6g7h8.RotVelocity
@@ -1248,6 +1294,8 @@ run(function()
                     pendingTask = task.delay(5, attemptInit)
                 else
                     if pendingTask then task.cancel(pendingTask); pendingTask = nil end
+                    createVisual()
+                    startVisualUpdate()
                 end
             end
 
@@ -1261,9 +1309,44 @@ run(function()
                     shared.__s9t0u1:Shutdown()
                     shared.__s9t0u1 = nil
                 end
+                stopVisual()
             end
         end,
         Tooltip = "Just Shoot"
+    })
+
+    DesyncModule:CreateSlider({
+        Name = "X Offset",
+        Min = -20,
+        Max = 20,
+        Default = 0,
+        Function = function(v)
+            offsetX = v
+            updateVisual()
+        end,
+        Suffix = "studs"
+    })
+    DesyncModule:CreateSlider({
+        Name = "Y Offset",
+        Min = -20,
+        Max = 20,
+        Default = 5,
+        Function = function(v)
+            offsetY = v
+            updateVisual()
+        end,
+        Suffix = "studs"
+    })
+    DesyncModule:CreateSlider({
+        Name = "Z Offset",
+        Min = -20,
+        Max = 20,
+        Default = 0,
+        Function = function(v)
+            offsetZ = v
+            updateVisual()
+        end,
+        Suffix = "studs"
     })
 
     DesyncModule:CreateToggle({
@@ -1272,12 +1355,12 @@ run(function()
         Function = function(state)
             voidBulletEnabled = state
             if state then
-                notif('Rawr.xyz', 'Attached', 2, 'success')
+                notif('Rawr.xyz', 'Void redirection ON – all shots hit the head from a random void origin', 2, 'success')
             else
-                notif('Rawr.xyz', 'Detached', 2, 'info')
+                notif('Rawr.xyz', 'Void redirection OFF', 2, 'info')
             end
         end,
-        Tooltip = 'Redirection'
+        Tooltip = 'Redirects bullets to originate from a random far‑away point, always hitting the enemy head.'
     })
 end)
                                                                                                                                                 
