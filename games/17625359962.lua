@@ -954,14 +954,14 @@ end)
                                                                                                                                                 
 run(function()
     if not hookfunction then
-        notif('Rawr.xyz says', 'Your executor does not support hookfunction.', 5, 'alert')
+        notif('Gun Mods', 'Your executor does not support hookfunction.', 5, 'alert')
         return
     end
 
     local gunModsEnabled = false
     local oldInput = nil
     local hookActive = false
-    local retryConn = nil
+    local pendingTask = nil
 
     local recoilVal = 0
     local spreadVal = 0
@@ -970,29 +970,36 @@ run(function()
     local quickShotCooldownVal = 0
 
     local function tryApplyHook()
-        -- if hook
-        if hookActive then
-            if retryConn then
-                retryConn:Disconnect()
-                retryConn = nil
+        --
+        if not gunModsEnabled then return end
+
+        --
+        local lobbyVisible
+        pcall(function() lobbyVisible = isLobbyVisible() end)
+        if lobbyVisible then
+            --
+            if gunModsEnabled then
+                pendingTask = task.delay(10, tryApplyHook)
             end
             return
         end
 
-        -- Wait
-        local lobbyVisible
-        pcall(function()
-            lobbyVisible = isLobbyVisible()
-        end)
-        if lobbyVisible then return end
+        --
+        if hookActive then return end
 
+        --
         local ok, clientItemModule = pcall(function()
             return require(lplr.PlayerScripts.Modules.ClientReplicatedClasses.ClientFighter.ClientItem)
         end)
         if not ok or not clientItemModule or not clientItemModule.Input then
+            --
+            if gunModsEnabled then
+                pendingTask = task.delay(10, tryApplyHook)
+            end
             return
         end
 
+        -- hook here
         local inputFunc = clientItemModule.Input
         oldInput = hookfunction(inputFunc, function(...)
             local args = {...}
@@ -1010,41 +1017,28 @@ run(function()
             return oldInput(...)
         end)
         hookActive = true
-
-        -- Hook succeeded
-        if retryConn then
-            retryConn:Disconnect()
-            retryConn = nil
-        end
     end
 
-    local function startRetrying()
-        if retryConn then return end
-        retryConn = runService.Heartbeat:Connect(tryApplyHook)
-    end
-
-    local function stopRetrying()
-        if retryConn then
-            retryConn:Disconnect()
-            retryConn = nil
+    local function cancelPending()
+        if pendingTask then
+            pcall(task.cancel, pendingTask)
+            pendingTask = nil
         end
     end
 
     local function removeHook()
-        -- stop retry connections
-        stopRetrying()
+        cancelPending()   -- don't re‑hook
+
         if not hookActive or not oldInput then return end
+
         local ok, clientItemModule = pcall(function()
             return require(lplr.PlayerScripts.Modules.ClientReplicatedClasses.ClientFighter.ClientItem)
         end)
         if ok and clientItemModule and clientItemModule.Input then
-            pcall(function()
-                hookfunction(clientItemModule.Input, oldInput)
-            end)
-            pcall(function()
-                clientItemModule.Input = oldInput
-            end)
+            pcall(function() hookfunction(clientItemModule.Input, oldInput) end)
+            pcall(function() clientItemModule.Input = oldInput end)
         end
+
         hookActive = false
         oldInput = nil
     end
@@ -1054,14 +1048,14 @@ run(function()
         Function = function(callback)
             gunModsEnabled = callback
             if callback then
-                -- Start
-                startRetrying()
+                -- Start initial attempt after 10 seconds
+                cancelPending()   -- just in case
+                pendingTask = task.delay(10, tryApplyHook)
             else
-                stopRetrying()
                 removeHook()
             end
         end,
-        Tooltip = "Customize weapon stats. Waits for match to start."
+        Tooltip = "Customize weapon stats. Waits 10s then retries until match starts."
     })
 
     GunModsModule:CreateSlider({
