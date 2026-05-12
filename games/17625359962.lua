@@ -429,6 +429,241 @@ run(function()
         end
     })
 end)
+                                                                                                        
+run(function()
+    local antiSmokeRunning = false
+    local workerConn = nil
+
+    local function handleSmoke(inst)
+        if not inst or not inst.Parent then return end
+        for _, d in ipairs(inst:GetDescendants()) do
+            if d:IsA("ParticleEmitter") then
+                d.Enabled = false
+            elseif d:IsA("BasePart") then
+                d.Transparency = 1
+            elseif d:IsA("Decal") or d:IsA("Texture") then
+                d.Transparency = 1
+            end
+        end
+        task.defer(function()
+            pcall(function()
+                if inst and inst.Parent then
+                    inst:Destroy()
+                end
+            end)
+        end)
+    end
+
+    local function startAntiSmoke()
+        if antiSmokeRunning then return end
+        antiSmokeRunning = true
+
+        if not workerConn then
+            workerConn = workspace.DescendantAdded:Connect(function(child)
+                if not antiSmokeRunning then return end
+                if child.Name == "Smoke Grenade" then
+                    handleSmoke(child)
+                end
+            end)
+        end
+
+        for _, v in ipairs(workspace:GetDescendants()) do
+            if v.Name == "Smoke Grenade" then
+                handleSmoke(v)
+            end
+        end
+    end
+
+    local function stopAntiSmoke()
+        antiSmokeRunning = false
+    end
+
+    local cleanupFunc
+    cleanupFunc = function()
+        if workerConn then
+            workerConn:Disconnect()
+            workerConn = nil
+        end
+        antiSmokeRunning = false
+    end
+
+    local AntiSmokeModule = vape.Categories.World:CreateModule({
+        Name = "Anti-Smoke",
+        Function = function(callback)
+            if callback then
+                startAntiSmoke()
+            else
+                stopAntiSmoke()
+                cleanupFunc()
+            end
+        end,
+        Tooltip = "Removes smoke grenades."
+    })
+
+    vape:Clean(cleanupFunc)
+end)
+
+run(function()
+    local enabled = false
+    local wsConn, guiConn = nil, nil
+    local playerGui = lplr:FindFirstChild("PlayerGui")
+    local lastShow = 0
+    local SHOW_THROTTLE = 0.5
+
+    local function showFlashLabel()
+        local now = tick()
+        if now - lastShow < SHOW_THROTTLE then return end
+        lastShow = now
+        pcall(function()
+            if _G.RivalsTopLabel and _G.RivalsTopLabel.New then
+                local lbl = _G.RivalsTopLabel.New("You are flashbanged currently", {TextSize = 14})
+                task.delay(3.5, function()
+                    if lbl then lbl:Destroy() end
+                end)
+            end
+        end)
+    end
+
+    local function handleFlashInstance(inst)
+        if not enabled or not inst then return end
+        local now = tick()
+        if now - lastShow < SHOW_THROTTLE then
+            inst:Destroy()
+            return
+        end
+        inst:Destroy()
+        showFlashLabel()
+    end
+
+    local function startRemover()
+        if wsConn then return end
+        wsConn = workspace.ChildAdded:Connect(function(child)
+            if child.Name == "FlashbangEffect" then handleFlashInstance(child) end
+        end)
+        if playerGui then
+            guiConn = playerGui.ChildAdded:Connect(function(child)
+                if child.Name:lower():find("flash") then handleFlashInstance(child) end
+            end)
+        end
+        -- clean
+        repeat
+            local found = workspace:FindFirstChild("FlashbangEffect", true)
+            if found then handleFlashInstance(found) end
+        until not found
+        if playerGui then
+            for _, v in ipairs(playerGui:GetDescendants()) do
+                if v.Name:lower():find("flash") then v:Destroy() end
+            end
+        end
+    end
+
+    local function stopRemover()
+        if wsConn then wsConn:Disconnect(); wsConn = nil end
+        if guiConn then guiConn:Disconnect(); guiConn = nil end
+    end
+
+    vape.Categories.World:CreateModule({
+        Name = "Anti-Flashbang",
+        Function = function(callback)
+            enabled = callback
+            if callback then
+                startRemover()
+            else
+                stopRemover()
+            end
+        end,
+        Tooltip = "its in the name"
+    })
+
+    vape:Clean(function()
+        stopRemover()
+    end)
+end)
+
+run(function()
+    local katanaEnabled = false
+    local heartbeatConn = nil
+    local lastNotifTime = 0
+    local NOTIF_COOLDOWN = 5
+
+    local function showKatanaWarning(playerName)
+        if tick() - lastNotifTime < NOTIF_COOLDOWN then return end
+        lastNotifTime = tick()
+        notif('Rawr.xyz', playerName .. ' is holding a Katana!', 5, 'alert')
+    end
+
+    local function findWeaponName(player)
+        local viewModels = workspace:FindFirstChild("ViewModels")
+        if viewModels then
+            for _, model in ipairs(viewModels:GetChildren()) do
+                if model:IsA("Model") then
+                    local parts = string.split(model.Name, " - ")
+                    if #parts >= 1 and parts[1] == player.Name then
+                        if #parts >= 3 then return parts[3]
+                        elseif #parts >= 2 then return parts[2]
+                        else return parts[1] end
+                    end
+                end
+            end
+        end
+        local char = player.Character
+        if char then
+            local tool = char:FindFirstChildOfClass("Tool")
+            if tool then return tool.Name end
+        end
+        return nil
+    end
+
+    local function detectKatana()
+        if not katanaEnabled then return end
+        local lpChar = lplr.Character
+        local lpRoot = lpChar and (lpChar:FindFirstChild("HumanoidRootPart") or lpChar.PrimaryPart)
+        if not lpRoot then return end
+
+        for _, player in ipairs(playersService:GetPlayers()) do
+            if player ~= lplr and isEnemy(player) then
+                local weaponName = findWeaponName(player)
+                if weaponName and string.find(string.lower(weaponName), "katana") then
+                    local char = player.Character
+                    if char then
+                        local rootPart = char:FindFirstChild("HumanoidRootPart") or char.PrimaryPart
+                        if rootPart and (lpRoot.Position - rootPart.Position).Magnitude <= 150 then
+                            local dirToUs = (lpRoot.Position - rootPart.Position).Unit
+                            local forward = rootPart.CFrame.LookVector
+                            local dot = forward:Dot(dirToUs)
+                            if dot >= 0.3 then
+                                showKatanaWarning(player.Name)
+                                return
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    local KatanaModule = vape.Categories.Utility:CreateModule({
+        Name = "Katana Detection",
+        Function = function(callback)
+            katanaEnabled = callback
+            if callback then
+                if not heartbeatConn then
+                    heartbeatConn = runService.Heartbeat:Connect(detectKatana)
+                end
+            else
+                if heartbeatConn then
+                    heartbeatConn:Disconnect()
+                    heartbeatConn = nil
+                end
+            end
+        end,
+        Tooltip = "Warns you when an enemy has a katana"
+    })
+
+    vape:Clean(function()
+        if heartbeatConn then heartbeatConn:Disconnect() end
+    end)
+end)
 
 run(function()
     local camera = workspace.CurrentCamera
