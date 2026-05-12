@@ -493,21 +493,21 @@ run(function()
                 end
             end
         end,
-        Tooltip = "save yourself not love."
+        Tooltip = "safe place safe strafe."
     })
 
     local playerDropdown = RagebotModule:CreateDropdown({
         Name = "Target Player",
         List = buildPlayerList(),
         Function = function(val)
-            -- object 
+            -- object
             for _, p in ipairs(playersService:GetPlayers()) do
                 if p.Name == val and isEnemy(p) then
                     targetPlayer = p
                     break
                 end
             end
-            -- disconnection
+            -- disconn
             if strafeConnection then
                 strafeConnection:Disconnect()
                 if ragebotEnabled and strafeEnabled and targetPlayer then
@@ -537,6 +537,7 @@ run(function()
         Tooltip = "Turn strafing on/off while module stays active"
     })
 
+    -- The actual strafe loop
     local function strafeLoop()
         if not entitylib.isAlive then return end
         if not targetPlayer or not targetPlayer.Character then return end
@@ -617,6 +618,7 @@ run(function()
         Function = function(v) shouldPause = v end
     })
 end)
+                                                                                                                                                            
 run(function()
     local SkinModule = vape.Categories.Utility:CreateModule({Name = "Skin Unlocker", Function = function(callback)
         if callback and not shared.VapeSkinUnlockerActive then
