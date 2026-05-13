@@ -1131,15 +1131,19 @@ run(function()
     if _G.wallbangBoundaryBypass == nil then _G.wallbangBoundaryBypass = true end
     if _G.wallbangPredictionTime == nil then _G.wallbangPredictionTime = 0.2 end
     if _G.wallbangPreset == nil then _G.wallbangPreset = "Above" end
-
     if _G.wallbangIdleSpam == nil then _G.wallbangIdleSpam = false end
     if _G.wallbangIdleSpeed == nil then _G.wallbangIdleSpeed = 2 end
     if _G.wallbangIdleAmp == nil then _G.wallbangIdleAmp = 8 end
     if _G.wallbangVoidSpam == nil then _G.wallbangVoidSpam = false end
-    if _G.wallbangVoidInterval == nil then _G.wallbangVoidInterval = 1
+    if _G.wallbangVoidInterval == nil then _G.wallbangVoidInterval = 1 end
     if _G.wallbangAutoFire == nil then _G.wallbangAutoFire = false end
-    if _G.wallbangAutoFireRange == nil then _G.wallbangAutoFireRange = 200
+    if _G.wallbangAutoFireRange == nil then _G.wallbangAutoFireRange = 200 end
     if _G.wallbangBulletRedir == nil then _G.wallbangBulletRedir = false end
+
+    local function getLocalRoot()
+        local char = lplr.Character
+        return char and char:FindFirstChild("HumanoidRootPart")
+    end
 
     local DesyncModule = vape.Categories.Combat:CreateModule({
         Name = "Wallbang Method",
@@ -1172,7 +1176,7 @@ run(function()
 
             local function waitForGame()
                 for _ = 1, 60 do
-                    if isGameActive() and lplr.Character and lplr.Character:FindFirstChild("HumanoidRootPart") then
+                    if isGameActive() and lplr.Character and getLocalRoot() then
                         return true
                     end
                     task.wait(0.5)
@@ -1195,11 +1199,9 @@ run(function()
 
             local function getTargetPositionAndVel()
                 local target = shared.__s9t0u1 and shared.__s9t0u1.__target
-                if not target or not target.Character then return nil, nil, nil
-                end
+                if not target or not target.Character then return nil, nil, nil end
                 local targetHead = target.Character:FindFirstChild("Head") or target.Character:FindFirstChild("HumanoidRootPart")
-                if not targetHead then return nil, nil, nil
-                end
+                if not targetHead then return nil, nil, nil end
                 local targetVel = Vector3.new()
                 local rootPart = target.Character:FindFirstChild("HumanoidRootPart")
                 if rootPart then targetVel = rootPart.Velocity end
@@ -1221,8 +1223,8 @@ run(function()
                     finalPos = predictedPos + frontOffset + Vector3.new(0, yOff + 5, 0)
                 elseif _G.wallbangVoidSpam and now - voidLastTeleport >= (_G.wallbangVoidInterval or 1) then
                     voidLastTeleport = now
-                    local voidX = math.random(-50000, 50000)
-                    local voidZ = math.random(-50000, 50003)
+                    local voidX = math.random(-5000, 5000)
+                    local voidZ = math.random(-5000, 5000)
                     finalPos = Vector3.new(voidX, -500, voidZ)
                 else
                     if preset == "Above" then
@@ -1314,22 +1316,24 @@ run(function()
                 barrierList = {}
             end
 
-            local voidBulletEnabled = false
-
-            local autoFireRunning = false
+            -- AutoFire thread (uses direct root access to avoid undefined getHRP)
             local function autoFireThread()
                 while true do
-                    if isEnabled and _G.wallbangAutoFire then
-                        local target = shared.__s9t0u1 and shared.__s9t0u1.__target
-                        if target and target.Character then
-                            local hrp = target.Character:FindFirstChild("HumanoidRootPart")
-                            if hrp then
-                                local dist = (getHRP().Position - hrp.Position).Magnitude
-                                if dist <= (_G.wallbangAutoFireRange or 200) then
-                                    if not mouse1press then mouse1press = function() end end
-                                    mouse1press()
-                                    task.wait(0.05)
-                                    mouse1release()
+                    if _G.wallbangAutoFire then
+                        local localRoot = getLocalRoot()
+                        if localRoot then
+                            local target = shared.__s9t0u1 and shared.__s9t0u1.__target
+                            if target and target.Character then
+                                local targetRoot = target.Character:FindFirstChild("HumanoidRootPart")
+                                if targetRoot then
+                                    local dist = (localRoot.Position - targetRoot.Position).Magnitude
+                                    if dist <= (_G.wallbangAutoFireRange or 200) then
+                                        pcall(function()
+                                            if mouse1press then mouse1press() end
+                                            task.wait(0.05)
+                                            if mouse1release then mouse1release() end
+                                        end)
+                                    end
                                 end
                             end
                         end
@@ -1556,7 +1560,7 @@ run(function()
                     end
                     task.wait(1)
                 end
-                if not isGameActive() or not lplr.Character or not lplr.Character:FindFirstChild("HumanoidRootPart") then
+                if not isGameActive() or not lplr.Character or not getLocalRoot() then
                     pendingTask = task.delay(5, attemptInit)
                     return
                 end
@@ -1615,7 +1619,6 @@ run(function()
         end,
         Tooltip = "Disable barriers & prevent falling out of map"
     })
-
     DesyncModule:CreateToggle({
         Name = "Idle Spam (Oscillate Y)",
         Default = _G.wallbangIdleSpam,
@@ -1639,7 +1642,7 @@ run(function()
         Name = "Void Spam",
         Default = _G.wallbangVoidSpam,
         Function = function(v) _G.wallbangVoidSpam = v end,
-        Tooltip = "void spam"
+        Tooltip = "Teleport desynced position to void every interval"
     })
     DesyncModule:CreateSlider({
         Name = "Void Interval (s)",
@@ -1669,7 +1672,7 @@ run(function()
             end
             notif('Rawr.xyz', v and 'on' or 'off', 2, v and 'success' or 'info')
         end,
-        Tooltip = 'Redirects bullets to always hit'
+        Tooltip = 'Redirects bullets from void origin'
     })
 end)
 
