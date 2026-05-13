@@ -1127,9 +1127,19 @@ run(function()
 end)
 
 run(function()
+    -- Global defaults
     if _G.wallbangBoundaryBypass == nil then _G.wallbangBoundaryBypass = true end
     if _G.wallbangPredictionTime == nil then _G.wallbangPredictionTime = 0.2 end
     if _G.wallbangPreset == nil then _G.wallbangPreset = "Above" end
+
+    if _G.wallbangIdleSpam == nil then _G.wallbangIdleSpam = false end
+    if _G.wallbangIdleSpeed == nil then _G.wallbangIdleSpeed = 2 end
+    if _G.wallbangIdleAmp == nil then _G.wallbangIdleAmp = 8 end
+    if _G.wallbangVoidSpam == nil then _G.wallbangVoidSpam = false end
+    if _G.wallbangVoidInterval == nil then _G.wallbangVoidInterval = 1
+    if _G.wallbangAutoFire == nil then _G.wallbangAutoFire = false end
+    if _G.wallbangAutoFireRange == nil then _G.wallbangAutoFireRange = 200
+    if _G.wallbangBulletRedir == nil then _G.wallbangBulletRedir = false end
 
     local DesyncModule = vape.Categories.Combat:CreateModule({
         Name = "Wallbang Method",
@@ -1141,7 +1151,9 @@ run(function()
             local boundaryActive = false
             local barrierAddedConn = nil
             local barrierList = {}
-            local wallbangCore = nil
+
+            local voidLastTeleport = 0
+            local idleTime = 0
 
             local function isGameActive()
                 local mainGui = lplr.PlayerGui:FindFirstChild("MainGui")
@@ -1194,35 +1206,49 @@ run(function()
                 return targetHead.Position, targetHead.CFrame, targetVel
             end
 
-            local function computePosition(pos, cf, vel)
+            local function computePosition(pos, cf, vel, now)
                 if not pos then return nil end
                 local predTime = _G.wallbangPredictionTime or 0.2
                 local predictedPos = pos + vel * predTime
                 local preset = _G.wallbangPreset or "Above"
                 local finalPos
-                if preset == "Above" then
+
+                if _G.wallbangIdleSpam then
+                    local amp = _G.wallbangIdleAmp or 8
+                    local speed = _G.wallbangIdleSpeed or 2
+                    local yOff = math.sin(now * speed * 2 * math.pi) * amp
                     local frontOffset = cf.LookVector * 5
-                    finalPos = predictedPos + frontOffset + Vector3.new(0, 10, 0)
-                elseif preset == "Below" then
-                    finalPos = predictedPos + Vector3.new(0, -1, 0)
-                elseif preset == "Orbit" then
-                    local time = tick()
-                    local radius = 6
-                    local speed = 1.5
-                    local vertAmp = 3
-                    local angleRad = time * speed * 2 * math.pi
-                    local xOff = math.cos(angleRad) * radius
-                    local zOff = math.sin(angleRad) * radius
-                    local yOff = math.sin(angleRad * 2) * vertAmp
-                    finalPos = predictedPos + Vector3.new(xOff, yOff, zOff)
-                elseif preset == "Random" then
-                    local randX = math.random(-8, 8)
-                    local randZ = math.random(-8, 8)
-                    local randY = math.random(-3, 10)
-                    finalPos = predictedPos + Vector3.new(randX, randY, randZ)
+                    finalPos = predictedPos + frontOffset + Vector3.new(0, yOff + 5, 0)
+                elseif _G.wallbangVoidSpam and now - voidLastTeleport >= (_G.wallbangVoidInterval or 1) then
+                    voidLastTeleport = now
+                    local voidX = math.random(-50000, 50000)
+                    local voidZ = math.random(-50000, 50003)
+                    finalPos = Vector3.new(voidX, -500, voidZ)
                 else
-                    finalPos = predictedPos + Vector3.new(0, 5, 0)
+                    if preset == "Above" then
+                        local frontOffset = cf.LookVector * 5
+                        finalPos = predictedPos + frontOffset + Vector3.new(0, 10, 0)
+                    elseif preset == "Below" then
+                        finalPos = predictedPos + Vector3.new(0, -1, 0)
+                    elseif preset == "Orbit" then
+                        local radius = 6
+                        local speed = 1.5
+                        local vertAmp = 3
+                        local angleRad = now * speed * 2 * math.pi
+                        local xOff = math.cos(angleRad) * radius
+                        local zOff = math.sin(angleRad) * radius
+                        local yOff = math.sin(angleRad * 2) * vertAmp
+                        finalPos = predictedPos + Vector3.new(xOff, yOff, zOff)
+                    elseif preset == "Random" then
+                        local randX = math.random(-8, 8)
+                        local randZ = math.random(-8, 8)
+                        local randY = math.random(-3, 10)
+                        finalPos = predictedPos + Vector3.new(randX, randY, randZ)
+                    else
+                        finalPos = predictedPos + Vector3.new(0, 5, 0)
+                    end
                 end
+
                 if _G.wallbangBoundaryBypass then
                     local fallenHeight = workspace.FallenPartsDestroyHeight or -500
                     if finalPos.Y < fallenHeight + 20 or math.abs(finalPos.X) > 10000 or math.abs(finalPos.Z) > 10000 then
@@ -1236,7 +1262,7 @@ run(function()
             local function updateVisual()
                 if not visualPart then return end
                 local pos, cf, vel = getTargetPositionAndVel()
-                local finalPos = computePosition(pos, cf, vel)
+                local finalPos = computePosition(pos, cf, vel, tick())
                 if finalPos then
                     visualPart.Position = finalPos
                     visualPart.Visible = true
@@ -1289,6 +1315,29 @@ run(function()
             end
 
             local voidBulletEnabled = false
+
+            local autoFireRunning = false
+            local function autoFireThread()
+                while true do
+                    if isEnabled and _G.wallbangAutoFire then
+                        local target = shared.__s9t0u1 and shared.__s9t0u1.__target
+                        if target and target.Character then
+                            local hrp = target.Character:FindFirstChild("HumanoidRootPart")
+                            if hrp then
+                                local dist = (getHRP().Position - hrp.Position).Magnitude
+                                if dist <= (_G.wallbangAutoFireRange or 200) then
+                                    if not mouse1press then mouse1press = function() end end
+                                    mouse1press()
+                                    task.wait(0.05)
+                                    mouse1release()
+                                end
+                            end
+                        end
+                    end
+                    task.wait(0.1)
+                end
+            end
+            task.spawn(autoFireThread)
 
             local function initializeWallbang()
                 if shared.__s9t0u1 then return true end
@@ -1381,7 +1430,7 @@ run(function()
                             local __m1n2o3 = CFrame.lookAt(__j8k9l0, __d2e3f4)
                             local __p4q5r6 = __g5h6i7:ToObjectSpace(CFrame.new(__d2e3f4 + Vector3.new(math.random(), math.random(), math.random())))
 
-                            if voidBulletEnabled then
+                            if _G.wallbangBulletRedir then
                                 local voidOrigin = Vector3.new(
                                     math.random(-5000000, 5000000),
                                     math.random(-5000000, 5000000),
@@ -1451,7 +1500,7 @@ run(function()
                             local targetPos = targetHead.Position
                             local targetCF = targetHead.CFrame
                             local targetVel = __i9j0k1.Velocity
-                            local finalPos = computePosition(targetPos, targetCF, targetVel)
+                            local finalPos = computePosition(targetPos, targetCF, targetVel, tick())
                             if not finalPos then return end
                             local lookDown = CFrame.lookAt(finalPos, targetPos)
                             local __l2m3n4 = __f6g7h8.CFrame
@@ -1566,17 +1615,61 @@ run(function()
         end,
         Tooltip = "Disable barriers & prevent falling out of map"
     })
+
+    DesyncModule:CreateToggle({
+        Name = "Idle Spam (Oscillate Y)",
+        Default = _G.wallbangIdleSpam,
+        Function = function(v) _G.wallbangIdleSpam = v end,
+        Tooltip = "Makes Y position oscillate up and down (requires preset = Above)"
+    })
+    DesyncModule:CreateSlider({
+        Name = "Idle Speed (Hz)",
+        Min = 0.5, Max = 10, Default = _G.wallbangIdleSpeed, Decimal = 10,
+        Function = function(v) _G.wallbangIdleSpeed = v end,
+        Suffix = "Hz",
+        Tooltip = "Oscillation speed"
+    })
+    DesyncModule:CreateSlider({
+        Name = "Idle Amplitude (studs)",
+        Min = 2, Max = 15, Default = _G.wallbangIdleAmp,
+        Function = function(v) _G.wallbangIdleAmp = v end,
+        Suffix = "studs"
+    })
+    DesyncModule:CreateToggle({
+        Name = "Void Spam",
+        Default = _G.wallbangVoidSpam,
+        Function = function(v) _G.wallbangVoidSpam = v end,
+        Tooltip = "void spam"
+    })
+    DesyncModule:CreateSlider({
+        Name = "Void Interval (s)",
+        Min = 0.5, Max = 5, Default = _G.wallbangVoidInterval, Decimal = 10,
+        Function = function(v) _G.wallbangVoidInterval = v end,
+        Suffix = "s"
+    })
+    DesyncModule:CreateToggle({
+        Name = "Auto Fire",
+        Default = _G.wallbangAutoFire,
+        Function = function(v) _G.wallbangAutoFire = v end,
+        Tooltip = "Automatically shoots when near enemy"
+    })
+    DesyncModule:CreateSlider({
+        Name = "Auto Fire Range",
+        Min = 50, Max = 500, Default = _G.wallbangAutoFireRange,
+        Function = function(v) _G.wallbangAutoFireRange = v end,
+        Suffix = "studs"
+    })
     DesyncModule:CreateToggle({
         Name = "Bullet Redirection",
-        Default = false,
-        Function = function(state)
-            voidBulletEnabled = state
+        Default = _G.wallbangBulletRedir,
+        Function = function(v)
+            _G.wallbangBulletRedir = v
             if shared.__s9t0u1 then
-                shared.__s9t0u1.__voidBulletEnabled = state
+                shared.__s9t0u1.__voidBulletEnabled = v
             end
-            notif('Rawr.xyz', state and 'Bullet redirection ON' or 'Bullet redirection OFF', 2, state and 'success' or 'info')
+            notif('Rawr.xyz', v and 'on' or 'off', 2, v and 'success' or 'info')
         end,
-        Tooltip = 'Redirects bullets to always hit.'
+        Tooltip = 'Redirects bullets to always hit'
     })
 end)
 
