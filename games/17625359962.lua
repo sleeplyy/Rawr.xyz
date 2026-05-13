@@ -358,7 +358,7 @@ CrosshairModule:CreateColorSlider({Name="Outline Color", Visible=false, Function
 CrosshairModule:CreateSlider({Name="Outline Thickness", Min=0,Max=3,Default=0.5,Decimal=10, Visible=false, Function=function(v) outlineThickness=v end, Suffix="px"})
 
 run(function()
-    -- Hitsounds
+    -- hitsounds
     local assetSounds = {
         {name="Bameware", id="rbxassetid://3124331820"},{name="Bell", id="rbxassetid://6534947240"},
         {name="Bubble", id="rbxassetid://6534947588"},{name="Pick", id="rbxassetid://1347140027"},
@@ -374,15 +374,14 @@ run(function()
     }
 
     local customSounds = {}
-    local customSoundPaths = {}
     local customSoundNames = {}
+    local soundFolder = "newvape/assets/sounds"
 
     local function loadCustomSounds()
-        local folderPath = "newvape\assets\sounds"
-        if not isfolder or not isfolder(folderPath) then return end
+        if not isfolder or not isfolder(soundFolder) then return end
         local files = nil
         if listfiles then
-            files = listfiles(folderPath)
+            files = listfiles(soundFolder)
         else
             return
         end
@@ -391,7 +390,7 @@ run(function()
                 local fileName = filePath:match("([^/\\]+)%.mp3$")
                 if fileName then
                     table.insert(customSoundNames, fileName)
-                    customSoundPaths[fileName] = filePath
+                    customSounds[fileName] = "rbxasset://sounds/" .. fileName .. ".mp3"
                 end
             end
         end
@@ -407,21 +406,13 @@ run(function()
         soundMap[s.name] = s.id
     end
     for _, name in ipairs(customSoundNames) do
-        table.insert(soundNames, ": " .. name)
-        soundMap[": " .. name] = customSoundPaths[name]
+        table.insert(soundNames, "Local: " .. name)
+        soundMap["Local: " .. name] = customSounds[name]
     end
 
     local hitsoundEnabled = false
     local currentSoundId = soundMap["Bell"]
     local hitConnection = nil
-    local customAudioId = nil
-
-    local function getCustomSoundId(filePath)
-        if getcustomaudio then
-            return getcustomaudio(filePath)
-        end
-        return nil
-    end
 
     local function applySoundReplacement()
         if hitConnection then hitConnection:Disconnect() end
@@ -434,15 +425,7 @@ run(function()
             hitConnection = viewModel.ChildAdded:Connect(function(v)
                 if v:IsA("Sound") then
                     local newSoundId = currentSoundId
-                    if type(newSoundId) == "string" and newSoundId:match("%.mp3$") then
-                        local audioId = getCustomSoundId(newSoundId)
-                        if audioId then
-                            newSoundId = audioId
-                        else
-                            return
-                        end
-                    end
-                    if v.SoundId ~= newSoundId then
+                    if newSoundId and v.SoundId ~= newSoundId then
                         v.SoundId = newSoundId
                         v.Pitch = 1
                         v.Volume = 1
