@@ -1136,9 +1136,6 @@ run(function()
     if _G.wallbangIdleAmp == nil then _G.wallbangIdleAmp = 8 end
     if _G.wallbangVoidSpam == nil then _G.wallbangVoidSpam = false end
     if _G.wallbangVoidInterval == nil then _G.wallbangVoidInterval = 1 end
-    if _G.wallbangAutoFire == nil then _G.wallbangAutoFire = false end
-    if _G.wallbangAutoFireRange == nil then _G.wallbangAutoFireRange = 200 end
-    if _G.wallbangBulletRedir == nil then _G.wallbangBulletRedir = false end
 
     local function getLocalRoot()
         local char = lplr.Character
@@ -1155,9 +1152,7 @@ run(function()
             local boundaryActive = false
             local barrierAddedConn = nil
             local barrierList = {}
-
             local voidLastTeleport = 0
-            local idleTime = 0
 
             local function isGameActive()
                 local mainGui = lplr.PlayerGui:FindFirstChild("MainGui")
@@ -1316,33 +1311,6 @@ run(function()
                 barrierList = {}
             end
 
-            -- AutoFire thread (uses direct root access to avoid undefined getHRP)
-            local function autoFireThread()
-                while true do
-                    if _G.wallbangAutoFire then
-                        local localRoot = getLocalRoot()
-                        if localRoot then
-                            local target = shared.__s9t0u1 and shared.__s9t0u1.__target
-                            if target and target.Character then
-                                local targetRoot = target.Character:FindFirstChild("HumanoidRootPart")
-                                if targetRoot then
-                                    local dist = (localRoot.Position - targetRoot.Position).Magnitude
-                                    if dist <= (_G.wallbangAutoFireRange or 200) then
-                                        pcall(function()
-                                            if mouse1press then mouse1press() end
-                                            task.wait(0.05)
-                                            if mouse1release then mouse1release() end
-                                        end)
-                                    end
-                                end
-                            end
-                        end
-                    end
-                    task.wait(0.1)
-                end
-            end
-            task.spawn(autoFireThread)
-
             local function initializeWallbang()
                 if shared.__s9t0u1 then return true end
 
@@ -1434,26 +1402,10 @@ run(function()
                             local __m1n2o3 = CFrame.lookAt(__j8k9l0, __d2e3f4)
                             local __p4q5r6 = __g5h6i7:ToObjectSpace(CFrame.new(__d2e3f4 + Vector3.new(math.random(), math.random(), math.random())))
 
-                            if _G.wallbangBulletRedir then
-                                local voidOrigin = Vector3.new(
-                                    math.random(-5000000, 5000000),
-                                    math.random(-5000000, 5000000),
-                                    math.random(-5000000, 5000000)
-                                )
-                                local direction = (__d2e3f4 - voidOrigin).Unit
-                                local newStart = voidOrigin
-                                local newEnd = __d2e3f4 + direction * 5
-                                local voidCF = CFrame.lookAt(newStart, newEnd)
-                                __u3v4w5[utf8.char(0)] = __w9x0y1:EncodeCFrame(voidCF)
-                                __u3v4w5[utf8.char(1)] = __w9x0y1:EncodeCFrame(CFrame.new(newEnd))
-                                __u3v4w5[utf8.char(2)] = __a9b0c1
-                                __u3v4w5[utf8.char(3)] = __w9x0y1:EncodeCFrame(__p4q5r6)
-                            else
-                                __u3v4w5[utf8.char(0)] = __w9x0y1:EncodeCFrame(CFrame.new(__j8k9l0, __d2e3f4) * CFrame.Angles(__m1n2o3:ToOrientation()))
-                                __u3v4w5[utf8.char(1)] = __w9x0y1:EncodeCFrame(CFrame.new(__d2e3f4) * CFrame.Angles(__m1n2o3:ToOrientation()))
-                                __u3v4w5[utf8.char(2)] = __a9b0c1
-                                __u3v4w5[utf8.char(3)] = __w9x0y1:EncodeCFrame(__p4q5r6)
-                            end
+                            __u3v4w5[utf8.char(0)] = __w9x0y1:EncodeCFrame(CFrame.new(__j8k9l0, __d2e3f4) * CFrame.Angles(__m1n2o3:ToOrientation()))
+                            __u3v4w5[utf8.char(1)] = __w9x0y1:EncodeCFrame(CFrame.new(__d2e3f4) * CFrame.Angles(__m1n2o3:ToOrientation()))
+                            __u3v4w5[utf8.char(2)] = __a9b0c1
+                            __u3v4w5[utf8.char(3)] = __w9x0y1:EncodeCFrame(__p4q5r6)
 
                             self.__task1 = task.delay(0.15, function()
                                 self:__desync_stop()
@@ -1589,7 +1541,7 @@ run(function()
                 disableBoundaryBypass()
             end
         end,
-        Tooltip = "hvh shit"
+        Tooltip = "Desync & positioning (presets, idle spam, void spam)"
     })
 
     DesyncModule:CreateDropdown({
@@ -1642,7 +1594,7 @@ run(function()
         Name = "Void Spam",
         Default = _G.wallbangVoidSpam,
         Function = function(v) _G.wallbangVoidSpam = v end,
-        Tooltip = "Teleport desynced position to void every interval"
+        Tooltip = "Teleport desynced position to void every interval (Boundary Bypass keeps you alive)"
     })
     DesyncModule:CreateSlider({
         Name = "Void Interval (s)",
@@ -1650,30 +1602,86 @@ run(function()
         Function = function(v) _G.wallbangVoidInterval = v end,
         Suffix = "s"
     })
-    DesyncModule:CreateToggle({
-        Name = "Auto Fire",
-        Default = _G.wallbangAutoFire,
-        Function = function(v) _G.wallbangAutoFire = v end,
-        Tooltip = "Automatically shoots when near enemy"
+end)
+                                                                                                                                                                                                        
+run(function()
+    if _G.ragebotAutoFire == nil then _G.ragebotAutoFire = false end
+    if _G.ragebotAutoFireRange == nil then _G.ragebotAutoFireRange = 200 end
+    if _G.ragebotBulletRedir == nil then _G.ragebotBulletRedir = false end
+
+    local function getLocalRoot()
+        local char = lplr.Character
+        return char and char:FindFirstChild("HumanoidRootPart")
+    end
+
+    local RagebotModule = vape.Categories.Combat:CreateModule({
+        Name = "Ragebot",
+        Function = function(callback)
+            if callback then
+                print("[Ragebot] Enabled")
+            else
+                print("[Ragebot] Disabled")
+            end
+        end,
+        Tooltip = "hvh6"
     })
-    DesyncModule:CreateSlider({
+
+    local autoFireThreadRunning = true
+    task.spawn(function()
+        while autoFireThreadRunning do
+            if _G.ragebotAutoFire then
+                local localRoot = getLocalRoot()
+                if localRoot then
+                    local target = shared.__s9t0u1 and shared.__s9t0u1.__target
+                    if target and target.Character then
+                        local targetRoot = target.Character:FindFirstChild("HumanoidRootPart")
+                        if targetRoot then
+                            local dist = (localRoot.Position - targetRoot.Position).Magnitude
+                            if dist <= (_G.ragebotAutoFireRange or 200) then
+                                pcall(function()
+                                    if mouse1press then mouse1press() end
+                                    task.wait(0.05)
+                                    if mouse1release then mouse1release() end
+                                end)
+                            end
+                        end
+                    end
+                end
+            end
+            task.wait(0.1)
+        end
+    end)
+
+    local function updateWallbangRedir()
+        if shared.__s9t0u1 then
+            shared.__s9t0u1.__voidBulletEnabled = _G.ragebotBulletRedir
+        end
+    end
+
+    RagebotModule:CreateToggle({
+        Name = "Auto Fire",
+        Default = _G.ragebotAutoFire,
+        Function = function(v) _G.ragebotAutoFire = v end,
+        Tooltip = "Automatically shoot when enemy is in range"
+    })
+    RagebotModule:CreateSlider({
         Name = "Auto Fire Range",
-        Min = 50, Max = 500, Default = _G.wallbangAutoFireRange,
-        Function = function(v) _G.wallbangAutoFireRange = v end,
+        Min = 50, Max = 500, Default = _G.ragebotAutoFireRange,
+        Function = function(v) _G.ragebotAutoFireRange = v end,
         Suffix = "studs"
     })
-    DesyncModule:CreateToggle({
+    RagebotModule:CreateToggle({
         Name = "Bullet Redirection",
-        Default = _G.wallbangBulletRedir,
+        Default = _G.ragebotBulletRedir,
         Function = function(v)
-            _G.wallbangBulletRedir = v
-            if shared.__s9t0u1 then
-                shared.__s9t0u1.__voidBulletEnabled = v
-            end
-            notif('Rawr.xyz', v and 'on' or 'off', 2, v and 'success' or 'info')
+            _G.ragebotBulletRedir = v
+            updateWallbangRedir()
+            notif('Rawr.xyz', v and 'BRD ON' or 'BRD OFF', 2, v and 'success' or 'info')
         end,
-        Tooltip = 'Redirects bullets from void origin'
+        Tooltip = "Redirects bullets"
     })
+
+    updateWallbangRedir()
 end)
 
 run(function()
