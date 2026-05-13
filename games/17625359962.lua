@@ -991,20 +991,11 @@ run(function()
 end)
                                                                                                                                             
 run(function()
-    -- Globals
-    if _G.wallbangMode == nil then _G.wallbangMode = "Static" end
-    if _G.wallbangX == nil then _G.wallbangX = 0 end
-    if _G.wallbangY == nil then _G.wallbangY = 5 end
-    if _G.wallbangZ == nil then _G.wallbangZ = 0 end
-    if _G.wallbangOrbitRadius == nil then _G.wallbangOrbitRadius = 6 end
-    if _G.wallbangOrbitSpeed == nil then _G.wallbangOrbitSpeed = 1.5 end
-    if _G.wallbangOrbitVert == nil then _G.wallbangOrbitVert = 3 end
-    if _G.wallbangPrediction == nil then _G.wallbangPrediction = true end
-    if _G.wallbangPredictionTime == nil then _G.wallbangPredictionTime = 0.15 end
+    -- Global defaults
     if _G.wallbangBoundaryBypass == nil then _G.wallbangBoundaryBypass = true end
 
     local DesyncModule = vape.Categories.Combat:CreateModule({
-        Name = "Wallbang Method (Might be Detected)",
+        Name = "Wallbang Method",
         Function = function(callback)
             local isEnabled = callback
             local pendingTask = nil
@@ -1061,22 +1052,10 @@ run(function()
                         local targetVel = Vector3.new()
                         local rootPart = target.Character:FindFirstChild("HumanoidRootPart")
                         if rootPart then targetVel = rootPart.Velocity end
-                        local timeNow = tick()
-                        local predPos = targetHead.Position
-                        if _G.wallbangPrediction then
-                            predPos = predPos + targetVel * _G.wallbangPredictionTime
-                        end
-                        local pos
-                        if _G.wallbangMode == "Static" then
-                            pos = predPos + Vector3.new(_G.wallbangX, _G.wallbangY, _G.wallbangZ)
-                        else
-                            local angleRad = timeNow * _G.wallbangOrbitSpeed * 2 * math.pi
-                            local xOff = math.cos(angleRad) * _G.wallbangOrbitRadius
-                            local zOff = math.sin(angleRad) * _G.wallbangOrbitRadius
-                            local yOff = math.sin(angleRad * 2) * _G.wallbangOrbitVert
-                            pos = predPos + Vector3.new(xOff, yOff, zOff)
-                        end
-                        visualPart.Position = pos
+                        local predPos = targetHead.Position + targetVel * 0.2
+                        local frontOffset = predPos + targetHead.CFrame.LookVector * 5
+                        local finalPos = frontOffset + Vector3.new(0, 10, 0)
+                        visualPart.Position = finalPos
                         visualPart.Visible = true
                         return
                     end
@@ -1117,7 +1096,6 @@ run(function()
             local function enableBoundaryBypass()
                 if boundaryActive then return end
                 boundaryActive = true
-                -- Barriers
                 scanBarriers()
                 barrierAddedConn = workspace.DescendantAdded:Connect(onBarrierAdded)
             end
@@ -1289,34 +1267,22 @@ run(function()
                             end
                             local targetHead = __c3d4e5.Character:FindFirstChild("Head") or __i9j0k1
                             local targetPos = targetHead.Position
+                            local targetCF = targetHead.CFrame
                             local targetVel = __i9j0k1.Velocity
-                            local timeNow = tick()
 
-                            if _G.wallbangPrediction then
-                                targetPos = targetPos + targetVel * _G.wallbangPredictionTime
-                            end
+                            local predictedPos = targetPos + targetVel * 0.2
+                            local frontOffset = targetCF.LookVector * 5
+                            local finalPos = predictedPos + frontOffset + Vector3.new(0, 10, 0)
 
-                            local newPos
-                            if _G.wallbangMode == "Static" then
-                                newPos = targetPos + Vector3.new(_G.wallbangX, _G.wallbangY, _G.wallbangZ)
-                            else
-                                local angleRad = timeNow * _G.wallbangOrbitSpeed * 2 * math.pi
-                                local xOff = math.cos(angleRad) * _G.wallbangOrbitRadius
-                                local zOff = math.sin(angleRad) * _G.wallbangOrbitRadius
-                                local yOff = math.sin(angleRad * 2) * _G.wallbangOrbitVert
-                                newPos = targetPos + Vector3.new(xOff, yOff, zOff)
-                            end
-
-                            -- Combined boundary bypass
                             if _G.wallbangBoundaryBypass then
                                 local fallenHeight = workspace.FallenPartsDestroyHeight or -500
-                                if newPos.Y < fallenHeight + 20 or math.abs(newPos.X) > 10000 or math.abs(newPos.Z) > 10000 then
-                                    newPos = targetPos + Vector3.new(0, 5, 0)
+                                if finalPos.Y < fallenHeight + 20 or math.abs(finalPos.X) > 10000 or math.abs(finalPos.Z) > 10000 then
+                                    finalPos = predictedPos + Vector3.new(0, 5, 0)
                                     pcall(function() notif('Rawr.xyz', 'Boundary corrected', 1, 'alert') end)
                                 end
                             end
 
-                            local lookDown = CFrame.lookAt(newPos, targetPos)
+                            local lookDown = CFrame.lookAt(finalPos, predictedPos)
                             local __l2m3n4 = __f6g7h8.CFrame
                             local __o5p6q7 = __f6g7h8.Velocity
                             local __r8s9t0 = __f6g7h8.RotVelocity
@@ -1399,15 +1365,9 @@ run(function()
                 disableBoundaryBypass()
             end
         end,
-        Tooltip = "Just Shoot"
+        Tooltip = "hvh shit"
     })
 
-    DesyncModule:CreateToggle({
-        Name = "Prediction",
-        Default = _G.wallbangPrediction,
-        Function = function(v) _G.wallbangPrediction = v end,
-        Tooltip = "Lead moving targets"
-    })
     DesyncModule:CreateToggle({
         Name = "Boundary Bypass",
         Default = _G.wallbangBoundaryBypass,
@@ -1419,7 +1379,7 @@ run(function()
                 disableBoundaryBypass()
             end
         end,
-        Tooltip = "Disable"
+        Tooltip = "Disable barriers & prevent falling out of map"
     })
     DesyncModule:CreateToggle({
         Name = "Bullet Redirection",
@@ -1429,59 +1389,9 @@ run(function()
             if shared.__s9t0u1 then
                 shared.__s9t0u1.__voidBulletEnabled = state
             end
-            notif('Rawr.xyz', state and 'on' or 'off', 2, state and 'success' or 'info')
+            notif('Rawr.xyz', state and 'Bullet redirection ON' or 'Bullet redirection OFF', 2, state and 'success' or 'info')
         end,
-        Tooltip = 'Redirects bullets.'
-    })
-
-    DesyncModule:CreateSlider({
-        Name = "Prediction Time (s)",
-        Min = 0, Max = 0.5, Default = _G.wallbangPredictionTime, Decimal = 100,
-        Function = function(v) _G.wallbangPredictionTime = v end,
-        Suffix = "s"
-    })
-    DesyncModule:CreateSlider({
-        Name = "X Offset",
-        Min = -20, Max = 20, Default = _G.wallbangX,
-        Function = function(v) _G.wallbangX = v end,
-        Suffix = "studs"
-    })
-    DesyncModule:CreateSlider({
-        Name = "Y Offset",
-        Min = -20, Max = 20, Default = _G.wallbangY,
-        Function = function(v) _G.wallbangY = v end,
-        Suffix = "studs"
-    })
-    DesyncModule:CreateSlider({
-        Name = "Z Offset",
-        Min = -20, Max = 20, Default = _G.wallbangZ,
-        Function = function(v) _G.wallbangZ = v end,
-        Suffix = "studs"
-    })
-    DesyncModule:CreateDropdown({
-        Name = "Offset Mode",
-        List = {"Static", "Orbit"},
-        Default = _G.wallbangMode,
-        Function = function(v) _G.wallbangMode = v end,
-        Tooltip = "Static = fixed offset; Orbit = moves around target"
-    })
-    DesyncModule:CreateSlider({
-        Name = "Orbit Radius",
-        Min = 1, Max = 15, Default = _G.wallbangOrbitRadius,
-        Function = function(v) _G.wallbangOrbitRadius = v end,
-        Suffix = "studs"
-    })
-    DesyncModule:CreateSlider({
-        Name = "Orbit Speed (cyc/s)",
-        Min = 0.5, Max = 5.0, Default = _G.wallbangOrbitSpeed, Decimal = 10,
-        Function = function(v) _G.wallbangOrbitSpeed = v end,
-        Suffix = "cyc/s"
-    })
-    DesyncModule:CreateSlider({
-        Name = "Orbit Vertical Amplitude",
-        Min = 0, Max = 10, Default = _G.wallbangOrbitVert,
-        Function = function(v) _G.wallbangOrbitVert = v end,
-        Suffix = "studs"
+        Tooltip = 'Redirects bullets to always hit.'
     })
 end)
                                                                                                                                                 
