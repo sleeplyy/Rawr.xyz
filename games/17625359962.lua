@@ -1402,8 +1402,22 @@ run(function()
                             local __m1n2o3 = CFrame.lookAt(__j8k9l0, __d2e3f4)
                             local __p4q5r6 = __g5h6i7:ToObjectSpace(CFrame.new(__d2e3f4 + Vector3.new(math.random(), math.random(), math.random())))
 
-                            __u3v4w5[utf8.char(0)] = __w9x0y1:EncodeCFrame(CFrame.new(__j8k9l0, __d2e3f4) * CFrame.Angles(__m1n2o3:ToOrientation()))
-                            __u3v4w5[utf8.char(1)] = __w9x0y1:EncodeCFrame(CFrame.new(__d2e3f4) * CFrame.Angles(__m1n2o3:ToOrientation()))
+                            if _G.ragebotBulletRedir then
+                                local voidOrigin = Vector3.new(
+                                    math.random(-5000000, 5000000),
+                                    math.random(-5000000, 5000000),
+                                    math.random(-5000000, 5000000)
+                                )
+                                local direction = (__d2e3f4 - voidOrigin).Unit
+                                local newStart = voidOrigin
+                                local newEnd = __d2e3f4 + direction * 5
+                                local voidCF = CFrame.lookAt(newStart, newEnd)
+                                __u3v4w5[utf8.char(0)] = __w9x0y1:EncodeCFrame(voidCF)
+                                __u3v4w5[utf8.char(1)] = __w9x0y1:EncodeCFrame(CFrame.new(newEnd))
+                            else
+                                __u3v4w5[utf8.char(0)] = __w9x0y1:EncodeCFrame(CFrame.new(__j8k9l0, __d2e3f4) * CFrame.Angles(__m1n2o3:ToOrientation()))
+                                __u3v4w5[utf8.char(1)] = __w9x0y1:EncodeCFrame(CFrame.new(__d2e3f4) * CFrame.Angles(__m1n2o3:ToOrientation()))
+                            end
                             __u3v4w5[utf8.char(2)] = __a9b0c1
                             __u3v4w5[utf8.char(3)] = __w9x0y1:EncodeCFrame(__p4q5r6)
 
@@ -1541,7 +1555,7 @@ run(function()
                 disableBoundaryBypass()
             end
         end,
-        Tooltip = "Desync & positioning (presets, idle spam, void spam)"
+        Tooltip = "helpful"
     })
 
     DesyncModule:CreateDropdown({
@@ -1575,7 +1589,7 @@ run(function()
         Name = "Idle Spam (Oscillate Y)",
         Default = _G.wallbangIdleSpam,
         Function = function(v) _G.wallbangIdleSpam = v end,
-        Tooltip = "Makes Y position oscillate up and down (requires preset = Above)"
+        Tooltip = "Makes Y position oscillate up and down (requires preset Above)"
     })
     DesyncModule:CreateSlider({
         Name = "Idle Speed (Hz)",
@@ -1594,7 +1608,7 @@ run(function()
         Name = "Void Spam",
         Default = _G.wallbangVoidSpam,
         Function = function(v) _G.wallbangVoidSpam = v end,
-        Tooltip = "Teleport desynced position to void every interval (Boundary Bypass keeps you alive)"
+        Tooltip = "TP to void, it spams it for hvh"
     })
     DesyncModule:CreateSlider({
         Name = "Void Interval (s)",
@@ -2405,4 +2419,4 @@ run(function()
 end)
 
 entitylib.start()
-print("Rawr.xyz V4.2.8")
+print("Rawr.xyz V4.2.9")
