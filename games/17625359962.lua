@@ -991,11 +991,28 @@ run(function()
 end)
                                                                                                                                             
 run(function()
+    if _G.wallbangMode == nil then _G.wallbangMode = "Static" end
+    if _G.wallbangX == nil then _G.wallbangX = 0 end
+    if _G.wallbangY == nil then _G.wallbangY = 5 end
+    if _G.wallbangZ == nil then _G.wallbangZ = 0 end
+    if _G.wallbangOrbitRadius == nil then _G.wallbangOrbitRadius = 6 end
+    if _G.wallbangOrbitSpeed == nil then _G.wallbangOrbitSpeed = 1.5 end
+    if _G.wallbangOrbitVert == nil then _G.wallbangOrbitVert = 3 end
+    if _G.wallbangPrediction == nil then _G.wallbangPrediction = true end
+    if _G.wallbangPredictionTime == nil then _G.wallbangPredictionTime = 0.15 end
+    if _G.wallbangAntiOOB == nil then _G.wallbangAntiOOB = true end
+    if _G.wallbangBarrierBypass == nil then _G.wallbangBarrierBypass = true end
+
     local DesyncModule = vape.Categories.Combat:CreateModule({
         Name = "Wallbang Method (Might be Detected)",
         Function = function(callback)
             local isEnabled = callback
             local pendingTask = nil
+            local visualPart = nil
+            local visualConn = nil
+            local barrierBypassActive = false
+            local barrierAddedConn = nil
+            local barrierList = {}   -- set
 
             local function isGameActive()
                 local mainGui = lplr.PlayerGui:FindFirstChild("MainGui")
@@ -1022,9 +1039,6 @@ run(function()
                 return false
             end
 
-            local visualPart = nil
-            local visualConn = nil
-
             local function createVisual()
                 if visualPart then visualPart:Destroy() end
                 visualPart = Instance.new("Part")
@@ -1038,28 +1052,9 @@ run(function()
                 visualPart.Parent = workspace
             end
 
-            local function getCurrentTarget()
-                if shared.__s9t0u1 and shared.__s9t0u1.__target then
-                    return shared.__s9t0u1.__target
-                end
-                return nil
-            end
-
-            local function getPredictionEnabled() return _G.wallbangPrediction ~= false end
-            local function getPredictionTime() return tonumber(_G.wallbangPredictionTime) or 0.15 end
-            local function getAntiOOB() return _G.wallbangAntiOOB ~= false end
-            local function getOffsetMode() return _G.wallbangMode or "Static" end
-            local function getOffsetX() return tonumber(_G.wallbangX) or 0 end
-            local function getOffsetY() return tonumber(_G.wallbangY) or 5 end
-            local function getOffsetZ() return tonumber(_G.wallbangZ) or 0 end
-            local function getOrbitRadius() return tonumber(_G.wallbangOrbitRadius) or 6 end
-            local function getOrbitSpeed() return tonumber(_G.wallbangOrbitSpeed) or 1.5 end
-            local function getOrbitVert() return tonumber(_G.wallbangOrbitVert) or 3 end
-            local function getBarrierBypass() return _G.wallbangBarrierBypass ~= false end
-
             local function updateVisual()
                 if not visualPart then return end
-                local target = getCurrentTarget()
+                local target = shared.__s9t0u1 and shared.__s9t0u1.__target
                 if target and target.Character then
                     local targetHead = target.Character:FindFirstChild("Head") or target.Character:FindFirstChild("HumanoidRootPart")
                     if targetHead then
@@ -1068,18 +1063,17 @@ run(function()
                         if rootPart then targetVel = rootPart.Velocity end
                         local timeNow = tick()
                         local predPos = targetHead.Position
-                        if getPredictionEnabled() then
-                            predPos = predPos + targetVel * getPredictionTime()
+                        if _G.wallbangPrediction then
+                            predPos = predPos + targetVel * _G.wallbangPredictionTime
                         end
-                        local mode = getOffsetMode()
                         local pos
-                        if mode == "Static" then
-                            pos = predPos + Vector3.new(getOffsetX(), getOffsetY(), getOffsetZ())
+                        if _G.wallbangMode == "Static" then
+                            pos = predPos + Vector3.new(_G.wallbangX, _G.wallbangY, _G.wallbangZ)
                         else
-                            local angleRad = timeNow * getOrbitSpeed() * 2 * math.pi
-                            local xOff = math.cos(angleRad) * getOrbitRadius()
-                            local zOff = math.sin(angleRad) * getOrbitRadius()
-                            local yOff = math.sin(angleRad * 2) * getOrbitVert()
+                            local angleRad = timeNow * _G.wallbangOrbitSpeed * 2 * math.pi
+                            local xOff = math.cos(angleRad) * _G.wallbangOrbitRadius
+                            local zOff = math.sin(angleRad) * _G.wallbangOrbitRadius
+                            local yOff = math.sin(angleRad * 2) * _G.wallbangOrbitVert
                             pos = predPos + Vector3.new(xOff, yOff, zOff)
                         end
                         visualPart.Position = pos
@@ -1087,7 +1081,7 @@ run(function()
                         return
                     end
                 end
-                visualPart.Visible = false
+                if visualPart then visualPart.Visible = false end
             end
 
             local function startVisualUpdate()
@@ -1100,15 +1094,11 @@ run(function()
                 if visualPart then visualPart:Destroy(); visualPart = nil end
             end
 
-            local barrierBypassEnabled = false
-            local barrierParts = {}
-            local barrierAddedConn = nil
-
             local function scanBarriers()
                 for _, part in ipairs(workspace:GetDescendants()) do
                     if part:IsA("BasePart") and (part.Name == "Barrier" or (part.Parent and part.Parent.Name == "Barriers")) then
-                        if not barrierParts[part] then
-                            barrierParts[part] = true
+                        if not barrierList[part] then
+                            barrierList[part] = true
                             pcall(function() part.CanCollide = false end)
                         end
                     end
@@ -1117,24 +1107,24 @@ run(function()
 
             local function onBarrierAdded(part)
                 if part:IsA("BasePart") and (part.Name == "Barrier" or (part.Parent and part.Parent.Name == "Barriers")) then
-                    if not barrierParts[part] then
-                        barrierParts[part] = true
+                    if not barrierList[part] then
+                        barrierList[part] = true
                         pcall(function() part.CanCollide = false end)
                     end
                 end
             end
 
             local function enableBarrierBypass()
-                if barrierBypassEnabled then return end
-                barrierBypassEnabled = true
+                if barrierBypassActive then return end
+                barrierBypassActive = true
                 scanBarriers()
                 barrierAddedConn = workspace.DescendantAdded:Connect(onBarrierAdded)
             end
 
             local function disableBarrierBypass()
-                barrierBypassEnabled = false
+                barrierBypassActive = false
                 if barrierAddedConn then barrierAddedConn:Disconnect(); barrierAddedConn = nil end
-                barrierParts = {}
+                barrierList = {}
             end
 
             local voidBulletEnabled = false
@@ -1301,23 +1291,22 @@ run(function()
                             local targetVel = __i9j0k1.Velocity
                             local timeNow = tick()
 
-                            if getPredictionEnabled() then
-                                targetPos = targetPos + targetVel * getPredictionTime()
+                            if _G.wallbangPrediction then
+                                targetPos = targetPos + targetVel * _G.wallbangPredictionTime
                             end
 
-                            local mode = getOffsetMode()
                             local newPos
-                            if mode == "Static" then
-                                newPos = targetPos + Vector3.new(getOffsetX(), getOffsetY(), getOffsetZ())
+                            if _G.wallbangMode == "Static" then
+                                newPos = targetPos + Vector3.new(_G.wallbangX, _G.wallbangY, _G.wallbangZ)
                             else
-                                local angleRad = timeNow * getOrbitSpeed() * 2 * math.pi
-                                local xOff = math.cos(angleRad) * getOrbitRadius()
-                                local zOff = math.sin(angleRad) * getOrbitRadius()
-                                local yOff = math.sin(angleRad * 2) * getOrbitVert()
+                                local angleRad = timeNow * _G.wallbangOrbitSpeed * 2 * math.pi
+                                local xOff = math.cos(angleRad) * _G.wallbangOrbitRadius
+                                local zOff = math.sin(angleRad) * _G.wallbangOrbitRadius
+                                local yOff = math.sin(angleRad * 2) * _G.wallbangOrbitVert
                                 newPos = targetPos + Vector3.new(xOff, yOff, zOff)
                             end
 
-                            if getAntiOOB() then
+                            if _G.wallbangAntiOOB then
                                 local fallenHeight = workspace.FallenPartsDestroyHeight or -500
                                 if newPos.Y < fallenHeight + 20 or math.abs(newPos.X) > 10000 or math.abs(newPos.Z) > 10000 then
                                     newPos = targetPos + Vector3.new(0, 5, 0)
@@ -1390,7 +1379,7 @@ run(function()
                     if pendingTask then task.cancel(pendingTask); pendingTask = nil end
                     createVisual()
                     startVisualUpdate()
-                    if getBarrierBypass() then enableBarrierBypass() else disableBarrierBypass() end
+                    if _G.wallbangBarrierBypass then enableBarrierBypass() else disableBarrierBypass() end
                 end
             end
 
@@ -1411,33 +1400,21 @@ run(function()
         Tooltip = "Just Shoot"
     })
 
-    if _G.wallbangMode == nil then _G.wallbangMode = "Static" end
-    if _G.wallbangX == nil then _G.wallbangX = 0 end
-    if _G.wallbangY == nil then _G.wallbangY = 5 end
-    if _G.wallbangZ == nil then _G.wallbangZ = 0 end
-    if _G.wallbangOrbitRadius == nil then _G.wallbangOrbitRadius = 6 end
-    if _G.wallbangOrbitSpeed == nil then _G.wallbangOrbitSpeed = 1.5 end
-    if _G.wallbangOrbitVert == nil then _G.wallbangOrbitVert = 3 end
-    if _G.wallbangPrediction == nil then _G.wallbangPrediction = true end
-    if _G.wallbangPredictionTime == nil then _G.wallbangPredictionTime = 0.15 end
-    if _G.wallbangAntiOOB == nil then _G.wallbangAntiOOB = true end
-    if _G.wallbangBarrierBypass == nil then _G.wallbangBarrierBypass = true end
-
     DesyncModule:CreateToggle({
         Name = "Prediction",
-        Default = true,
+        Default = _G.wallbangPrediction,
         Function = function(v) _G.wallbangPrediction = v end,
         Tooltip = "Lead moving targets"
     })
     DesyncModule:CreateToggle({
         Name = "Anti‑Out‑of‑Bounds",
-        Default = true,
+        Default = _G.wallbangAntiOOB,
         Function = function(v) _G.wallbangAntiOOB = v end,
-        Tooltip = "self"
+        Tooltip = "Prevents falling out of map"
     })
     DesyncModule:CreateToggle({
         Name = "Barrier Bypass",
-        Default = true,
+        Default = _G.wallbangBarrierBypass,
         Function = function(v)
             _G.wallbangBarrierBypass = v
             if v then
@@ -1446,69 +1423,67 @@ run(function()
                 disableBarrierBypass()
             end
         end,
-        Tooltip = "Anti Boundry (testing)"
+        Tooltip = "Disables Barriers"
     })
     DesyncModule:CreateToggle({
-        Name = 'Bullet Redirection',
+        Name = "Bullet Redirection",
         Default = false,
         Function = function(state)
-            if shared.__s9t0u1 and shared.__s9t0u1.__voidBulletEnabled then
+            voidBulletEnabled = state
+            if shared.__s9t0u1 then
                 shared.__s9t0u1.__voidBulletEnabled = state
             end
-            notif('Rawr.xyz', state and 'Attached' or 'Detached', 2, state and 'success' or 'info')
+            notif('Rawr.xyz', state and 'on' or 'off', 2, state and 'success' or 'info')
         end,
-        Tooltip = 'Redirects bullets to hit your enemys :)'
+        Tooltip = 'Redirects bullets'
     })
 
-    -- Sliders and dropdown
     DesyncModule:CreateSlider({
         Name = "Prediction Time (s)",
-        Min = 0, Max = 0.5, Default = 0.15, Decimal = 100,
+        Min = 0, Max = 0.5, Default = _G.wallbangPredictionTime, Decimal = 100,
         Function = function(v) _G.wallbangPredictionTime = v end,
         Suffix = "s"
     })
     DesyncModule:CreateSlider({
         Name = "X Offset",
-        Min = -20, Max = 20, Default = 0,
+        Min = -20, Max = 20, Default = _G.wallbangX,
         Function = function(v) _G.wallbangX = v end,
         Suffix = "studs"
     })
     DesyncModule:CreateSlider({
         Name = "Y Offset",
-        Min = -20, Max = 20, Default = 5,
+        Min = -20, Max = 20, Default = _G.wallbangY,
         Function = function(v) _G.wallbangY = v end,
         Suffix = "studs"
     })
     DesyncModule:CreateSlider({
         Name = "Z Offset",
-        Min = -20, Max = 20, Default = 0,
+        Min = -20, Max = 20, Default = _G.wallbangZ,
         Function = function(v) _G.wallbangZ = v end,
         Suffix = "studs"
     })
-
     DesyncModule:CreateDropdown({
         Name = "Offset Mode",
         List = {"Static", "Orbit"},
-        Default = "Static",
+        Default = _G.wallbangMode,
         Function = function(v) _G.wallbangMode = v end,
         Tooltip = "Static = fixed offset; Orbit = moves around target"
     })
-
     DesyncModule:CreateSlider({
         Name = "Orbit Radius",
-        Min = 1, Max = 15, Default = 6,
+        Min = 1, Max = 15, Default = _G.wallbangOrbitRadius,
         Function = function(v) _G.wallbangOrbitRadius = v end,
         Suffix = "studs"
     })
     DesyncModule:CreateSlider({
         Name = "Orbit Speed (cyc/s)",
-        Min = 0.5, Max = 5.0, Default = 1.5, Decimal = 10,
+        Min = 0.5, Max = 5.0, Default = _G.wallbangOrbitSpeed, Decimal = 10,
         Function = function(v) _G.wallbangOrbitSpeed = v end,
         Suffix = "cyc/s"
     })
     DesyncModule:CreateSlider({
         Name = "Orbit Vertical Amplitude",
-        Min = 0, Max = 10, Default = 3,
+        Min = 0, Max = 10, Default = _G.wallbangOrbitVert,
         Function = function(v) _G.wallbangOrbitVert = v end,
         Suffix = "studs"
     })
