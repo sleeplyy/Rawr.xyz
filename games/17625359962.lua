@@ -1131,7 +1131,58 @@ run(function()
     if _G.wallbangBoundaryBypass == nil then _G.wallbangBoundaryBypass = true end
     if _G.wallbangPredictionTime == nil then _G.wallbangPredictionTime = 0.2 end
     if _G.wallbangPreset == nil then _G.wallbangPreset = "Above" end
-    if _G.wallbangVoidDesync == nil then _G.wallbangVoidDesync = false end
+                                                                                                                                                                            
+    local voidCorners = {
+    Vector3.new(-5000, 2000, -5000),
+    Vector3.new(5000, 2000, -5000),
+    Vector3.new(5000, 2000, 5000),
+    Vector3.new(-5000, 2000, 5000),
+}
+local lastCornerTime = 0
+local cornerIndex = 1
+local cornerInterval = 0.2
+
+local function computePosition(pos, cf, vel, now)
+    if not pos then return nil end
+    if _G.autoFireVoidDesync then
+        if now - lastCornerTime >= cornerInterval then
+            lastCornerTime = now
+            cornerIndex = (cornerIndex % 4) + 1
+        end
+        return voidCorners[cornerIndex]
+    end
+
+    local predTime = _G.wallbangPredictionTime or 0.2
+    local predictedPos = pos + vel * predTime
+    local preset = _G.wallbangPreset or "Above"
+
+    if preset == "Above" then
+        if cf and type(cf) == "CFrame" then
+            local frontOffset = cf.LookVector * 5
+            return predictedPos + frontOffset + Vector3.new(0, 10, 0)
+        else
+            return predictedPos + Vector3.new(0, 10, 0)
+        end
+    elseif preset == "Below" then
+        return predictedPos + Vector3.new(0, -1, 0)
+    elseif preset == "Orbit" then
+        local radius = 6
+        local speed = 1.5
+        local vertAmp = 3
+        local angleRad = now * speed * 2 * math.pi
+        local xOff = math.cos(angleRad) * radius
+        local zOff = math.sin(angleRad) * radius
+        local yOff = math.sin(angleRad * 2) * vertAmp
+        return predictedPos + Vector3.new(xOff, yOff, zOff)
+    elseif preset == "Random" then
+        local randX = math.random(-8, 8)
+        local randZ = math.random(-8, 8)
+        local randY = math.random(-3, 10)
+        return predictedPos + Vector3.new(randX, randY, randZ)
+    else
+        return predictedPos + Vector3.new(0, 5, 0)
+    end
+end
 
     local function getLocalRoot()
         local char = lplr.Character
@@ -1148,7 +1199,6 @@ run(function()
             local boundaryActive = false
             local barrierAddedConn = nil
             local barrierList = {}
-            local voidDesyncTimer = 0
 
             local function isGameActive()
                 local mainGui = lplr.PlayerGui:FindFirstChild("MainGui")
@@ -1204,47 +1254,33 @@ run(function()
                 local predTime = _G.wallbangPredictionTime or 0.2
                 local predictedPos = pos + vel * predTime
                 local preset = _G.wallbangPreset or "Above"
-                local finalPos
 
-                if _G.wallbangVoidDesync then
-                    finalPos = Vector3.new(math.random(-5000, 5000), 1000, math.random(-5000, 5000))
-                else
-                    if preset == "Above" then
-                        if cf and type(cf) == "CFrame" then
-                            local frontOffset = cf.LookVector * 5
-                            finalPos = predictedPos + frontOffset + Vector3.new(0, 10, 0)
-                        else
-                            finalPos = predictedPos + Vector3.new(0, 10, 0)
-                        end
-                    elseif preset == "Below" then
-                        finalPos = predictedPos + Vector3.new(0, -1, 0)
-                    elseif preset == "Orbit" then
-                        local radius = 6
-                        local speed = 1.5
-                        local vertAmp = 3
-                        local angleRad = now * speed * 2 * math.pi
-                        local xOff = math.cos(angleRad) * radius
-                        local zOff = math.sin(angleRad) * radius
-                        local yOff = math.sin(angleRad * 2) * vertAmp
-                        finalPos = predictedPos + Vector3.new(xOff, yOff, zOff)
-                    elseif preset == "Random" then
-                        local randX = math.random(-8, 8)
-                        local randZ = math.random(-8, 8)
-                        local randY = math.random(-3, 10)
-                        finalPos = predictedPos + Vector3.new(randX, randY, randZ)
+                if preset == "Above" then
+                    if cf and type(cf) == "CFrame" then
+                        local frontOffset = cf.LookVector * 5
+                        return predictedPos + frontOffset + Vector3.new(0, 10, 0)
                     else
-                        finalPos = predictedPos + Vector3.new(0, 5, 0)
+                        return predictedPos + Vector3.new(0, 10, 0)
                     end
+                elseif preset == "Below" then
+                    return predictedPos + Vector3.new(0, -1, 0)
+                elseif preset == "Orbit" then
+                    local radius = 6
+                    local speed = 1.5
+                    local vertAmp = 3
+                    local angleRad = now * speed * 2 * math.pi
+                    local xOff = math.cos(angleRad) * radius
+                    local zOff = math.sin(angleRad) * radius
+                    local yOff = math.sin(angleRad * 2) * vertAmp
+                    return predictedPos + Vector3.new(xOff, yOff, zOff)
+                elseif preset == "Random" then
+                    local randX = math.random(-8, 8)
+                    local randZ = math.random(-8, 8)
+                    local randY = math.random(-3, 10)
+                    return predictedPos + Vector3.new(randX, randY, randZ)
+                else
+                    return predictedPos + Vector3.new(0, 5, 0)
                 end
-
-                if _G.wallbangBoundaryBypass then
-                    local fallenHeight = workspace.FallenPartsDestroyHeight or -500
-                    if finalPos.Y < fallenHeight + 20 then
-                        finalPos = Vector3.new(finalPos.X, fallenHeight + 50, finalPos.Z)
-                        pcall(function() notif('Rawr.xyz', 'Boundary corrected (prevent death)', 1, 'alert') end)
-                    end
-                end
-                return finalPos
             end
 
             local function updateVisual()
@@ -1590,6 +1626,7 @@ run(function()
     if _G.autoFirePredictionTime == nil then _G.autoFirePredictionTime = 0.15 end
     if _G.autoFireShootDelay == nil then _G.autoFireShootDelay = 0.1 end
     if _G.autoFireBulletRedir == nil then _G.autoFireBulletRedir = false end
+    if _G.autoFireVoidDesync == nil then _G.autoFireVoidDesync = false end
 
     local function getLocalRoot()
         local char = lplr.Character
@@ -1717,7 +1754,32 @@ run(function()
         end
     end
 
-    -- UI elements
+    local voidDesyncCorners = {
+        Vector3.new(-5000, 2000, -5000),
+        Vector3.new(5000, 2000, -5000),
+        Vector3.new(5000, 2000, 5000),
+        Vector3.new(-5000, 2000, 5000),
+    }
+    local currentCorner = 1
+    local lastVoidTeleport = 0
+    local voidInterval = 0.2
+    local originalPosCache = nil
+
+    local function updateVoidDesync()
+        if not _G.autoFireVoidDesync then return end
+        local now = tick()
+        if now - lastVoidTeleport >= voidInterval then
+            lastVoidTeleport = now
+            currentCorner = (currentCorner % 4) + 1
+            local newPos = voidDesyncCorners[currentCorner]
+
+            if not originalPosCache then
+                local root = getLocalRoot()
+                if root then originalPosCache = root.CFrame end
+            end
+        end
+    end
+
     AutoFireModule:CreateToggle({
         Name = "Auto Fire",
         Default = _G.autoFireEnabled,
@@ -1741,12 +1803,6 @@ run(function()
         Min = 0, Max = 100, Default = _G.autoFireHitChance,
         Function = function(v) _G.autoFireHitChance = v end,
         Suffix = "%"
-    })
-        AutoFireModule:CreateToggle({
-        Name = "Void Spam",
-        Default = _G.wallbangVoidDesync,
-        Function = function(v) _G.wallbangVoidDesync = v end,
-        Tooltip = "testin"
     })
     AutoFireModule:CreateSlider({
         Name = "Headshot Chance (%)",
@@ -1795,10 +1851,15 @@ run(function()
         end,
         Tooltip = "Redirects bullets"
     })
+    AutoFireModule:CreateToggle({
+        Name = "Void Desync",
+        Default = _G.autoFireVoidDesync,
+        Function = function(v) _G.autoFireVoidDesync = v end,
+        Tooltip = "Teleport"
+    })
 
     updateWallbangRedir()
 end)
-
 run(function()
     if not hookfunction then
         notif('Gun Mods', 'Your executor does not support hookfunction.', 5, 'alert')
