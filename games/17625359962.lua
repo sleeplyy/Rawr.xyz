@@ -1629,14 +1629,22 @@ run(function()
     if _G.ragebotVisibleCheck == nil then _G.ragebotVisibleCheck = true end
     if _G.ragebotPrediction == nil then _G.ragebotPrediction = true end
     if _G.ragebotPredictionTime == nil then _G.ragebotPredictionTime = 0.15 end
+    if _G.ragebotShootDelay == nil then _G.ragebotShootDelay = 0.1 end
 
     local function getLocalRoot()
         local char = lplr.Character
         return char and char:FindFirstChild("HumanoidRootPart")
     end
 
+    local function isAlive(player)
+        if not player or not player.Character then return false end
+        local hum = player.Character:FindFirstChildOfClass("Humanoid")
+        return hum and hum.Health > 0
+    end
+
     local function isEnemyRagebot(player)
         if player == lplr then return false end
+        if not isAlive(player) then return false end
         if not _G.ragebotTeamCheck then return true end
         return isEnemy(player)
     end
@@ -1653,7 +1661,7 @@ run(function()
         return not result or result.Instance:IsDescendantOf(part.Parent)
     end
 
-    local function getPredictedPosition(part)
+    local function getPredictedPosition(part, speed)
         if not _G.ragebotPrediction then return part.Position end
         local velocity = part.Velocity
         if velocity.Magnitude < 0.1 then return part.Position end
@@ -1670,12 +1678,13 @@ run(function()
             if isEnemyRagebot(player) and player.Character then
                 local targetPart = player.Character:FindFirstChild(_G.ragebotTargetPart) or player.Character:FindFirstChild("Head") or player.Character:FindFirstChild("HumanoidRootPart")
                 if targetPart and isVisible(targetPart) then
-                    local screenPos, onScreen = gameCamera:WorldToViewportPoint(getPredictedPosition(targetPart))
+                    local predPos = getPredictedPosition(targetPart)
+                    local screenPos, onScreen = gameCamera:WorldToViewportPoint(predPos)
                     if onScreen and screenPos.Z > 0 then
                         local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
                         if dist < bestDist then
                             bestDist = dist
-                            best = {player = player, part = targetPart, position = getPredictedPosition(targetPart)}
+                            best = {player = player, part = targetPart, position = predPos}
                         end
                     end
                 end
@@ -1684,7 +1693,7 @@ run(function()
         return best
     end
 
-    local function shootAtTarget(targetPart, origin)
+    local function shoot()
         pcall(function()
             if mouse1press then mouse1press() end
             task.wait(0.05)
@@ -1696,9 +1705,9 @@ run(function()
         Name = "Ragebot",
         Function = function(callback)
             if callback then
-                print("nigga im off :<")
+                print("en")
             else
-                print("nigga im on :>")
+                print("dn")
             end
         end,
         Tooltip = "hvh"
@@ -1707,19 +1716,22 @@ run(function()
     local autoFireThreadRunning = true
     local autoFireTask = task.spawn(function()
         local lastShootTime = 0
-        local shootDelay = 0.1
         while autoFireThreadRunning do
             if _G.ragebotAutoFire then
                 local target = findBestTarget()
                 if target then
                     local now = tick()
-                    if now - lastShootTime >= shootDelay then
+                    if now - lastShootTime >= _G.ragebotShootDelay then
                         if math.random(1, 100) <= (_G.ragebotHitChance or 100) then
-                            if _G.ragebotHeadshotChance and math.random(1, 100) > (_G.ragebotHeadshotChance or 100) then
-                                local bodyPart = target.player.Character:FindFirstChild("HumanoidRootPart") or target.part
-                                shootAtTarget(bodyPart, gameCamera.CFrame.Position)
+                            if (_G.ragebotHeadshotChance or 80) >= 100 or math.random(1, 100) <= (_G.ragebotHeadshotChance or 80) then
+                                shoot()
                             else
-                                shootAtTarget(target.part, gameCamera.CFrame.Position)
+                                local bodyPart = target.player.Character:FindFirstChild("HumanoidRootPart") or target.player.Character:FindFirstChild("UpperTorso")
+                                if bodyPart then
+                                    shoot()
+                                else
+                                    shoot()
+                                end
                             end
                             lastShootTime = now
                         end
@@ -1730,18 +1742,14 @@ run(function()
         end
     end)
 
-    local function updateWallbangTarget()
-        if shared.__s9t0u1 and _G.ragebotAutoFire then
-            local target = findBestTarget()
-            if target and (not shared.__s9t0u1.__target or shared.__s9t0u1.__target ~= target.player) then
-                shared.__s9t0u1.__target = target.player
-            end
-        end
-    end
-
     local targetUpdateTask = task.spawn(function()
         while true do
-            if _G.ragebotAutoFire then updateWallbangTarget() end
+            if _G.ragebotAutoFire then
+                local best = findBestTarget()
+                if best and shared.__s9t0u1 then
+                    shared.__s9t0u1.__target = best.player
+                end
+            end
             task.wait(0.2)
         end
     end)
@@ -1757,13 +1765,19 @@ run(function()
         Name = "Auto Fire",
         Default = _G.ragebotAutoFire,
         Function = function(v) _G.ragebotAutoFire = v end,
-        Tooltip = "Automatically aim and shoot at the nearest enemy"
+        Tooltip = "Automatically shoot the nearest player)"
     })
     RagebotModule:CreateSlider({
         Name = "Auto Fire Range",
         Min = 50, Max = 500, Default = _G.ragebotAutoFireRange,
         Function = function(v) _G.ragebotAutoFireRange = v end,
         Suffix = "studs"
+    })
+    RagebotModule:CreateSlider({
+        Name = "Shoot Delay (s)",
+        Min = 0.02, Max = 0.5, Default = _G.ragebotShootDelay, Decimal = 100,
+        Function = function(v) _G.ragebotShootDelay = v end,
+        Suffix = "s"
     })
     RagebotModule:CreateSlider({
         Name = "Hit Chance (%)",
@@ -1788,7 +1802,7 @@ run(function()
         Name = "Team Check",
         Default = _G.ragebotTeamCheck,
         Function = function(v) _G.ragebotTeamCheck = v end,
-        Tooltip = "Only target enemies (respects teams)"
+        Tooltip = "Only target enemies"
     })
     RagebotModule:CreateToggle({
         Name = "Visible Check",
@@ -1821,7 +1835,6 @@ run(function()
 
     updateWallbangRedir()
 end)
-
 run(function()
     if not hookfunction then
         notif('Gun Mods', 'Your executor does not support hookfunction.', 5, 'alert')
