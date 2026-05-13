@@ -358,7 +358,6 @@ CrosshairModule:CreateColorSlider({Name="Outline Color", Visible=false, Function
 CrosshairModule:CreateSlider({Name="Outline Thickness", Min=0,Max=3,Default=0.5,Decimal=10, Visible=false, Function=function(v) outlineThickness=v end, Suffix="px"})
 
 run(function()
-    -- Built‑in asset sounds (always available)
     local assetSounds = {
         {name="Bameware", id="rbxassetid://3124331820"},{name="Bell", id="rbxassetid://6534947240"},
         {name="Bubble", id="rbxassetid://6534947588"},{name="Pick", id="rbxassetid://1347140027"},
@@ -373,17 +372,27 @@ run(function()
         {name="iphone", id="rbxassetid://131935970184832"},{name="Lmk", id="rbxassetid://118833207462382"},
     }
 
-    local customSounds = {
-        {name="1nn", path="rbxasset://sounds/1nn.mp3"},
-        {name="67", path="rbxasset://sounds/67.mp3"},
-        {name="Hentai1", path="rbxasset://sounds/Hentai1.mp3"},
-        {name="Hentai2", path="rbxasset://sounds/Hentai2.mp3"},
-        {name="Hentai3", path="rbxasset://sounds/Hentai3.mp3"},
-        {name="Fairy1", path="rbxasset://sounds/Fairy1.mp3"},
-        {name="Fairy2", path="rbxasset://sounds/Fairy2.mp3"},
-    }
+    local getAsset = getcustomasset or getsynasset or function(path)
+        warn("No getcustomasset/getsynasset available")
+        return nil
+    end
 
-    -- Build dropdown list
+    local customSoundFiles = {
+        "1nn.mp3", "67.mp3", "Hentai1.mp3", "Hentai2.mp3", "Hentai3.mp3",
+        "Fairy1.mp3", "Fairy2.mp3"
+    }
+    local customSounds = {}
+    local soundFolder = "newvape/assets/sounds/"
+
+    for _, fileName in ipairs(customSoundFiles) do
+        local fullPath = soundFolder .. fileName
+        local assetId = getAsset(fullPath)
+        if assetId then
+            local soundName = fileName:gsub("%.mp3$", "")
+            table.insert(customSounds, {name = soundName, id = assetId})
+        end
+    end
+
     local soundNames = {}
     local soundMap = {}
 
@@ -393,7 +402,7 @@ run(function()
     end
     for _, s in ipairs(customSounds) do
         table.insert(soundNames, "Local: " .. s.name)
-        soundMap["Local: " .. s.name] = s.path
+        soundMap["Local: " .. s.name] = s.id
     end
 
     local hitsoundEnabled = false
