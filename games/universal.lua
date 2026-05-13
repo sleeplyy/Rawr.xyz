@@ -656,7 +656,7 @@ run(function()
 				local tLocalization = getrenv().require(game:GetService('CorePackages').Workspace.Packages.RobloxAppLocales).Localization
 				local localProvider = getrenv().require(game:GetService('CorePackages').Workspace.Packages.Localization).LocalizationProvider
 				lplr.PlayerGui:ClearAllChildren()
-				vape.gui.Enabled = true
+				vape.gui.Enabled = false
 				coreGui:ClearAllChildren()
 				lightingService:ClearAllChildren()
 				for _, v in workspace:GetChildren() do
