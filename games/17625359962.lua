@@ -1131,58 +1131,6 @@ run(function()
     if _G.wallbangBoundaryBypass == nil then _G.wallbangBoundaryBypass = true end
     if _G.wallbangPredictionTime == nil then _G.wallbangPredictionTime = 0.2 end
     if _G.wallbangPreset == nil then _G.wallbangPreset = "Above" end
-                                                                                                                                                                            
-    local voidCorners = {
-    Vector3.new(-5000, 2000, -5000),
-    Vector3.new(5000, 2000, -5000),
-    Vector3.new(5000, 2000, 5000),
-    Vector3.new(-5000, 2000, 5000),
-}
-local lastCornerTime = 0
-local cornerIndex = 1
-local cornerInterval = 0.2
-
-local function computePosition(pos, cf, vel, now)
-    if not pos then return nil end
-    if _G.autoFireVoidDesync then
-        if now - lastCornerTime >= cornerInterval then
-            lastCornerTime = now
-            cornerIndex = (cornerIndex % 4) + 1
-        end
-        return voidCorners[cornerIndex]
-    end
-
-    local predTime = _G.wallbangPredictionTime or 0.2
-    local predictedPos = pos + vel * predTime
-    local preset = _G.wallbangPreset or "Above"
-
-    if preset == "Above" then
-        if cf and type(cf) == "CFrame" then
-            local frontOffset = cf.LookVector * 5
-            return predictedPos + frontOffset + Vector3.new(0, 12, 0)
-        else
-            return predictedPos + Vector3.new(0, 12, 0)
-        end
-    elseif preset == "Below" then
-        return predictedPos + Vector3.new(0, -1, 0)
-    elseif preset == "Orbit" then
-        local radius = 6
-        local speed = 2
-        local vertAmp = 3
-        local angleRad = now * speed * 2 * math.pi
-        local xOff = math.cos(angleRad) * radius
-        local zOff = math.sin(angleRad) * radius
-        local yOff = math.sin(angleRad * 2) * vertAmp
-        return predictedPos + Vector3.new(xOff, yOff, zOff)
-    elseif preset == "Random" then
-        local randX = math.random(-8, 8)
-        local randZ = math.random(-8, 8)
-        local randY = math.random(-3, 10)
-        return predictedPos + Vector3.new(randX, randY, randZ)
-    else
-        return predictedPos + Vector3.new(0, 5, 0)
-    end
-end
 
     local function getLocalRoot()
         local char = lplr.Character
@@ -1198,8 +1146,8 @@ end
             local visualConn = nil
             local boundaryActive = false
             local barrierAddedConn = nil
-            local barrierList = {}
             local antiVoidConn = nil
+            local barrierList = {}
 
             local function isGameActive()
                 local mainGui = lplr.PlayerGui:FindFirstChild("MainGui")
@@ -1250,8 +1198,26 @@ end
                 return targetHead.Position, targetHead.CFrame, targetVel
             end
 
+            local voidCorners = {
+                Vector3.new(-5000, 2000, -5000),
+                Vector3.new(5000, 2000, -5000),
+                Vector3.new(5000, 2000, 5000),
+                Vector3.new(-5000, 2000, 5000),
+            }
+            local lastCornerTime = 0
+            local cornerIndex = 1
+            local cornerInterval = 0.2
+
             local function computePosition(pos, cf, vel, now)
                 if not pos then return nil end
+                if _G.autoFireVoidDesync then
+                    if now - lastCornerTime >= cornerInterval then
+                        lastCornerTime = now
+                        cornerIndex = (cornerIndex % 4) + 1
+                    end
+                    return voidCorners[cornerIndex]
+                end
+
                 local predTime = _G.wallbangPredictionTime or 0.2
                 local predictedPos = pos + vel * predTime
                 local preset = _G.wallbangPreset or "Above"
@@ -1306,81 +1272,60 @@ end
                 if visualPart then visualPart:Destroy(); visualPart = nil end
             end
 
-            local function scanBarriers()
-                for _, part in ipairs(workspace:GetDescendants()) do
-                    if part:IsA("BasePart") and (part.Name == "Barrier" or (part.Parent and part.Parent.Name == "Barriers")) then
-                        if not barrierList[part] then
-                            barrierList[part] = true
-                            pcall(function() part.CanCollide = false end)
+            local function enableBoundaryBypass()
+                if boundaryActive then return end
+                boundaryActive = true
+
+                local killParts = {"KillPart", "DeathPart", "OutOfBounds", "Barrier", "InvisibleWall", "Boundary", "ClimbBlocker"}
+                local function process(inst)
+                    if not inst or not inst.Parent then return end
+                    if inst:IsA("BasePart") then
+                        local name = inst.Name
+                        for _, kp in ipairs(killParts) do
+                            if name == kp or (inst.Parent and inst.Parent.Name == "Barriers") then
+                                pcall(function()
+                                    inst.CanCollide = false
+                                    inst.CanTouch = false
+                                    inst.Transparency = 1
+                                    inst.Material = Enum.Material.Air
+                                end)
+                                break
+                            end
                         end
                     end
                 end
-            end
 
-            local function onBarrierAdded(part)
-                if part:IsA("BasePart") and (part.Name == "Barrier" or (part.Parent and part.Parent.Name == "Barriers")) then
-                    if not barrierList[part] then
-                        barrierList[part] = true
-                        pcall(function() part.CanCollide = false end)
+                for _, descendant in ipairs(workspace:GetDescendants()) do
+                    process(descendant)
+                end
+                barrierAddedConn = workspace.DescendantAdded:Connect(process)
+
+                local function antiVoid()
+                    local root = getLocalRoot()
+                    if not root then return end
+                    local fallenHeight = workspace.FallenPartsDestroyHeight or -500
+                    if root.Position.Y < fallenHeight + 10 then
+                        local target = shared.__s9t0u1 and shared.__s9t0u1.__target
+                        if target and target.Character then
+                            local targetHead = target.Character:FindFirstChild("Head") or target.Character:FindFirstChild("HumanoidRootPart")
+                            if targetHead then
+                                root.CFrame = CFrame.new(targetHead.Position + Vector3.new(0, 5, 0))
+                                pcall(function() notif('Boundary Bypass', 'Prevented out-of-bounds death', 1, 'alert') end)
+                            end
+                        end
                     end
                 end
+
+                if antiVoidConn then antiVoidConn:Disconnect() end
+                antiVoidConn = runService.Heartbeat:Connect(antiVoid)
             end
 
-            local function enableBoundaryBypass()
-    if boundaryActive then return end
-    boundaryActive = true
-
-    local killParts = {"KillPart", "DeathPart", "OutOfBounds", "Barrier", "InvisibleWall", "Boundary", "ClimbBlocker"}
-    local function process(inst)
-        if not inst or not inst.Parent then return end
-        if inst:IsA("BasePart") then
-            local name = inst.Name
-            for _, kp in ipairs(killParts) do
-                if name == kp or (inst.Parent and inst.Parent.Name == "Barriers") then
-                    pcall(function()
-                        inst.CanCollide = false
-                        inst.CanTouch = false
-                        inst.Transparency = 1
-                        inst.Material = Enum.Material.Air
-                    end)
-                    break
-                end
+            local function disableBoundaryBypass()
+                boundaryActive = false
+                if barrierAddedConn then barrierAddedConn:Disconnect(); barrierAddedConn = nil end
+                if antiVoidConn then antiVoidConn:Disconnect(); antiVoidConn = nil end
+                barrierList = {}
             end
-        end
-    end
-
-    for _, descendant in ipairs(workspace:GetDescendants()) do
-        process(descendant)
-    end
-
-    barrierAddedConn = workspace.DescendantAdded:Connect(process)
-
-    local function antiVoid()
-        local root = getLocalRoot()
-        if not root then return end
-        local fallenHeight = workspace.FallenPartsDestroyHeight or -500
-        if root.Position.Y < fallenHeight + 10 then
-            local target = shared.__s9t0u1 and shared.__s9t0u1.__target
-            if target and target.Character then
-                local targetHead = target.Character:FindFirstChild("Head") or target.Character:FindFirstChild("HumanoidRootPart")
-                if targetHead then
-                    root.CFrame = CFrame.new(targetHead.Position + Vector3.new(0, 5, 0))
-                    pcall(function() notif('Boundary says', 'Prevented Death', 1, 'alert') end)
-                end
-            end
-        end
-    end
-
-    if antiVoidConn then antiVoidConn:Disconnect() end
-    antiVoidConn = runService.Heartbeat:Connect(antiVoid)
-end
-
-local function disableBoundaryBypass()
-    boundaryActive = false
-    if barrierAddedConn then barrierAddedConn:Disconnect(); barrierAddedConn = nil end
-    if antiVoidConn then antiVoidConn:Disconnect(); antiVoidConn = nil end
-    barrierList = {}
-end
 
             local function initializeWallbang()
                 if shared.__s9t0u1 then return true end
@@ -1629,33 +1574,9 @@ end
         Tooltip = "Desync & positioning"
     })
 
-    DesyncModule:CreateDropdown({
-        Name = "Preset",
-        List = {"Above", "Below", "Orbit", "Random"},
-        Default = _G.wallbangPreset,
-        Function = function(v) _G.wallbangPreset = v end,
-        Tooltip = "Position relative to target"
-    })
-    DesyncModule:CreateSlider({
-        Name = "Prediction Time (s)",
-        Min = 0.1, Max = 0.5, Default = _G.wallbangPredictionTime, Decimal = 100,
-        Function = function(v) _G.wallbangPredictionTime = v end,
-        Suffix = "s",
-        Tooltip = "Compensates for desync"
-    })
-    DesyncModule:CreateToggle({
-        Name = "Boundary Bypass",
-        Default = _G.wallbangBoundaryBypass,
-        Function = function(v)
-            _G.wallbangBoundaryBypass = v
-            if v then
-                enableBoundaryBypass()
-            else
-                disableBoundaryBypass()
-            end
-        end,
-        Tooltip = "Disable barriers"
-    })
+    DesyncModule:CreateDropdown({ Name = "Preset", List = {"Above","Below","Orbit","Random"}, Default = _G.wallbangPreset, Function = function(v) _G.wallbangPreset = v end, Tooltip = "Position relative to target" })
+    DesyncModule:CreateSlider({ Name = "Prediction Time (s)", Min = 0.1, Max = 0.5, Default = _G.wallbangPredictionTime, Decimal = 100, Function = function(v) _G.wallbangPredictionTime = v end, Suffix = "s", Tooltip = "Compensates for desync" })
+    DesyncModule:CreateToggle({ Name = "Boundary Bypass", Default = _G.wallbangBoundaryBypass, Function = function(v) _G.wallbangBoundaryBypass = v; if v then enableBoundaryBypass() else disableBoundaryBypass() end end, Tooltip = "Disable barriers & prevent death from out-of-bounds" })
 end)
                                                                                                                                                                                                         
 run(function()
