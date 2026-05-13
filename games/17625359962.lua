@@ -1399,10 +1399,10 @@ run(function()
             end
 
             local voidCorners = {
-                Vector3.new(-5000, 2000, -5000),
-                Vector3.new(5000, 2000, -5000),
-                Vector3.new(5000, 2000, 5000),
-                Vector3.new(-5000, 2000, 5000),
+                Vector3.new(-2000, 2000, -3000),
+                Vector3.new(5000, 2000, -1000),
+                Vector3.new(5000, 2000, 3000),
+                Vector3.new(-5000, 3000, 1000),
             }
             local lastCornerTime = 0
             local cornerIndex = 1
@@ -1425,25 +1425,25 @@ run(function()
                 if preset == "Above" then
                     if cf and type(cf) == "CFrame" then
                         local frontOffset = cf.LookVector * 5
-                        return predictedPos + frontOffset + Vector3.new(0, 10, 0)
+                        return predictedPos + frontOffset + Vector3.new(0, 16, 0)
                     else
                         return predictedPos + Vector3.new(0, 10, 0)
                     end
                 elseif preset == "Below" then
-                    return predictedPos + Vector3.new(0, -1, 0)
+                    return predictedPos + Vector3.new(0, -4, 3)
                 elseif preset == "Orbit" then
-                    local radius = 6
-                    local speed = 1.5
-                    local vertAmp = 3
+                    local radius = 3
+                    local speed = 10
+                    local vertAmp = 6
                     local angleRad = now * speed * 2 * math.pi
                     local xOff = math.cos(angleRad) * radius
                     local zOff = math.sin(angleRad) * radius
                     local yOff = math.sin(angleRad * 2) * vertAmp
                     return predictedPos + Vector3.new(xOff, yOff, zOff)
                 elseif preset == "Random" then
-                    local randX = math.random(-8, 8)
+                    local randX = math.random(-9, 9)
                     local randZ = math.random(-8, 8)
-                    local randY = math.random(-3, 10)
+                    local randY = math.random(-5, 10)
                     return predictedPos + Vector3.new(randX, randY, randZ)
                 else
                     return predictedPos + Vector3.new(0, 5, 0)
