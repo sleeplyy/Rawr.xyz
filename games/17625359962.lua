@@ -378,9 +378,19 @@ run(function()
     end
 
     local customSoundFiles = {
-        "1nn.mp3", "67.mp3", "Hentai1.mp3", "Hentai2.mp3", "Hentai3.mp3",
-        "Fairy1.mp3", "Fairy2.mp3"
+        "1nn.mp3", "67.mp3", "BatHit.mp3", "Beep.mp3", "Bonk.mp3", "Bow.mp3",
+        "Bubble.mp3", "Bubble2.mp3", "CSGO.mp3", "Cod.mp3", "Fairy1.mp3",
+        "Fairy2.mp3", "Fatality.mp3", "Fatality2.mp3", "Hentai1.mp3",
+        "Hentai2.mp3", "Hentai3.mp3", "Lazer.mp3", "MarioCoins.mp3",
+        "MinecraftXP.mp3", "Neverlose.mp3", "OSU.mp3", "PubgPan.mp3",
+        "Rifk7.mp3", "RustHeadshot.mp3", "Skeet.mp3", "SpanishMoan.mp3",
+        "StaryKrow.mp3", "Steve.mp3", "TF2Crit.mp3", "TF2Default.mp3",
+        "Windows.mp3", "boolean.ogg", "disable.ogg", "enable.ogg",
+        "keypress.ogg", "keyrelease.ogg", "lobby.mp3", "moan1.ogg",
+        "moan2.ogg", "moan3.ogg", "moan4.ogg", "orthodox.ogg",
+        "pmsound.ogg", "rifk.ogg"
     }
+
     local customSounds = {}
     local soundFolder = "newvape/assets/sounds/"
 
@@ -388,8 +398,8 @@ run(function()
         local fullPath = soundFolder .. fileName
         local assetId = getAsset(fullPath)
         if assetId then
-            local soundName = fileName:gsub("%.mp3$", "")
-            table.insert(customSounds, {name = soundName, id = assetId})
+            local displayName = fileName:gsub("%.mp3$", ""):gsub("%.ogg$", "")
+            table.insert(customSounds, {name = displayName, id = assetId})
         end
     end
 
@@ -401,8 +411,8 @@ run(function()
         soundMap[s.name] = s.id
     end
     for _, s in ipairs(customSounds) do
-        table.insert(soundNames, "Local: " .. s.name)
-        soundMap["Local: " .. s.name] = s.id
+        table.insert(soundNames, s.name)
+        soundMap[s.name] = s.id
     end
 
     local hitsoundEnabled = false
