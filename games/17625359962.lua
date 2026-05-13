@@ -223,10 +223,10 @@ run(function()
         end,
         Tooltip = 'Redirects Bullets :3'
     })
-    SilentAim:CreateDropdown({Name='Aim Part', List={'Head','Body','Random'}, Default='Head', Function=function(v) aimPartSA=v end, Tooltip='Part to lock onto'})
-    SilentAim:CreateSlider({Name='Smoothness', Min=1, Max=100, Default=100, Function=function(v) smoothnessSA=v/100 end, Suffix='%', Tooltip='Lock smoothness'})
-    SilentAim:CreateToggle({Name='Wall Check', Default=true, Function=function(v) wallCheckSA=v end, Tooltip='Only lock when visible'})
-    SilentAim:CreateSlider({Name='Hit Chance', Min=0, Max=100, Default=100, Function=function(v) lockChance=v end, Suffix='%', Tooltip='Chance to lock per check'})
+    SilentAim:CreateDropdown({Name='Aim Part', List={'Head','Body','Random'}, Default='Head', Function=function(v) aimPartSA=v end, Tooltip='Part to Redirect onto'})
+    SilentAim:CreateSlider({Name='Smoothness', Min=1, Max=100, Default=100, Function=function(v) smoothnessSA=v/100 end, Suffix='%', Tooltip='smoothness'})
+    SilentAim:CreateToggle({Name='Wall Check', Default=true, Function=function(v) wallCheckSA=v end, Tooltip='Only Redirect when visible'})
+    SilentAim:CreateSlider({Name='Hit Chance', Min=0, Max=100, Default=100, Function=function(v) lockChance=v end, Suffix='%', Tooltip='Chance to Redirect per check'})
     SilentAim:CreateSlider({Name='Click Interval', Min=1, Max=50, Default=10, Function=function(v) clickInterval=v/100 end, Suffix='s', Tooltip='Time between auto‑clicks'})
     ShowTargetSA = SilentAim:CreateToggle({Name='Show Target Info', Default=true})
     CircleColor = SilentAim:CreateColorSlider({Name='Circle Color', Darker=true, Visible=false, Function=function(h,s,v) if CircleObject then CircleObject.Color=Color3.fromHSV(h,s,v) end end})
@@ -250,112 +250,280 @@ run(function()
     end})
 end)
 
-local crosshairEnabled = false
-local crosshairColor = Color3.fromRGB(128,128,128)
-local crosshairStyle = "Cross"
-local crosshairSpin = true
-local crosshairLength = 10
-local crosshairRadius = 11
-local crosshairWidth = 1.5
-local dotSize = 0
-local outlineEnabled = false
-local outlineColor = Color3.new(0,0,0)
-local outlineThickness = 0.5
-local drawings = { lines = {}, texts = {}, dot = nil, outlines = {} }
-local crosshairRenderConnection
-local text_x = 0
-local lastSpinAngle = 0
+local CROSSHAIR_STYLES = {"Cross", "Dot", "Diagonal"}
+local DRAWING_COUNT = {lines = 8, outlines = 4}
+local DEFAULT_CONFIG = {
+    enabled = false,
+    color = Color3.fromRGB(128, 128, 128),
+    style = "Cross",
+    spin = true,
+    length = 10,
+    radius = 11,
+    width = 1.5,
+    dotSize = 0,
+    outline = false,
+    outlineColor = Color3.new(0, 0, 0),
+    outlineThickness = 0.5,
+}
+
+local config = table.clone(DEFAULT_CONFIG)
+local drawings = {
+    lines = {},
+    outlines = {},
+    dot = nil,
+}
+local crosshairRenderConnection = nil
 local drawingsCreated = false
+local lastSpinAngle = 0
 
 local function solve(angle, radius)
     local rad = math.rad(angle)
-    return Vector2.new(math.sin(rad)*radius, math.cos(rad)*radius)
+    return Vector2.new(math.sin(rad) * radius, math.cos(rad) * radius)
 end
+
 local function createDrawings()
     if drawingsCreated then return end
-    for i = 1, 8 do drawings.lines[i] = Drawing.new('Line') end
-    for i = 1, 4 do drawings.outlines[i] = Drawing.new('Line') end
+    
+    for i = 1, DRAWING_COUNT.lines do
+        drawings.lines[i] = Drawing.new('Line')
+    end
+    
+    for i = 1, DRAWING_COUNT.outlines do
+        drawings.outlines[i] = Drawing.new('Line')
+    end
+    
     drawings.dot = Drawing.new('Circle')
-    drawings.texts[1] = Drawing.new('Text', {Size=13,Font=2,Outline=true,Text='Rawr.xyz',Color=Color3.new(1,1,1)})
-    drawings.texts[2] = Drawing.new('Text', {Size=13,Font=2,Outline=true,Text='Rawr.xyz',Color=crosshairColor})
+    
     drawingsCreated = true
 end
+
+local function hideAllDrawings()
+    for i = 1, DRAWING_COUNT.lines do
+        if drawings.lines[i] then drawings.lines[i].Visible = false end
+    end
+    for i = 1, DRAWING_COUNT.outlines do
+        if drawings.outlines[i] then drawings.outlines[i].Visible = false end
+    end
+    if drawings.dot then drawings.dot.Visible = false end
+end
+
+local function drawLine(lineObj, from, to, thickness, color)
+    if not lineObj then return end
+    lineObj.Visible = true
+    lineObj.Color = color
+    lineObj.From = from
+    lineObj.To = to
+    lineObj.Thickness = thickness
+end
+
+local function drawOutline(outlineObj, from, to, thickness, color)
+    if not outlineObj then return end
+    outlineObj.Visible = true
+    outlineObj.Color = color
+    outlineObj.From = from
+    outlineObj.To = to
+    outlineObj.Thickness = thickness
+end
+
+local function renderCrossStyle(mousePos)
+    local angles = {0, 90, 180, 270}
+    
+    for idx, angle in ipairs(angles) do
+        local lineObj = drawings.lines[idx + 4]
+        local outlineObj = drawings.outlines[idx]
+        local adjustedAngle = angle + lastSpinAngle
+        local direction = solve(adjustedAngle, 1)
+        
+        local fromPos = mousePos + direction * config.radius
+        local toPos = mousePos + direction * (config.radius + config.length)
+        
+        drawLine(lineObj, fromPos, toPos, config.width, config.color)
+        
+        if config.outline then
+            local outlineFrom = mousePos + direction * (config.radius - config.outlineThickness)
+            local outlineTo = mousePos + direction * (config.radius + config.length + config.outlineThickness)
+            drawOutline(outlineObj, outlineFrom, outlineTo, config.width + 1.2, config.outlineColor)
+        end
+    end
+end
+
+local function renderDotStyle(mousePos)
+    local dotObj = drawings.dot
+    if not dotObj then return end
+    
+    dotObj.Visible = true
+    dotObj.Position = mousePos
+    dotObj.Radius = config.dotSize
+    dotObj.Filled = true
+    dotObj.Color = config.color
+    dotObj.Transparency = 0
+end
+
+local function renderDiagonalStyle(mousePos)
+    local angles = {45, 135}
+    
+    for i, angle in ipairs(angles) do
+        local lineObj = drawings.lines[i]
+        local outlineObj = drawings.outlines[i]
+        local adjustedAngle = angle + lastSpinAngle
+        local direction = solve(adjustedAngle, 1)
+        
+        local fromPos = mousePos + direction * config.radius
+        local toPos = mousePos + direction * (config.radius + config.length)
+        
+        drawLine(lineObj, fromPos, toPos, config.width, config.color)
+        
+        if config.outline then
+            local outlineFrom = mousePos + direction * (config.radius - config.outlineThickness)
+            local outlineTo = mousePos + direction * (config.radius + config.length + config.outlineThickness)
+            drawOutline(outlineObj, outlineFrom, outlineTo, config.width + 1.2, config.outlineColor)
+        end
+    end
+end
+
+local styleRenderers = {
+    Cross = renderCrossStyle,
+    Dot = renderDotStyle,
+    Diagonal = renderDiagonalStyle,
+}
+
 local function updateCrosshair()
-    local pos = inputService:GetMouseLocation()
-    if drawings.texts[1] then drawings.texts[1].Visible = crosshairEnabled end
-    if drawings.texts[2] then drawings.texts[2].Visible = crosshairEnabled end
-    if crosshairEnabled then
-        if text_x == 0 and drawings.texts[1] then text_x = drawings.texts[1].TextBounds.X + drawings.texts[2].TextBounds.X end
-        if drawings.texts[1] then drawings.texts[1].Position = pos + Vector2.new(-text_x/2, crosshairRadius+crosshairLength+15) end
-        if drawings.texts[2] then
-            drawings.texts[2].Position = (drawings.texts[1] and drawings.texts[1].Position or Vector2.new()) + Vector2.new(drawings.texts[1] and drawings.texts[1].TextBounds.X or 0, 0)
-            drawings.texts[2].Color = crosshairColor
-        end
-        if crosshairSpin then lastSpinAngle = (tick()*360) % 360 end
-        for i = 1, 8 do if drawings.lines[i] then drawings.lines[i].Visible = false end end
-        for i = 1, 4 do if drawings.outlines[i] then drawings.outlines[i].Visible = false end end
-        if drawings.dot then drawings.dot.Visible = false end
-        if crosshairStyle == "Cross" then
-            for idx = 1, 4 do
-                local inline = drawings.lines[idx+4]; local outline = drawings.outlines[idx]
-                local angle = (idx-1)*90 + lastSpinAngle; local dir = solve(angle,1)
-                local fromPos = pos + dir * crosshairRadius; local toPos = pos + dir * (crosshairRadius + crosshairLength)
-                inline.Visible = true; inline.Color = crosshairColor; inline.From = fromPos; inline.To = toPos; inline.Thickness = crosshairWidth
-                if outlineEnabled then
-                    outline.Visible = true; outline.From = pos + dir * (crosshairRadius - outlineThickness)
-                    outline.To = pos + dir * (crosshairRadius + crosshairLength + outlineThickness)
-                    outline.Thickness = crosshairWidth + 1.2; outline.Color = outlineColor
-                end
-            end
-        elseif crosshairStyle == "Dot" then
-            drawings.dot.Visible = true; drawings.dot.Position = pos; drawings.dot.Radius = dotSize; drawings.dot.Filled = true
-            drawings.dot.Color = crosshairColor; drawings.dot.Transparency = 0
-        elseif crosshairStyle == "Diagonal" then
-            local angles = {45, 135}
-            for i = 1, 2 do
-                local inline = drawings.lines[i]; local outline = drawings.outlines[i]
-                local angle = angles[i] + lastSpinAngle; local dir = solve(angle,1)
-                inline.Visible = true; inline.Color = crosshairColor; inline.From = pos + dir * crosshairRadius; inline.To = pos + dir * (crosshairRadius + crosshairLength)
-                inline.Thickness = crosshairWidth
-                if outlineEnabled then
-                    outline.Visible = true; outline.From = pos + dir * (crosshairRadius - outlineThickness)
-                    outline.To = pos + dir * (crosshairRadius + crosshairLength + outlineThickness)
-                    outline.Thickness = crosshairWidth + 1.2; outline.Color = outlineColor
-                end
-            end
-        end
-    else
-        for i = 1, 8 do if drawings.lines[i] then drawings.lines[i].Visible = false end end
-        for i = 1, 4 do if drawings.outlines[i] then drawings.outlines[i].Visible = false end end
-        if drawings.dot then drawings.dot.Visible = false end
+    if not config.enabled then
+        hideAllDrawings()
+        return
+    end
+    
+    local mousePos = inputService:GetMouseLocation()
+    
+    if config.spin then
+        lastSpinAngle = (tick() * 360) % 360
+    end
+    
+    hideAllDrawings()
+    
+    local renderer = styleRenderers[config.style]
+    if renderer then
+        renderer(mousePos)
     end
 end
 
 local CrosshairModule = vape.Categories.Utility:CreateModule({
     Name = "Crosshair",
-    Function = function(callback)
-        crosshairEnabled = callback
-        if callback then
+    Function = function(enabled)
+        config.enabled = enabled
+        
+        if enabled then
             if not drawingsCreated then createDrawings() end
             crosshairRenderConnection = runService.RenderStepped:Connect(updateCrosshair)
         else
-            if crosshairRenderConnection then crosshairRenderConnection:Disconnect(); crosshairRenderConnection = nil end
-            for i = 1, 8 do if drawings.lines[i] then drawings.lines[i].Visible = false end end
-            for i = 1, 4 do if drawings.outlines[i] then drawings.outlines[i].Visible = false end end
-            if drawings.dot then drawings.dot.Visible = false end
+            if crosshairRenderConnection then
+                crosshairRenderConnection:Disconnect()
+                crosshairRenderConnection = nil
+            end
+            hideAllDrawings()
         end
     end
 })
-CrosshairModule:CreateDropdown({Name="Style", List={"Cross","Dot","Diagonal"}, Default="Cross", Function=function(v) crosshairStyle=v end})
-CrosshairModule:CreateColorSlider({Name="Color", Function=function(h,s,v) crosshairColor=Color3.fromHSV(h,s,v) end})
-CrosshairModule:CreateToggle({Name="Spin", Default=true, Function=function(v) crosshairSpin=v end})
-CrosshairModule:CreateSlider({Name="Length", Min=1,Max=30,Default=10, Function=function(v) crosshairLength=v end, Suffix="px"})
-CrosshairModule:CreateSlider({Name="Radius", Min=0,Max=30,Default=11, Function=function(v) crosshairRadius=v end, Suffix="px"})
-CrosshairModule:CreateSlider({Name="Thickness", Min=0.5,Max=5,Default=1.5,Decimal=10, Function=function(v) crosshairWidth=v end, Suffix="px"})
-CrosshairModule:CreateSlider({Name="Dot Size", Min=0,Max=10,Default=0, Function=function(v) dotSize=v end, Suffix="px"})
-CrosshairModule:CreateToggle({Name="Outline", Default=false, Function=function(v) outlineEnabled=v end})
-CrosshairModule:CreateColorSlider({Name="Outline Color", Visible=false, Function=function(h,s,v) outlineColor=Color3.fromHSV(h,s,v) end})
-CrosshairModule:CreateSlider({Name="Outline Thickness", Min=0,Max=3,Default=0.5,Decimal=10, Visible=false, Function=function(v) outlineThickness=v end, Suffix="px"})
+
+CrosshairModule:CreateDropdown({
+    Name = "Style",
+    List = CROSSHAIR_STYLES,
+    Default = DEFAULT_CONFIG.style,
+    Function = function(value)
+        config.style = value
+        local outlineVisible = (value ~= "Dot")
+    end
+})
+
+CrosshairModule:CreateColorSlider({
+    Name = "Color",
+    Function = function(h, s, v)
+        config.color = Color3.fromHSV(h, s, v)
+    end
+})
+
+CrosshairModule:CreateToggle({
+    Name = "Spin",
+    Default = DEFAULT_CONFIG.spin,
+    Function = function(value)
+        config.spin = value
+        if not value then lastSpinAngle = 0 end
+    end
+})
+
+CrosshairModule:CreateSlider({
+    Name = "Length",
+    Min = 1,
+    Max = 30,
+    Default = DEFAULT_CONFIG.length,
+    Function = function(value)
+        config.length = value
+    end,
+    Suffix = "px"
+})
+
+CrosshairModule:CreateSlider({
+    Name = "Radius",
+    Min = 0,
+    Max = 30,
+    Default = DEFAULT_CONFIG.radius,
+    Function = function(value)
+        config.radius = value
+    end,
+    Suffix = "px"
+})
+
+CrosshairModule:CreateSlider({
+    Name = "Thickness",
+    Min = 0.5,
+    Max = 5,
+    Default = DEFAULT_CONFIG.width,
+    Decimal = 10,
+    Function = function(value)
+        config.width = value
+    end,
+    Suffix = "px"
+})
+
+CrosshairModule:CreateSlider({
+    Name = "Dot Size",
+    Min = 0,
+    Max = 10,
+    Default = DEFAULT_CONFIG.dotSize,
+    Function = function(value)
+        config.dotSize = value
+    end,
+    Suffix = "px"
+})
+
+CrosshairModule:CreateToggle({
+    Name = "Outline",
+    Default = DEFAULT_CONFIG.outline,
+    Function = function(value)
+        config.outline = value
+    end
+})
+
+CrosshairModule:CreateColorSlider({
+    Name = "Outline Color",
+    Visible = DEFAULT_CONFIG.outline,
+    Function = function(h, s, v)
+        config.outlineColor = Color3.fromHSV(h, s, v)
+    end
+})
+
+CrosshairModule:CreateSlider({
+    Name = "Outline Thickness",
+    Min = 0,
+    Max = 3,
+    Default = DEFAULT_CONFIG.outlineThickness,
+    Decimal = 10,
+    Visible = DEFAULT_CONFIG.outline,
+    Function = function(value)
+        config.outlineThickness = value
+    end,
+    Suffix = "px"
+})
 
 run(function()
     local assetSounds = {
@@ -365,10 +533,9 @@ run(function()
         {name="Sans", id="rbxassetid://3188795283"},{name="Fart", id="rbxassetid://130833677"},
         {name="Big", id="rbxassetid://5332005053"},{name="Vine", id="rbxassetid://5332680810"},
         {name="Bruh", id="rbxassetid://4578740568"},{name="Skeet", id="rbxassetid://5633695679"},
-        {name="Neverlose", id="rbxassetid://6534948092"},{name="Fatality", id="rbxassetid://6534947869"},
-        {name="Bonk", id="rbxassetid://5766898159"},{name="Minecraft", id="rbxassetid://4018616850"},
-        {name="TomScream", id="rbxassetid://7553397015"},{name="Prowler", id="rbxassetid://131169447699141"},
-        {name="CSGO", id="rbxassetid://133002449941130"},{name="Fortnite", id="rbxassetid://140073271098075"},
+        {name="Fatality", id="rbxassetid://6534947869"},{name="Bonk", id="rbxassetid://5766898159"},
+        {name="Minecraft", id="rbxassetid://4018616850"},{name="TomScream", id="rbxassetid://7553397015"},
+        {name="Prowler", id="rbxassetid://131169447699141"},{name="Fortnite", id="rbxassetid://140073271098075"},
         {name="iphone", id="rbxassetid://131935970184832"},{name="Lmk", id="rbxassetid://118833207462382"},
     }
 
