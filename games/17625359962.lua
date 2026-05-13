@@ -991,6 +991,7 @@ run(function()
 end)
                                                                                                                                             
 run(function()
+    -- Globals
     if _G.wallbangMode == nil then _G.wallbangMode = "Static" end
     if _G.wallbangX == nil then _G.wallbangX = 0 end
     if _G.wallbangY == nil then _G.wallbangY = 5 end
@@ -1000,8 +1001,7 @@ run(function()
     if _G.wallbangOrbitVert == nil then _G.wallbangOrbitVert = 3 end
     if _G.wallbangPrediction == nil then _G.wallbangPrediction = true end
     if _G.wallbangPredictionTime == nil then _G.wallbangPredictionTime = 0.15 end
-    if _G.wallbangAntiOOB == nil then _G.wallbangAntiOOB = true end
-    if _G.wallbangBarrierBypass == nil then _G.wallbangBarrierBypass = true end
+    if _G.wallbangBoundaryBypass == nil then _G.wallbangBoundaryBypass = true end
 
     local DesyncModule = vape.Categories.Combat:CreateModule({
         Name = "Wallbang Method (Might be Detected)",
@@ -1010,9 +1010,9 @@ run(function()
             local pendingTask = nil
             local visualPart = nil
             local visualConn = nil
-            local barrierBypassActive = false
+            local boundaryActive = false
             local barrierAddedConn = nil
-            local barrierList = {}   -- set
+            local barrierList = {}
 
             local function isGameActive()
                 local mainGui = lplr.PlayerGui:FindFirstChild("MainGui")
@@ -1114,15 +1114,16 @@ run(function()
                 end
             end
 
-            local function enableBarrierBypass()
-                if barrierBypassActive then return end
-                barrierBypassActive = true
+            local function enableBoundaryBypass()
+                if boundaryActive then return end
+                boundaryActive = true
+                -- Barriers
                 scanBarriers()
                 barrierAddedConn = workspace.DescendantAdded:Connect(onBarrierAdded)
             end
 
-            local function disableBarrierBypass()
-                barrierBypassActive = false
+            local function disableBoundaryBypass()
+                boundaryActive = false
                 if barrierAddedConn then barrierAddedConn:Disconnect(); barrierAddedConn = nil end
                 barrierList = {}
             end
@@ -1306,11 +1307,12 @@ run(function()
                                 newPos = targetPos + Vector3.new(xOff, yOff, zOff)
                             end
 
-                            if _G.wallbangAntiOOB then
+                            -- Combined boundary bypass
+                            if _G.wallbangBoundaryBypass then
                                 local fallenHeight = workspace.FallenPartsDestroyHeight or -500
                                 if newPos.Y < fallenHeight + 20 or math.abs(newPos.X) > 10000 or math.abs(newPos.Z) > 10000 then
                                     newPos = targetPos + Vector3.new(0, 5, 0)
-                                    pcall(function() notif('Rawr.xyz', 'Out of bounds corrected', 1, 'alert') end)
+                                    pcall(function() notif('Rawr.xyz', 'Boundary corrected', 1, 'alert') end)
                                 end
                             end
 
@@ -1379,7 +1381,7 @@ run(function()
                     if pendingTask then task.cancel(pendingTask); pendingTask = nil end
                     createVisual()
                     startVisualUpdate()
-                    if _G.wallbangBarrierBypass then enableBarrierBypass() else disableBarrierBypass() end
+                    if _G.wallbangBoundaryBypass then enableBoundaryBypass() else disableBoundaryBypass() end
                 end
             end
 
@@ -1394,7 +1396,7 @@ run(function()
                     shared.__s9t0u1 = nil
                 end
                 stopVisual()
-                disableBarrierBypass()
+                disableBoundaryBypass()
             end
         end,
         Tooltip = "Just Shoot"
@@ -1407,23 +1409,17 @@ run(function()
         Tooltip = "Lead moving targets"
     })
     DesyncModule:CreateToggle({
-        Name = "Anti‑Out‑of‑Bounds",
-        Default = _G.wallbangAntiOOB,
-        Function = function(v) _G.wallbangAntiOOB = v end,
-        Tooltip = "Prevents falling out of map"
-    })
-    DesyncModule:CreateToggle({
-        Name = "Barrier Bypass",
-        Default = _G.wallbangBarrierBypass,
+        Name = "Boundary Bypass",
+        Default = _G.wallbangBoundaryBypass,
         Function = function(v)
-            _G.wallbangBarrierBypass = v
+            _G.wallbangBoundaryBypass = v
             if v then
-                enableBarrierBypass()
+                enableBoundaryBypass()
             else
-                disableBarrierBypass()
+                disableBoundaryBypass()
             end
         end,
-        Tooltip = "Disables Barriers"
+        Tooltip = "Disable"
     })
     DesyncModule:CreateToggle({
         Name = "Bullet Redirection",
@@ -1435,7 +1431,7 @@ run(function()
             end
             notif('Rawr.xyz', state and 'on' or 'off', 2, state and 'success' or 'info')
         end,
-        Tooltip = 'Redirects bullets'
+        Tooltip = 'Redirects bullets.'
     })
 
     DesyncModule:CreateSlider({
