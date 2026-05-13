@@ -996,7 +996,6 @@ run(function()
         Function = function(callback)
             local isEnabled = callback
             local pendingTask = nil
-            local wallbangActive = false
 
             local function isGameActive()
                 local mainGui = lplr.PlayerGui:FindFirstChild("MainGui")
@@ -1023,22 +1022,6 @@ run(function()
                 return false
             end
 
-            local offsetMode = "Static"
-            local offsetX = 0
-            local offsetY = 5
-            local offsetZ = 0
-            local orbitRadius = 6
-            local orbitSpeed = 1.5
-            local orbitVerticalAmp = 3
-            local orbitAngle = 0
-
-            local predictionEnabled = true
-            local predictionTime = 0.15
-
-            local antiOutOfBounds = true
-            local safeTeleportCooldown = 0
-            local COOLDOWN_TIME = 1
-
             local visualPart = nil
             local visualConn = nil
 
@@ -1062,21 +1045,17 @@ run(function()
                 return nil
             end
 
-            local function computeOffsetPosition(targetHeadPos, targetVel, timeNow)
-                local predPos = targetHeadPos
-                if predictionEnabled and targetVel then
-                    predPos = targetHeadPos + targetVel * predictionTime
-                end
-                if offsetMode == "Static" then
-                    return predPos + Vector3.new(offsetX, offsetY, offsetZ)
-                else
-                    local angleRad = orbitAngle + timeNow * orbitSpeed * 2 * math.pi
-                    local xOff = math.cos(angleRad) * orbitRadius
-                    local zOff = math.sin(angleRad) * orbitRadius
-                    local yOff = math.sin(angleRad * 2) * orbitVerticalAmp
-                    return predPos + Vector3.new(xOff, yOff, zOff)
-                end
-            end
+            local function getPredictionEnabled() return _G.wallbangPrediction ~= false end
+            local function getPredictionTime() return tonumber(_G.wallbangPredictionTime) or 0.15 end
+            local function getAntiOOB() return _G.wallbangAntiOOB ~= false end
+            local function getOffsetMode() return _G.wallbangMode or "Static" end
+            local function getOffsetX() return tonumber(_G.wallbangX) or 0 end
+            local function getOffsetY() return tonumber(_G.wallbangY) or 5 end
+            local function getOffsetZ() return tonumber(_G.wallbangZ) or 0 end
+            local function getOrbitRadius() return tonumber(_G.wallbangOrbitRadius) or 6 end
+            local function getOrbitSpeed() return tonumber(_G.wallbangOrbitSpeed) or 1.5 end
+            local function getOrbitVert() return tonumber(_G.wallbangOrbitVert) or 3 end
+            local function getBarrierBypass() return _G.wallbangBarrierBypass ~= false end
 
             local function updateVisual()
                 if not visualPart then return end
@@ -1088,7 +1067,21 @@ run(function()
                         local rootPart = target.Character:FindFirstChild("HumanoidRootPart")
                         if rootPart then targetVel = rootPart.Velocity end
                         local timeNow = tick()
-                        local pos = computeOffsetPosition(targetHead.Position, targetVel, timeNow)
+                        local predPos = targetHead.Position
+                        if getPredictionEnabled() then
+                            predPos = predPos + targetVel * getPredictionTime()
+                        end
+                        local mode = getOffsetMode()
+                        local pos
+                        if mode == "Static" then
+                            pos = predPos + Vector3.new(getOffsetX(), getOffsetY(), getOffsetZ())
+                        else
+                            local angleRad = timeNow * getOrbitSpeed() * 2 * math.pi
+                            local xOff = math.cos(angleRad) * getOrbitRadius()
+                            local zOff = math.sin(angleRad) * getOrbitRadius()
+                            local yOff = math.sin(angleRad * 2) * getOrbitVert()
+                            pos = predPos + Vector3.new(xOff, yOff, zOff)
+                        end
                         visualPart.Position = pos
                         visualPart.Visible = true
                         return
@@ -1105,6 +1098,43 @@ run(function()
             local function stopVisual()
                 if visualConn then visualConn:Disconnect(); visualConn = nil end
                 if visualPart then visualPart:Destroy(); visualPart = nil end
+            end
+
+            local barrierBypassEnabled = false
+            local barrierParts = {}
+            local barrierAddedConn = nil
+
+            local function scanBarriers()
+                for _, part in ipairs(workspace:GetDescendants()) do
+                    if part:IsA("BasePart") and (part.Name == "Barrier" or (part.Parent and part.Parent.Name == "Barriers")) then
+                        if not barrierParts[part] then
+                            barrierParts[part] = true
+                            pcall(function() part.CanCollide = false end)
+                        end
+                    end
+                end
+            end
+
+            local function onBarrierAdded(part)
+                if part:IsA("BasePart") and (part.Name == "Barrier" or (part.Parent and part.Parent.Name == "Barriers")) then
+                    if not barrierParts[part] then
+                        barrierParts[part] = true
+                        pcall(function() part.CanCollide = false end)
+                    end
+                end
+            end
+
+            local function enableBarrierBypass()
+                if barrierBypassEnabled then return end
+                barrierBypassEnabled = true
+                scanBarriers()
+                barrierAddedConn = workspace.DescendantAdded:Connect(onBarrierAdded)
+            end
+
+            local function disableBarrierBypass()
+                barrierBypassEnabled = false
+                if barrierAddedConn then barrierAddedConn:Disconnect(); barrierAddedConn = nil end
+                barrierParts = {}
             end
 
             local voidBulletEnabled = false
@@ -1271,26 +1301,26 @@ run(function()
                             local targetVel = __i9j0k1.Velocity
                             local timeNow = tick()
 
-                            if predictionEnabled then
-                                targetPos = targetPos + targetVel * predictionTime
+                            if getPredictionEnabled() then
+                                targetPos = targetPos + targetVel * getPredictionTime()
                             end
 
+                            local mode = getOffsetMode()
                             local newPos
-                            if offsetMode == "Static" then
-                                newPos = targetPos + Vector3.new(offsetX, offsetY, offsetZ)
+                            if mode == "Static" then
+                                newPos = targetPos + Vector3.new(getOffsetX(), getOffsetY(), getOffsetZ())
                             else
-                                local angleRad = orbitAngle + timeNow * orbitSpeed * 2 * math.pi
-                                local xOff = math.cos(angleRad) * orbitRadius
-                                local zOff = math.sin(angleRad) * orbitRadius
-                                local yOff = math.sin(angleRad * 2) * orbitVerticalAmp
+                                local angleRad = timeNow * getOrbitSpeed() * 2 * math.pi
+                                local xOff = math.cos(angleRad) * getOrbitRadius()
+                                local zOff = math.sin(angleRad) * getOrbitRadius()
+                                local yOff = math.sin(angleRad * 2) * getOrbitVert()
                                 newPos = targetPos + Vector3.new(xOff, yOff, zOff)
                             end
 
-                            if antiOutOfBounds and tick() > safeTeleportCooldown then
+                            if getAntiOOB() then
                                 local fallenHeight = workspace.FallenPartsDestroyHeight or -500
                                 if newPos.Y < fallenHeight + 20 or math.abs(newPos.X) > 10000 or math.abs(newPos.Z) > 10000 then
                                     newPos = targetPos + Vector3.new(0, 5, 0)
-                                    safeTeleportCooldown = tick() + COOLDOWN_TIME
                                     pcall(function() notif('Rawr.xyz', 'Out of bounds corrected', 1, 'alert') end)
                                 end
                             end
@@ -1353,17 +1383,6 @@ run(function()
                     pendingTask = task.delay(5, attemptInit)
                     return
                 end
-                offsetMode = _G.wallbangMode or "Static"
-                offsetX = tonumber(_G.wallbangX) or 0
-                offsetY = tonumber(_G.wallbangY) or 5
-                offsetZ = tonumber(_G.wallbangZ) or 0
-                orbitRadius = tonumber(_G.wallbangOrbitRadius) or 6
-                orbitSpeed = tonumber(_G.wallbangOrbitSpeed) or 1.5
-                orbitVerticalAmp = tonumber(_G.wallbangOrbitVert) or 3
-                predictionEnabled = _G.wallbangPrediction ~= false
-                predictionTime = tonumber(_G.wallbangPredictionTime) or 0.15
-                antiOutOfBounds = _G.wallbangAntiOOB ~= false
-
                 local success = pcall(initializeWallbang)
                 if not success or not shared.__s9t0u1 then
                     pendingTask = task.delay(5, attemptInit)
@@ -1371,6 +1390,7 @@ run(function()
                     if pendingTask then task.cancel(pendingTask); pendingTask = nil end
                     createVisual()
                     startVisualUpdate()
+                    if getBarrierBypass() then enableBarrierBypass() else disableBarrierBypass() end
                 end
             end
 
@@ -1385,107 +1405,49 @@ run(function()
                     shared.__s9t0u1 = nil
                 end
                 stopVisual()
+                disableBarrierBypass()
             end
         end,
         Tooltip = "Just Shoot"
     })
 
-    DesyncModule:CreateDropdown({
-        Name = "Offset Mode",
-        List = {"Static", "Orbit"},
-        Default = "Static",
-        Function = function(v)
-            _G.wallbangMode = v
-            notif('Wallbang', 'Mode changed.', 2, 'info')
-        end,
-        Tooltip = "hi"
-    })
-
-    DesyncModule:CreateSlider({
-        Name = "X Offset",
-        Min = -20, Max = 20, Default = 0,
-        Function = function(v)
-            _G.wallbangX = v
-            notif('Wallbang', 'X Offset changed', 2, 'info')
-        end,
-        Suffix = "studs"
-    })
-    DesyncModule:CreateSlider({
-        Name = "Y Offset",
-        Min = -20, Max = 20, Default = 5,
-        Function = function(v)
-            _G.wallbangY = v
-            notif('Wallbang', 'Y Offset changed', 2, 'info')
-        end,
-        Suffix = "studs"
-    })
-    DesyncModule:CreateSlider({
-        Name = "Z Offset",
-        Min = -20, Max = 20, Default = 0,
-        Function = function(v)
-            _G.wallbangZ = v
-            notif('Wallbang', 'Z Offset changed', 2, 'info')
-        end,
-        Suffix = "studs"
-    })
-
-    DesyncModule:CreateSlider({
-        Name = "Orbit Radius",
-        Min = 1, Max = 15, Default = 6,
-        Function = function(v)
-            _G.wallbangOrbitRadius = v
-            notif('Wallbang', 'Orbit radius changed.', 2, 'info')
-        end,
-        Suffix = "studs"
-    })
-    DesyncModule:CreateSlider({
-        Name = "Orbit Speed",
-        Min = 0.5, Max = 5.0, Default = 1.5, Decimal = 10,
-        Function = function(v)
-            _G.wallbangOrbitSpeed = v
-            notif('Wallbang', 'Orbit speed changed.', 2, 'info')
-        end,
-        Suffix = "cycles/s"
-    })
-    DesyncModule:CreateSlider({
-        Name = "Orbit Vertical Amplitude",
-        Min = 0, Max = 10, Default = 3,
-        Function = function(v)
-            _G.wallbangOrbitVert = v
-            notif('Wallbang', 'Vertical amplitude changed', 2, 'info')
-        end,
-        Suffix = "studs"
-    })
+    if _G.wallbangMode == nil then _G.wallbangMode = "Static" end
+    if _G.wallbangX == nil then _G.wallbangX = 0 end
+    if _G.wallbangY == nil then _G.wallbangY = 5 end
+    if _G.wallbangZ == nil then _G.wallbangZ = 0 end
+    if _G.wallbangOrbitRadius == nil then _G.wallbangOrbitRadius = 6 end
+    if _G.wallbangOrbitSpeed == nil then _G.wallbangOrbitSpeed = 1.5 end
+    if _G.wallbangOrbitVert == nil then _G.wallbangOrbitVert = 3 end
+    if _G.wallbangPrediction == nil then _G.wallbangPrediction = true end
+    if _G.wallbangPredictionTime == nil then _G.wallbangPredictionTime = 0.15 end
+    if _G.wallbangAntiOOB == nil then _G.wallbangAntiOOB = true end
+    if _G.wallbangBarrierBypass == nil then _G.wallbangBarrierBypass = true end
 
     DesyncModule:CreateToggle({
-        Name = "Auto Prediction",
+        Name = "Prediction",
         Default = true,
-        Function = function(v)
-            _G.wallbangPrediction = v
-            notif('Wallbang', 'Prediction ' .. (v and 'ON' or 'OFF') .. '. Restart to apply.', 2, 'info')
-        end,
-        Tooltip = "Predict enemy movement"
+        Function = function(v) _G.wallbangPrediction = v end,
+        Tooltip = "Lead moving targets"
     })
-    DesyncModule:CreateSlider({
-        Name = "Prediction Time",
-        Min = 0, Max = 0.5, Default = 0.15, Decimal = 100,
-        Function = function(v)
-            _G.wallbangPredictionTime = v
-            notif('Wallbang', 'PDT Attached.', 2, 'info')
-        end,
-        Suffix = "s"
-    })
-
     DesyncModule:CreateToggle({
         Name = "Anti‑Out‑of‑Bounds",
         Default = true,
-        Function = function(v)
-            _G.wallbangAntiOOB = v
-            notif('Wallbang', 'Anti‑OOB ' .. (v and 'Attached' or 'Detached') .. '. Restart to apply.', 2, 'info')
-        end,
-        Tooltip = "Prevents falling out of map"
+        Function = function(v) _G.wallbangAntiOOB = v end,
+        Tooltip = "self"
     })
-
+    DesyncModule:CreateToggle({
+        Name = "Barrier Bypass",
+        Default = true,
+        Function = function(v)
+            _G.wallbangBarrierBypass = v
+            if v then
+                enableBarrierBypass()
+            else
+                disableBarrierBypass()
+            end
+        end,
+        Tooltip = "Anti Boundry (testing)"
+    })
     DesyncModule:CreateToggle({
         Name = 'Bullet Redirection',
         Default = false,
@@ -1495,7 +1457,60 @@ run(function()
             end
             notif('Rawr.xyz', state and 'Attached' or 'Detached', 2, state and 'success' or 'info')
         end,
-        Tooltip = 'Redirects bullets'
+        Tooltip = 'Redirects bullets to hit your enemys :)'
+    })
+
+    -- Sliders and dropdown
+    DesyncModule:CreateSlider({
+        Name = "Prediction Time (s)",
+        Min = 0, Max = 0.5, Default = 0.15, Decimal = 100,
+        Function = function(v) _G.wallbangPredictionTime = v end,
+        Suffix = "s"
+    })
+    DesyncModule:CreateSlider({
+        Name = "X Offset",
+        Min = -20, Max = 20, Default = 0,
+        Function = function(v) _G.wallbangX = v end,
+        Suffix = "studs"
+    })
+    DesyncModule:CreateSlider({
+        Name = "Y Offset",
+        Min = -20, Max = 20, Default = 5,
+        Function = function(v) _G.wallbangY = v end,
+        Suffix = "studs"
+    })
+    DesyncModule:CreateSlider({
+        Name = "Z Offset",
+        Min = -20, Max = 20, Default = 0,
+        Function = function(v) _G.wallbangZ = v end,
+        Suffix = "studs"
+    })
+
+    DesyncModule:CreateDropdown({
+        Name = "Offset Mode",
+        List = {"Static", "Orbit"},
+        Default = "Static",
+        Function = function(v) _G.wallbangMode = v end,
+        Tooltip = "Static = fixed offset; Orbit = moves around target"
+    })
+
+    DesyncModule:CreateSlider({
+        Name = "Orbit Radius",
+        Min = 1, Max = 15, Default = 6,
+        Function = function(v) _G.wallbangOrbitRadius = v end,
+        Suffix = "studs"
+    })
+    DesyncModule:CreateSlider({
+        Name = "Orbit Speed (cyc/s)",
+        Min = 0.5, Max = 5.0, Default = 1.5, Decimal = 10,
+        Function = function(v) _G.wallbangOrbitSpeed = v end,
+        Suffix = "cyc/s"
+    })
+    DesyncModule:CreateSlider({
+        Name = "Orbit Vertical Amplitude",
+        Min = 0, Max = 10, Default = 3,
+        Function = function(v) _G.wallbangOrbitVert = v end,
+        Suffix = "studs"
     })
 end)
                                                                                                                                                 
