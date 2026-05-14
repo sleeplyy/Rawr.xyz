@@ -5967,8 +5967,10 @@ run(function()
 		Name = 'ChatSpammer',
 		Function = function(callback)
 			if callback then
-				if #Lines.ListEnabled == 0 then
-					Lines:Add("love sent from rawr <3")
+				if not Lines or (type(Lines.ListEnabled) == "table" and #Lines.ListEnabled == 0) then
+					if Lines and Lines.Add then
+						Lines:Add("love sent from rawr <3")
+					end
 				end
 				
 				if textChatService.ChatVersion == Enum.ChatVersion.TextChatService then
@@ -5994,8 +5996,8 @@ run(function()
 				
 				local ind = 1
 				repeat
-					local message = (#Lines.ListEnabled > 0 and Lines.ListEnabled[math.random(1, #Lines.ListEnabled)] or 'rawr.xyz on top')
-					if Mode.Value == 'Order' and #Lines.ListEnabled > 0 then
+					local message = (Lines and Lines.ListEnabled and #Lines.ListEnabled > 0) and Lines.ListEnabled[math.random(1, #Lines.ListEnabled)] or 'rawr.xyz on top'
+					if Mode.Value == 'Order' and Lines and Lines.ListEnabled and #Lines.ListEnabled > 0 then
 						message = Lines.ListEnabled[ind] or Lines.ListEnabled[1]
 						ind = (ind % #Lines.ListEnabled) + 1
 					end
@@ -6016,8 +6018,16 @@ run(function()
 		end,
 		Tooltip = 'Automatically types in chat'
 	})
+	
 	Lines = ChatSpammer:CreateTextList({Name = 'Lines'})
-	Lines:Add("love sent from rawr <3")
+	if Lines and Lines.Add then
+		Lines:Add("love sent from rawr <3")
+	elseif Lines and type(Lines.ListEnabled) == "table" then
+		table.insert(Lines.ListEnabled, "love sent from rawr <3")
+	else
+		-- l1
+		Lines = { ListEnabled = {"love sent from rawr <3"} }
+	end
 	
 	Mode = ChatSpammer:CreateDropdown({
 		Name = 'Mode',
