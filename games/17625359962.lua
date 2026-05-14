@@ -927,6 +927,210 @@ run(function()
         Tooltip = "ESP for subspace"
     })
 end)
+                                                                                                                    
+run(function()
+    local playersService = game:GetService("Players")
+    local runService = game:GetService("RunService")
+    local localPlayer = playersService.LocalPlayer
+
+    local MATERIALS = {
+        "Plastic", "Wood", "Brick", "Concrete", "CorrodedMetal", "DiamondPlate",
+        "Foil", "Grass", "Ice", "Marble", "Metal", "Neon", "Pebble", "Sand",
+        "Slate", "SmoothPlastic", "WoodPlanks", "ForceField"
+    }
+
+    local BODY_PARTS = {
+        "Head", "Torso", "Left Arm", "Right Arm", "Left Leg", "Right Leg"
+    }
+
+    local function getValidParts(character)
+        local parts = {}
+        if not character then return parts end
+        for _, name in ipairs(BODY_PARTS) do
+            local part = character:FindFirstChild(name)
+            if part and part:IsA("BasePart") then
+                table.insert(parts, name)
+            end
+        end
+        for _, name in ipairs({"UpperTorso", "LowerTorso"}) do
+            local part = character:FindFirstChild(name)
+            if part and part:IsA("BasePart") then
+                table.insert(parts, name)
+            end
+        end
+        return parts
+    end
+
+    local modifications = {}
+
+    local function applyModifications()
+        local char = localPlayer.Character
+        if not char then return end
+        for _, mod in ipairs(modifications) do
+            local part = char:FindFirstChild(mod.partName)
+            if part and part:IsA("BasePart") then
+                part.Material = Enum.Material[mod.material] or Enum.Material.Plastic
+                part.Color = mod.color
+            end
+        end
+    end
+
+    localPlayer.CharacterAdded:Connect(function(char)
+        task.wait(0.1)
+        applyModifications()
+    end)
+
+    if localPlayer.Character then
+        applyModifications()
+    end
+
+    local SelfVisualsModule = vape.Categories.Render:CreateModule({
+        Name = "Self Visuals",
+        Function = function(enabled)
+        end,
+        Tooltip = "Custom materials and colors on your body parts"
+    })
+
+    local selectedPart = nil
+    local selectedMaterial = "Plastic"
+    local selectedColor = Color3.new(1, 1, 1)
+
+    local partDropdown
+    local function updatePartList()
+        local parts = getValidParts(localPlayer.Character)
+        if #parts == 0 then
+            parts = BODY_PARTS
+        end
+        partDropdown:SetOptions(parts)
+        if not selectedPart or not table.find(parts, selectedPart) then
+            selectedPart = parts[1] or "Head"
+        end
+    end
+    updatePartList()
+
+    partDropdown = SelfVisualsModule:CreateDropdown({
+        Name = "Body Part",
+        List = BODY_PARTS,
+        Default = "Head",
+        Function = function(val)
+            selectedPart = val
+        end
+    })
+                                                                                                                                    
+    localPlayer.CharacterAdded:Connect(function()
+        task.wait(0.1)
+        updatePartList()
+    end)
+    task.spawn(function()
+        while true do
+            updatePartList()
+            task.wait(5)
+        end
+    end)
+
+    SelfVisualsModule:CreateDropdown({
+        Name = "Material",
+        List = MATERIALS,
+        Default = "Plastic",
+        Function = function(val)
+            selectedMaterial = val
+        end,
+        Tooltip = "Choose a material for the selected part"
+    })
+
+    local colorSlider
+    colorSlider = SelfVisualsModule:CreateColorSlider({
+        Name = "Color",
+        Function = function(h, s, v)
+            selectedColor = Color3.fromHSV(h, s, v)
+        end,
+        Tooltip = "Pick a color for the selected part"
+    })
+
+    SelfVisualsModule:CreateButton({
+        Name = "Add Visual",
+        Function = function()
+            if not selectedPart then
+                vape:CreateNotification("Self Visuals", "No part selected", 2, "alert")
+                return
+            end
+            for i, mod in ipairs(modifications) do
+                if mod.partName == selectedPart then
+                    table.remove(modifications, i)
+                    break
+                end
+            end
+            table.insert(modifications, {
+                partName = selectedPart,
+                material = selectedMaterial,
+                color = selectedColor
+            })
+            applyModifications()
+            vape:CreateNotification("Self Visuals", "Added visual for " .. selectedPart, 2, "success")
+        end,
+        Tooltip = "Apply this material/color to the chosen body part"
+    })
+
+    SelfVisualsModule:CreateButton({
+        Name = "Remove Visual",
+        Function = function()
+            if not selectedPart then return end
+            for i, mod in ipairs(modifications) do
+                if mod.partName == selectedPart then
+                    table.remove(modifications, i)
+                    local char = localPlayer.Character
+                    if char then
+                        local part = char:FindFirstChild(selectedPart)
+                        if part and part:IsA("BasePart") then
+                            part.Material = Enum.Material.Plastic  -- default
+                            part.Color = Color3.new(1, 1, 1)
+                        end
+                    end
+                    vape:CreateNotification("Self Visuals", "Removed visual for " .. selectedPart, 2, "info")
+                    return
+                end
+            end
+            vape:CreateNotification("Self Visuals", "No visual on " .. selectedPart, 2, "alert")
+        end,
+        Tooltip = "Remove the m/c from the part"
+    })
+
+    SelfVisualsModule:CreateButton({
+        Name = "Clear All",
+        Function = function()
+            modifications = {}
+            local char = localPlayer.Character
+            if char then
+                for _, part in ipairs(char:GetChildren()) do
+                    if part:IsA("BasePart") then
+                        part.Material = Enum.Material.Plastic
+                        part.Color = Color3.new(1, 1, 1)
+                    end
+                end
+            end
+            vape:CreateNotification("Self Visuals", "All visuals cleared", 2, "info")
+        end,
+        Tooltip = "Remove all visuals"
+    })
+
+    vape:Clean(function()
+        local char = localPlayer.Character
+        if char then
+            for _, part in ipairs(char:GetChildren()) do
+                if part:IsA("BasePart") then
+                    part.Material = Enum.Material.Plastic
+                    part.Color = Color3.new(1, 1, 1)
+                end
+            end
+        end
+    end)
+
+    localPlayer.CharacterAdded:Connect(function(char)
+        task.wait(0.1)
+        updatePartList()
+        applyModifications()
+    end)
+end)
 
 run(function()
     local antiSmokeRunning = false
@@ -2802,347 +3006,6 @@ run(function()
             end
         end})
     end
-end)
-
-run(function()
-    local playersService = game:GetService("Players")
-    local runService = game:GetService("RunService")
-    local userInputService = game:GetService("UserInputService")
-    local camera = workspace.CurrentCamera
-    local localPlayer = playersService.LocalPlayer
-    local replicatedStorage = game:GetService("ReplicatedStorage")
-
-    local config = {
-        killFeedEnabled = true,
-        killFeedDuration = 5,
-        hitLogEnabled = true,
-        hitLogCooldown = 0.2,
-        hitDirectionEnabled = true,
-        hitDirectionColor = Color3.fromRGB(255, 80, 80),
-        damageNumbersEnabled = true,
-        damageNumberColor = Color3.fromRGB(255, 255, 255),
-        damageNumberSize = 18,
-        damageNumberDuration = 1,
-        hitChamsEnabled = true,
-        hitChamsDuration = 0.2,
-        hitChamsColor = Color3.fromRGB(255, 0, 0),
-        hitChamsTransparency = 0.3,
-        bodyCloneEnabled = true,
-        bodyCloneDuration = 0.3,
-        bodyCloneTransparency = 0.6,
-    }
-
-    local lastHitNotifTime = 0
-    local gameReady = false
-    local hooksInitialized = false
-
-    local function isGameActive()
-        local mainGui = localPlayer:FindFirstChild("PlayerGui")
-        if mainGui then
-            local mainFrame = mainGui:FindFirstChild("MainFrame")
-            if mainFrame then
-                local lobby = mainFrame:FindFirstChild("Lobby")
-                if lobby then
-                    local currency = lobby:FindFirstChild("Currency")
-                    return currency and currency.Visible == false
-                end
-            end
-        end
-        return false
-    end
-
-    local function waitForGame(timeout)
-        timeout = timeout or 120
-        local start = tick()
-        while tick() - start < timeout do
-            if isGameActive() and localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                return true
-            end
-            task.wait(0.5)
-        end
-        return false
-    end
-
-
-    local function killFeed(killerName, victimName, weaponName)
-        if not config.killFeedEnabled then return end
-        local msg = string.format("%s [%s] %s", killerName, weaponName or "?", victimName)
-        vape:CreateNotification("Elimination", msg, config.killFeedDuration, "alert")
-    end
-
-    local function hitLog(sourceName, targetName, damage)
-        if not config.hitLogEnabled then return end
-        local now = tick()
-        if now - lastHitNotifTime < config.hitLogCooldown then return end
-        lastHitNotifTime = now
-        local msg = string.format("%s hit %s for %d damage", sourceName, targetName, math.floor(damage))
-        vape:CreateNotification("Hit", msg, 2, "info")
-    end
-
-    local hitDirectionArrows = {}
-    local function addHitDirection(sourcePosition)
-        if not config.hitDirectionEnabled then return end
-        local camPos = camera.CFrame.Position
-        local direction = (sourcePosition - camPos).Unit
-        local lookAt = camera.CFrame.LookVector
-        local dot = lookAt:Dot(direction)
-        local angle = math.deg(math.acos(dot))
-        local isBehind = angle > 90
-        
-        local arrow = Drawing.new("Triangle")
-        arrow.Visible = true
-        arrow.Color = config.hitDirectionColor
-        arrow.Filled = true
-        arrow.Thickness = 1
-        arrow.Transparency = 0.3
-        
-        local screenCenter = camera.ViewportSize / 2
-        local radius = 50
-        local radAngle = math.rad(angle)
-        local offsetX = math.sin(radAngle) * radius
-        local offsetY = -math.cos(radAngle) * radius
-        
-        if isBehind then
-            arrow.PointA = screenCenter + Vector2.new(-15, -15)
-            arrow.PointB = screenCenter + Vector2.new(15, -15)
-            arrow.PointC = screenCenter + Vector2.new(0, 0)
-        else
-            local tip = screenCenter + Vector2.new(offsetX, offsetY)
-            local perp = Vector2.new(-offsetY, offsetX).Unit * 10
-            arrow.PointA = tip + perp
-            arrow.PointB = tip - perp
-            arrow.PointC = screenCenter
-        end
-        
-        table.insert(hitDirectionArrows, arrow)
-        task.delay(0.5, function()
-            arrow.Visible = false
-            arrow:Remove()
-            for i, a in ipairs(hitDirectionArrows) do
-                if a == arrow then table.remove(hitDirectionArrows, i); break end
-            end
-        end)
-    end
-
-    local damageNumbers = {}
-    local function addDamageNumber(targetPart, damage)
-        if not config.damageNumbersEnabled then return end
-        local screenPos, onScreen = camera:WorldToViewportPoint(targetPart.Position)
-        if not onScreen then return end
-        
-        local text = Drawing.new("Text")
-        text.Text = "-" .. math.floor(damage)
-        text.Size = config.damageNumberSize
-        text.Color = config.damageNumberColor
-        text.Center = true
-        text.Outline = true
-        text.Font = 2
-        text.Position = Vector2.new(screenPos.X, screenPos.Y)
-        text.Visible = true
-        
-        table.insert(damageNumbers, text)
-        local startTime = tick()
-        local conn
-        conn = runService.RenderStepped:Connect(function()
-            local elapsed = tick() - startTime
-            if elapsed >= config.damageNumberDuration then
-                text:Remove()
-                conn:Disconnect()
-                for i, t in ipairs(damageNumbers) do if t == text then table.remove(damageNumbers, i); break end end
-            else
-                local offsetY = -elapsed * 30
-                text.Position = Vector2.new(screenPos.X, screenPos.Y + offsetY)
-                text.Transparency = elapsed / config.damageNumberDuration
-            end
-        end)
-    end
-
-    local hitChamsList = {}
-    local function addHitChams(part)
-        if not config.hitChamsEnabled then return end
-        if not part or not part.Parent then return end
-        
-        local originalColor = part.Color
-        local originalTransparency = part.Transparency
-        local originalMaterial = part.Material
-        
-        part.Color = config.hitChamsColor
-        part.Transparency = config.hitChamsTransparency
-        part.Material = Enum.Material.Neon
-        
-        local startTime = tick()
-        local conn
-        conn = runService.Heartbeat:Connect(function()
-            if tick() - startTime >= config.hitChamsDuration then
-                part.Color = originalColor
-                part.Transparency = originalTransparency
-                part.Material = originalMaterial
-                conn:Disconnect()
-                for i, p in ipairs(hitChamsList) do if p == part then table.remove(hitChamsList, i); break end end
-            end
-        end)
-        table.insert(hitChamsList, part)
-    end
-
-    local clones = {}
-    local function addBodyClone(character)
-        if not config.bodyCloneEnabled then return end
-        if not character or not character.Parent then return end
-        
-        local clone = character:Clone()
-        clone.Name = "HitClone"
-        for _, descendant in ipairs(clone:GetDescendants()) do
-            if descendant:IsA("BasePart") then
-                descendant.Transparency = config.bodyCloneTransparency
-                descendant.Material = Enum.Material.Neon
-                descendant.Color = config.hitChamsColor
-                descendant.CanCollide = false
-            elseif descendant:IsA("Decal") or descendant:IsA("Texture") then
-                descendant.Transparency = 1
-            end
-        end
-        clone.Parent = workspace
-        
-        local startTime = tick()
-        local conn
-        conn = runService.Heartbeat:Connect(function()
-            if tick() - startTime >= config.bodyCloneDuration then
-                clone:Destroy()
-                conn:Disconnect()
-                for i, c in ipairs(clones) do if c == clone then table.remove(clones, i); break end end
-            end
-        end)
-        table.insert(clones, clone)
-    end
-
-    function onHit(sourcePlayer, targetPlayer, hitPart, damage, weaponName)
-        if hitPart then addDamageNumber(hitPart, damage) end
-        if hitPart then addHitChams(hitPart) end
-        if targetPlayer and targetPlayer.Character then
-            addBodyClone(targetPlayer.Character)
-        end
-        if sourcePlayer and sourcePlayer.Character then
-            local root = sourcePlayer.Character:FindFirstChild("HumanoidRootPart")
-            if root then addHitDirection(root.Position) end
-        end
-        if sourcePlayer and targetPlayer and sourcePlayer ~= targetPlayer then
-            hitLog(sourcePlayer.Name, targetPlayer.Name, damage)
-        end
-    end
-
-    local function initHooks()
-        if hooksInitialized then return end
-        hooksInitialized = true
-
-        local function tryHookHitRemote()
-            local hitRemote = replicatedStorage:FindFirstChild("Remotes")
-            if hitRemote then
-                hitRemote = hitRemote:FindFirstChild("Replication")
-                if hitRemote then
-                    hitRemote = hitRemote:FindFirstChild("Fighter")
-                    if hitRemote then
-                        hitRemote = hitRemote:FindFirstChild("HitNotify")
-                    end
-                end
-            end
-            if hitRemote then
-                hitRemote.OnClientEvent:Connect(function(data)
-                    local damage = data[utf8.char(0)] or 0
-                    local hitPart = data[utf8.char(2)]
-                    local victim = nil
-                    if typeof(hitPart) == "Instance" then
-                        local char = hitPart:FindFirstAncestorOfClass("Model")
-                        if char then
-                            victim = playersService:GetPlayerFromCharacter(char)
-                        end
-                    end
-                    if victim and localPlayer ~= victim then
-                        onHit(localPlayer, victim, hitPart, damage, "Weapon")
-                    end
-                end)
-                return true
-            end
-            return false
-        end
-
-        for i = 1, 20 do
-            if tryHookHitRemote() then break end
-            task.wait(0.5)
-        end
-        if not hitRemote then
-            vape:CreateNotification("Rawr.xyz", "HitNotify remote not found after retries – effects inactive", 5, "alert")
-        end
-
-        spawn(function()
-            local EliminationsDisplay = nil
-            for _ = 1, 30 do
-                local success, module = pcall(function()
-                    return require(localPlayer.PlayerScripts:WaitForChild("Modules"):WaitForChild("EliminationsDisplay", 5))
-                end)
-                if success and module and module.NewElimination then
-                    EliminationsDisplay = module
-                    break
-                end
-                task.wait(0.5)
-            end
-            if EliminationsDisplay then
-                local oldNewElimination = EliminationsDisplay.NewElimination
-                EliminationsDisplay.NewElimination = function(self, eliminator, victim, timestamp, weaponslot, weaponname, ...)
-                    oldNewElimination(self, eliminator, victim, timestamp, weaponslot, weaponname, ...)
-                    killFeed(eliminator.Name, victim.Name, weaponname or "Unknown")
-                end
-            else
-                vape:CreateNotification("Rawr.xyz", "EliminationsDisplay not found – kill feed won't work", 3, "alert")
-            end
-        end)
-    end
-
-    spawn(function()
-        if not waitForGame() then
-            vape:CreateNotification("Rawr.xyz", "Game load timeout – Check your internet", 5, "alert")
-        end
-        gameReady = true
-        initHooks()
-    end)
-
-    local VisualModule = vape.Categories.Visual or vape.Categories.Render or vape.Categories.Utility
-    if VisualModule then
-        local HitEffects = VisualModule:CreateModule({
-            Name = "Hit Effects",
-            Function = function() end
-        })
-        
-        HitEffects:CreateToggle({ Name = "Kill Feed Notif", Default = config.killFeedEnabled, Function = function(v) config.killFeedEnabled = v end })
-        HitEffects:CreateSlider({ Name = "Kill Notif Duration", Min = 1, Max = 10, Default = config.killFeedDuration, Function = function(v) config.killFeedDuration = v end })
-        HitEffects:CreateToggle({ Name = "Hit Log Notif", Default = config.hitLogEnabled, Function = function(v) config.hitLogEnabled = v end })
-        HitEffects:CreateSlider({ Name = "Hit Log Cooldown", Min = 0.1, Max = 2, Default = config.hitLogCooldown, Decimal = 10, Function = function(v) config.hitLogCooldown = v end, Suffix = "s" })
-        HitEffects:CreateToggle({ Name = "Hit Direction Indicator", Default = config.hitDirectionEnabled, Function = function(v) config.hitDirectionEnabled = v end })
-        HitEffects:CreateColorSlider({ Name = "Direction Color", Function = function(h,s,v) config.hitDirectionColor = Color3.fromHSV(h,s,v) end })
-        HitEffects:CreateToggle({ Name = "Damage Numbers", Default = config.damageNumbersEnabled, Function = function(v) config.damageNumbersEnabled = v end })
-        HitEffects:CreateSlider({ Name = "Number Size", Min = 10, Max = 30, Default = config.damageNumberSize, Function = function(v) config.damageNumberSize = v end })
-        HitEffects:CreateSlider({ Name = "Number Duration", Min = 0.5, Max = 2, Default = config.damageNumberDuration, Decimal = 10, Function = function(v) config.damageNumberDuration = v end, Suffix = "s" })
-        HitEffects:CreateToggle({ Name = "Hit Chams (Neon)", Default = config.hitChamsEnabled, Function = function(v) config.hitChamsEnabled = v end })
-        HitEffects:CreateSlider({ Name = "Chams Duration", Min = 0.1, Max = 1, Default = config.hitChamsDuration, Decimal = 10, Function = function(v) config.hitChamsDuration = v end, Suffix = "s" })
-        HitEffects:CreateColorSlider({ Name = "Chams Color", Function = function(h,s,v) config.hitChamsColor = Color3.fromHSV(h,s,v) end })
-        HitEffects:CreateSlider({ Name = "Chams Transparency", Min = 0, Max = 1, Default = config.hitChamsTransparency, Decimal = 10, Function = function(v) config.hitChamsTransparency = v end })
-        HitEffects:CreateToggle({ Name = "Body Clone Highlight", Default = config.bodyCloneEnabled, Function = function(v) config.bodyCloneEnabled = v end })
-        HitEffects:CreateSlider({ Name = "Clone Duration", Min = 0.2, Max = 1, Default = config.bodyCloneDuration, Decimal = 10, Function = function(v) config.bodyCloneDuration = v end, Suffix = "s" })
-        HitEffects:CreateSlider({ Name = "Clone Transparency", Min = 0, Max = 1, Default = config.bodyCloneTransparency, Decimal = 10, Function = function(v) config.bodyCloneTransparency = v end })
-    end
-
-    -- Cleanup
-    vape:Clean(function()
-        for _, arrow in ipairs(hitDirectionArrows) do arrow:Remove() end
-        for _, text in ipairs(damageNumbers) do text:Remove() end
-        for _, part in ipairs(hitChamsList) do
-            if part and part.Parent then
-                part.Color = Color3.fromRGB(255,255,255)
-                part.Transparency = 0
-                part.Material = Enum.Material.Plastic
-            end
-        end
-        for _, clone in ipairs(clones) do clone:Destroy() end
-    end)
 end)
 
 entitylib.start()
