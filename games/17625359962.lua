@@ -927,159 +927,329 @@ run(function()
         Tooltip = "ESP for subspace"
     })
 end)
-                                                                                                                    
-run(function()
-    local playersService = game:GetService("Players")
-    local localPlayer = playersService.LocalPlayer
 
+run(function()
+    local Players = game:GetService("Players")
+    local localPlayer = Players.LocalPlayer
+    
+    local R15_PARTS = {
+        "Head",
+        "UpperTorso", "LowerTorso",
+        "LeftUpperArm", "RightUpperArm", "LeftLowerArm", "RightLowerArm",
+        "LeftUpperLeg", "RightUpperLeg", "LeftLowerLeg", "RightLowerLeg",
+        "LeftHand", "RightHand",
+        "LeftFoot", "RightFoot"
+    }
+    
     local MATERIALS = {
         "Plastic", "Wood", "Brick", "Concrete", "CorrodedMetal", "DiamondPlate",
         "Foil", "Grass", "Ice", "Marble", "Metal", "Neon", "Pebble", "Sand",
         "Slate", "SmoothPlastic", "WoodPlanks", "ForceField"
     }
-
-    local ALL_PARTS = {
-        "Head", "Torso",
-        "Left Arm", "Right Arm", "Left Leg", "Right Leg",            -- R6
-        "UpperTorso", "LowerTorso",                                   -- R15
-        "LeftUpperArm", "RightUpperArm", "LeftLowerArm", "RightLowerArm",
-        "LeftUpperLeg", "RightUpperLeg", "LeftLowerLeg", "RightLowerLeg"
+    
+    local MATERIAL_PRESETS = {
+        ["Glass"] = {material = "ForceField", transparency = 0.3},
+        ["Metal"] = {material = "Metal", transparency = 0},
+        ["Neon"] = {material = "Neon", transparency = 0},
+        ["Wood"] = {material = "Wood", transparency = 0},
+        ["Marble"] = {material = "Marble", transparency = 0},
+        ["Gold"] = {material = "Metal", transparency = 0},
+        ["Ice"] = {material = "Ice", transparency = 0.1},
+        ["Emerald"] = {material = "Marble", transparency = 0},
     }
-
+    
+    local originalProperties = {}
     local modifications = {}
-
-    local function applyModifications()
+    local isEnabled = false
+    
+    local function cacheOriginalProperties()
         local char = localPlayer.Character
         if not char then return end
-        for _, mod in ipairs(modifications) do
-            local part = char:FindFirstChild(mod.partName)
+        
+        for _, partName in ipairs(R15_PARTS) do
+            local part = char:FindFirstChild(partName)
             if part and part:IsA("BasePart") then
-                part.Material = Enum.Material[mod.material] or Enum.Material.Plastic
-                part.Color = mod.color
+                originalProperties[partName] = {
+                    material = part.Material,
+                    color = part.Color,
+                    transparency = part.Transparency
+                }
             end
         end
     end
-
-    --
+    
+    local function getPart(partName)
+        local char = localPlayer.Character
+        if not char then return nil end
+        return char:FindFirstChild(partName)
+    end
+    
+    local function getModificationIndex(partName)
+        for i, mod in ipairs(modifications) do
+            if mod.partName == partName then
+                return i
+            end
+        end
+        return nil
+    end
+    
+    local function applyModification(partName, material, color, transparency)
+        local part = getPart(partName)
+        if not part or not part:IsA("BasePart") then return end
+        
+        part.Material = Enum.Material[material] or Enum.Material.Plastic
+        part.Color = color
+        part.Transparency = transparency or 0
+    end
+    
+    local function restorePart(partName)
+        local part = getPart(partName)
+        if not part or not part:IsA("BasePart") then return end
+        
+        local original = originalProperties[partName]
+        if original then
+            part.Material = original.material
+            part.Color = original.color
+            part.Transparency = original.transparency
+        else
+            part.Material = Enum.Material.Plastic
+            part.Color = Color3.new(1, 1, 1)
+            part.Transparency = 0
+        end
+    end
+    
+    local function applyAllModifications()
+        for _, mod in ipairs(modifications) do
+            applyModification(mod.partName, mod.material, mod.color, mod.transparency)
+        end
+    end
+    
+    local function restoreAll()
+        local char = localPlayer.Character
+        if not char then return end
+        
+        for _, partName in ipairs(R15_PARTS) do
+            restorePart(partName)
+        end
+    end
+    
     localPlayer.CharacterAdded:Connect(function(char)
         task.wait(0.1)
-        applyModifications()
+        originalProperties = {}
+        cacheOriginalProperties()
+        applyAllModifications()
     end)
-
-    --
+    
     if localPlayer.Character then
-        applyModifications()
+        cacheOriginalProperties()
     end
-
-    --
+    
     local SelfVisualsModule = vape.Categories.Render:CreateModule({
         Name = "Self Visuals",
-        Function = function(enabled) end,
-        Tooltip = "Custom materials and colors on your body parts"
+        Function = function(callback)
+            isEnabled = callback
+            if not callback then
+                restoreAll()
+            else
+                cacheOriginalProperties()
+                applyAllModifications()
+            end
+        end,
+        Tooltip = "Customize materials and colors on your body parts"
     })
-
-    --
+    
     local selectedPart = "Head"
     local selectedMaterial = "Plastic"
     local selectedColor = Color3.new(1, 1, 1)
-
-    --
+    local selectedTransparency = 0
+    
+    local partsList = {"All"}
+    for _, part in ipairs(R15_PARTS) do
+        table.insert(partsList, part)
+    end
+    
     SelfVisualsModule:CreateDropdown({
         Name = "Body Part",
-        List = ALL_PARTS,
+        List = partsList,
         Default = "Head",
-        Function = function(val) selectedPart = val end
+        Function = function(val)
+            selectedPart = val
+            
+            --
+            if val == "All" then
+                selectedColor = Color3.new(1, 1, 1)
+                selectedTransparency = 0
+                return
+            end
+            
+            --
+            local modIndex = getModificationIndex(val)
+            if modIndex then
+                local mod = modifications[modIndex]
+                selectedMaterial = mod.material
+                selectedColor = mod.color
+                selectedTransparency = mod.transparency or 0
+            else
+                -- 
+                local original = originalProperties[val]
+                if original then
+                    selectedColor = original.color
+                    selectedTransparency = original.transparency
+                else
+                    selectedColor = Color3.new(1, 1, 1)
+                    selectedTransparency = 0
+                end
+            end
+        end
     })
-
-    --
+    
     SelfVisualsModule:CreateDropdown({
         Name = "Material",
         List = MATERIALS,
         Default = "Plastic",
-        Function = function(val) selectedMaterial = val end
+        Function = function(val)
+            selectedMaterial = val
+        end
     })
-
-    -- 
+    
     SelfVisualsModule:CreateColorSlider({
         Name = "Color",
-        Visible = true,
         Function = function(h, s, v)
             selectedColor = Color3.fromHSV(h, s, v)
         end
     })
-
-    -- 
+    
+    SelfVisualsModule:CreateSlider({
+        Name = "Transparency",
+        Min = 0,
+        Max = 1,
+        Default = 0,
+        Decimal = 100,
+        Function = function(v)
+            selectedTransparency = v
+        end,
+        Suffix = ""
+    })
+    
     SelfVisualsModule:CreateButton({
-        Name = "Add Visual",
+        Name = "Presets: Glass",
         Function = function()
-            --
-            for i, mod in ipairs(modifications) do
-                if mod.partName == selectedPart then
-                    table.remove(modifications, i)
-                    break
-                end
+            selectedMaterial = "ForceField"
+            selectedTransparency = 0.3
+            if selectedPart == "All" then
+                applyToAllParts("ForceField", selectedColor, 0.3)
+            else
+                addModification(selectedPart, selectedMaterial, selectedColor, selectedTransparency)
             end
+            vape:CreateNotification("Self Visuals", "Applied Glass preset", 1.5, "success")
+        end
+    })
+    
+    SelfVisualsModule:CreateButton({
+        Name = "Presets: Metal",
+        Function = function()
+            selectedMaterial = "Metal"
+            selectedTransparency = 0
+            if selectedPart == "All" then
+                applyToAllParts("Metal", selectedColor, 0)
+            else
+                addModification(selectedPart, selectedMaterial, selectedColor, selectedTransparency)
+            end
+            vape:CreateNotification("Self Visuals", "Applied Metal preset", 1.5, "success")
+        end
+    })
+    
+    SelfVisualsModule:CreateButton({
+        Name = "Presets: Neon",
+        Function = function()
+            selectedMaterial = "Neon"
+            selectedTransparency = 0
+            if selectedPart == "All" then
+                applyToAllParts("Neon", selectedColor, 0)
+            else
+                addModification(selectedPart, selectedMaterial, selectedColor, selectedTransparency)
+            end
+            vape:CreateNotification("Self Visuals", "Applied Neon preset", 1.5, "success")
+        end
+    })
+    
+    function addModification(partName, material, color, transparency)
+        if partName == "All" then
+            applyToAllParts(material, color, transparency)
+            return
+        end
+        
+        local modIndex = getModificationIndex(partName)
+        if modIndex then
+            table.remove(modifications, modIndex)
+        end
+        
+        table.insert(modifications, {
+            partName = partName,
+            material = material,
+            color = color,
+            transparency = transparency or 0
+        })
+        
+        applyModification(partName, material, color, transparency)
+        vape:CreateNotification("Self Visuals", "Applied to " .. partName, 1.5, "success")
+    end
+    
+    function applyToAllParts(material, color, transparency)
+        modifications = {}
+        
+        for _, partName in ipairs(R15_PARTS) do
             table.insert(modifications, {
-                partName = selectedPart,
-                material = selectedMaterial,
-                color = selectedColor
+                partName = partName,
+                material = material,
+                color = color,
+                transparency = transparency or 0
             })
-            applyModifications()
-            vape:CreateNotification("Self Visuals", "Added " .. selectedPart, 2, "success")
         end
-    })
-
-    -- 
+        
+        applyAllModifications()
+        vape:CreateNotification("Self Visuals", "Applied to all parts", 2, "success")
+    end
+    
     SelfVisualsModule:CreateButton({
-        Name = "Remove Visual",
+        Name = "Apply",
         Function = function()
-            for i, mod in ipairs(modifications) do
-                if mod.partName == selectedPart then
-                    table.remove(modifications, i)
-                    -- Restore
-                    local char = localPlayer.Character
-                    if char then
-                        local part = char:FindFirstChild(selectedPart)
-                        if part and part:IsA("BasePart") then
-                            part.Material = Enum.Material.Plastic
-                            part.Color = Color3.new(1, 1, 1)
-                        end
-                    end
-                    vape:CreateNotification("Self Visuals", "Removed " .. selectedPart, 2, "info")
-                    return
-                end
-            end
-            vape:CreateNotification("Self Visuals", "No visual on " .. selectedPart, 2, "alert")
+            addModification(selectedPart, selectedMaterial, selectedColor, selectedTransparency)
         end
     })
-
+    
+    SelfVisualsModule:CreateButton({
+        Name = "Remove",
+        Function = function()
+            if selectedPart == "All" then
+                modifications = {}
+                restoreAll()
+                vape:CreateNotification("Self Visuals", "Removed all visuals", 2, "info")
+                return
+            end
+            
+            local modIndex = getModificationIndex(selectedPart)
+            if modIndex then
+                table.remove(modifications, modIndex)
+                restorePart(selectedPart)
+                vape:CreateNotification("Self Visuals", "Removed from " .. selectedPart, 1.5, "info")
+            else
+                vape:CreateNotification("Self Visuals", "No visual on " .. selectedPart, 1.5, "alert")
+            end
+        end
+    })
+    
     SelfVisualsModule:CreateButton({
         Name = "Clear All",
         Function = function()
             modifications = {}
-            local char = localPlayer.Character
-            if char then
-                for _, part in ipairs(char:GetChildren()) do
-                    if part:IsA("BasePart") then
-                        part.Material = Enum.Material.Plastic
-                        part.Color = Color3.new(1, 1, 1)
-                    end
-                end
-            end
+            restoreAll()
             vape:CreateNotification("Self Visuals", "All visuals cleared", 2, "info")
         end
     })
-
+    
     vape:Clean(function()
-        local char = localPlayer.Character
-        if char then
-            for _, part in ipairs(char:GetChildren()) do
-                if part:IsA("BasePart") then
-                    part.Material = Enum.Material.Plastic
-                    part.Color = Color3.new(1, 1, 1)
-                end
-            end
-        end
+        restoreAll()
     end)
 end)
                                                                                                                                             
