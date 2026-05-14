@@ -4579,7 +4579,7 @@ run(function()
 				end
 			end
 		end,
-		Tooltip = 'Sit in the best gaming chair known to mankind.'
+		Tooltip = 'Sit in the best gaming chair known to mankind :3'
 	})
 	Color = GamingChair:CreateColorSlider({
 		Name = 'Color',
@@ -4603,7 +4603,7 @@ run(function()
 				label.Position = UDim2.new(0.5, 6, 0.5, 30)
 				label.AnchorPoint = Vector2.new(0.5, 0)
 				label.BackgroundTransparency = 1
-				label.Text = '100 ❤️'
+				label.Text = '100'
 				label.TextSize = 18
 				label.Font = Enum.Font.Arial
 				label.Parent = vape.gui
@@ -6127,6 +6127,10 @@ run(function()
 		Name = 'ChatSpammer',
 		Function = function(callback)
 			if callback then
+				if #Lines.ListEnabled == 0 then
+					Lines:Add("love sent from rawr <3")
+				end
+				
 				if textChatService.ChatVersion == Enum.ChatVersion.TextChatService then
 					if Hide.Enabled and coreGui:FindFirstChild('ExperienceChat') then
 						ChatSpammer:Clean(coreGui.ExperienceChat:FindFirstChild('RCTScrollContentView', true).ChildAdded:Connect(function(msg)
@@ -6150,7 +6154,7 @@ run(function()
 				
 				local ind = 1
 				repeat
-					local message = (#Lines.ListEnabled > 0 and Lines.ListEnabled[math.random(1, #Lines.ListEnabled)] or 'vxpe on top')
+					local message = (#Lines.ListEnabled > 0 and Lines.ListEnabled[math.random(1, #Lines.ListEnabled)] or 'rawr.xyz on top')
 					if Mode.Value == 'Order' and #Lines.ListEnabled > 0 then
 						message = Lines.ListEnabled[ind] or Lines.ListEnabled[1]
 						ind = (ind % #Lines.ListEnabled) + 1
@@ -6173,6 +6177,8 @@ run(function()
 		Tooltip = 'Automatically types in chat'
 	})
 	Lines = ChatSpammer:CreateTextList({Name = 'Lines'})
+	Lines:Add("love sent from rawr <3")
+	
 	Mode = ChatSpammer:CreateDropdown({
 		Name = 'Mode',
 		List = {'Random', 'Order'}
