@@ -87,23 +87,67 @@ local function isEnemy(player)
     return true
 end
 
+local screenCache = {}
+local CACHE_DURATION = 0.1
+
 local function getClosestPlayerToMouse()
     local closest = nil
     local shortest = math.huge
     local mousePos = inputService:GetMouseLocation()
+    local myPos = gameCamera.CFrame.Position
+    local now = tick()
+
     for _, player in ipairs(playersService:GetPlayers()) do
-        if player ~= lplr and player.Character and player.Character:FindFirstChild("Head") and isEnemy(player) then
-            local head = player.Character.Head
-            local screenPos, onScreen = gameCamera:WorldToViewportPoint(head.Position)
-            if onScreen then
+        if player ~= lplr and isEnemy(player) then
+            local character = player.Character
+            if not character then continue end
+            
+            local targetPart = nil
+            if aimPartSA == "Head" then
+                targetPart = character:FindFirstChild("Head")
+            elseif aimPartSA == "Body" then
+                targetPart = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("UpperTorso") or character:FindFirstChild("Head")
+            elseif aimPartSA == "Random" then
+                local parts = {"Head", "HumanoidRootPart", "UpperTorso", "LowerTorso"}
+                local valid = {}
+                for _, p in ipairs(parts) do
+                    local part = character:FindFirstChild(p)
+                    if part then table.insert(valid, part) end
+                end
+                if #valid > 0 then
+                    targetPart = valid[math.random(1, #valid)]
+                else
+                    targetPart = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
+                end
+            else
+                targetPart = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
+            end
+            
+            if not targetPart then continue end
+            
+            local partPos = targetPart.Position
+            if (partPos - myPos).Magnitude > 1000 then continue end
+            
+            local key = targetPart
+            local screenPos, onScreen
+            if screenCache[key] and now - screenCache[key].time < CACHE_DURATION then
+                screenPos = screenCache[key].pos
+                onScreen = screenCache[key].onScreen
+            else
+                screenPos, onScreen = gameCamera:WorldToViewportPoint(partPos)
+                screenCache[key] = {pos = screenPos, onScreen = onScreen, time = now}
+            end
+            
+            if onScreen and screenPos.Z > 0 then
                 local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
                 if dist < shortest then
-                    closest = player
                     shortest = dist
+                    closest = player
                 end
             end
         end
     end
+    
     return closest
 end
 
@@ -122,86 +166,175 @@ local function isLobbyVisible()
     return false
 end
 
-local targetPlayer = nil
-local isLeftMouseDown, isRightMouseDown = false, false
-local autoClickConnection = nil
-local cameraLockConnection = nil
-local silentAimEnabled = false
-local lockChance = 100
-local clickInterval = 0.10
-local aimPartSA = "Head"
-local smoothnessSA = 1
-local wallCheckSA = true
-local ShowTargetSA = nil
-local CircleObject = nil
-local CircleColor, CircleTransparency, CircleFilled
-local lastRightClick = 0
+run(function()
+    local screenCache = {}
+    local visibilityCache = {}
+    local CACHE_DURATION = 0.1
 
-local function lockCameraToHead()
-    if not targetPlayer or not targetPlayer.Character then return end
-    local part = targetPlayer.Character:FindFirstChild(aimPartSA == "Head" and "Head" or "HumanoidRootPart")
-    if not part then return end
-    if wallCheckSA then
+    local function getScreenPosition(part)
+        if not part then return nil, false end
+        local key = part
+        local now = tick()
+        if screenCache[key] and now - screenCache[key].time < CACHE_DURATION then
+            return screenCache[key].pos, screenCache[key].onScreen
+        end
+        local pos, onScreen = gameCamera:WorldToViewportPoint(part.Position)
+        screenCache[key] = {pos = pos, onScreen = onScreen, time = now}
+        return pos, onScreen
+    end
+
+    local function isVisibleCached(part, targetChar)
+        if not part then return false end
+        local key = part
+        local now = tick()
+        if visibilityCache[key] and now - visibilityCache[key].time < CACHE_DURATION then
+            return visibilityCache[key].visible
+        end
+        local origin = gameCamera.CFrame.Position
+        local direction = (part.Position - origin).Unit
         local rayParams = RaycastParams.new()
         rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-        rayParams.FilterDescendantsInstances = {lplr.Character, targetPlayer.Character}
-        local origin = gameCamera.CFrame.Position
-        local direction = (part.Position - origin) * 0.999
-        if workspace:Raycast(origin, direction, rayParams) then return end
+        rayParams.FilterDescendantsInstances = {lplr.Character, targetChar}
+        local result = workspace:Raycast(origin, direction * (part.Position - origin).Magnitude, rayParams)
+        local visible = not result or result.Instance:IsDescendantOf(part.Parent)
+        visibilityCache[key] = {visible = visible, time = now}
+        return visible
     end
-    local headPosition = gameCamera:WorldToViewportPoint(part.Position)
-    if headPosition and headPosition.Z > 0 then
-        local goalCF = CFrame.new(gameCamera.CFrame.Position, part.Position)
-        if smoothnessSA >= 0.99 then
-            gameCamera.CFrame = goalCF
-        else
-            gameCamera.CFrame = gameCamera.CFrame:Lerp(goalCF, smoothnessSA)
-        end
-        if ShowTargetSA and ShowTargetSA.Enabled and targetinfo then
-            targetinfo.Targets[targetPlayer] = tick() + 1
-        end
-    end
-end
 
-local function startAutoClick()
-    if autoClickConnection then autoClickConnection:Disconnect() end
-    autoClickConnection = runService.Heartbeat:Connect(function()
-        if (isLeftMouseDown or isRightMouseDown) and silentAimEnabled then
-            if not isLobbyVisible() and canClick() and (tick() - lastRightClick) >= clickInterval then
-                mouse1click()
-                lastRightClick = tick()
+    local function getPredictedPosition(part, predictionTime)
+        if not part then return nil end
+        local vel = part.Velocity
+        if vel.Magnitude < 0.5 then return part.Position end
+        return part.Position + vel * predictionTime
+    end
+
+    local function getTargetPart(character, aimSetting, predictionTime)
+        if not character then return nil end
+        local part = nil
+        if aimSetting == "Head" then
+            part = character:FindFirstChild("Head")
+        elseif aimSetting == "Body" then
+            part = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("UpperTorso") or character:FindFirstChild("Head")
+        elseif aimSetting == "Random" then
+            local parts = {"Head", "HumanoidRootPart", "UpperTorso", "LowerTorso"}
+            local valid = {}
+            for _, p in ipairs(parts) do
+                local bp = character:FindFirstChild(p)
+                if bp then table.insert(valid, bp) end
             end
+            if #valid > 0 then part = valid[math.random(1, #valid)] end
         else
-            if autoClickConnection then autoClickConnection:Disconnect(); autoClickConnection = nil end
+            part = character:FindFirstChild("Head")
+        end
+        if part and predictionTime and predictionTime > 0 then
+            local predicted = getPredictedPosition(part, predictionTime)
+            return part, predicted
+        end
+        return part, part and part.Position
+    end
+
+    local function getClosestPlayerToMouse()
+        local closest = nil
+        local shortest = math.huge
+        local mousePos = inputService:GetMouseLocation()
+        local myPos = gameCamera.CFrame.Position
+        local now = tick()
+
+        for _, player in ipairs(playersService:GetPlayers()) do
+            if player ~= lplr and isEnemy(player) then
+                local char = player.Character
+                if not char then continue end
+                local part, _ = getTargetPart(char, aimPartSA, 0)
+                if not part then continue end
+                local distToPlayer = (part.Position - myPos).Magnitude
+                if distToPlayer > 1000 then continue end
+                local screenPos, onScreen = getScreenPosition(part)
+                if onScreen and screenPos.Z > 0 then
+                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                    if dist < shortest then
+                        shortest = dist
+                        closest = player
+                    end
+                end
+            end
+        end
+        return closest
+    end
+
+    local targetPlayer = nil
+    local isLeftMouseDown, isRightMouseDown = false, false
+    local autoClickConnection = nil
+    local cameraLockConnection = nil
+    local silentAimEnabled = false
+    local lockChance = 100
+    local clickInterval = 0.10
+    local aimPartSA = "Head"
+    local smoothnessSA = 1
+    local wallCheckSA = true
+    local ShowTargetSA = nil
+    local CircleObject = nil
+    local CircleColor, CircleTransparency, CircleFilled
+    local lastRightClick = 0
+    local predictionEnabled = false
+    local predictionTime = 0.1
+
+    local function lockCameraToHead()
+        if not targetPlayer or not targetPlayer.Character then return end
+        local part, targetPos = getTargetPart(targetPlayer.Character, aimPartSA, predictionEnabled and predictionTime or 0)
+        if not part or not targetPos then return end
+        if wallCheckSA and not isVisibleCached(part, targetPlayer.Character) then return end
+        local screenPos, onScreen = getScreenPosition(part)
+        if onScreen and screenPos.Z > 0 then
+            local goalCF = CFrame.new(gameCamera.CFrame.Position, targetPos)
+            if smoothnessSA >= 0.99 then
+                gameCamera.CFrame = goalCF
+            else
+                gameCamera.CFrame = gameCamera.CFrame:Lerp(goalCF, smoothnessSA)
+            end
+            if ShowTargetSA and ShowTargetSA.Enabled and targetinfo then
+                targetinfo.Targets[targetPlayer] = tick() + 1
+            end
+        end
+    end
+
+    local function startAutoClick()
+        if autoClickConnection then autoClickConnection:Disconnect() end
+        autoClickConnection = runService.Heartbeat:Connect(function()
+            if (isLeftMouseDown or isRightMouseDown) and silentAimEnabled then
+                if not isLobbyVisible() and canClick() and (tick() - lastRightClick) >= clickInterval then
+                    mouse1click()
+                    lastRightClick = tick()
+                end
+            else
+                if autoClickConnection then autoClickConnection:Disconnect(); autoClickConnection = nil end
+            end
+        end)
+    end
+
+    inputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            if not isLeftMouseDown then
+                isLeftMouseDown = true
+                if silentAimEnabled then startAutoClick() end
+            end
+        elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+            if not isRightMouseDown then
+                isRightMouseDown = true
+                if silentAimEnabled then startAutoClick() end
+            end
         end
     end)
-end
 
-inputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        if not isLeftMouseDown then
-            isLeftMouseDown = true
-            if silentAimEnabled then startAutoClick() end
+    inputService.InputEnded:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            isLeftMouseDown = false
+        elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+            isRightMouseDown = false
         end
-    elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
-        if not isRightMouseDown then
-            isRightMouseDown = true
-            if silentAimEnabled then startAutoClick() end
-        end
-    end
-end)
+    end)
 
-inputService.InputEnded:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        isLeftMouseDown = false
-    elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
-        isRightMouseDown = false
-    end
-end)
-
-run(function()
     local SilentAim = vape.Categories.Combat:CreateModule({
         Name = 'Silent Aim',
         Function = function(callback)
@@ -219,13 +352,19 @@ run(function()
                 if cameraLockConnection then cameraLockConnection:Disconnect(); cameraLockConnection = nil end
                 if autoClickConnection then autoClickConnection:Disconnect(); autoClickConnection = nil end
                 targetPlayer = nil
+                -- Clear caches on disable
+                screenCache = {}
+                visibilityCache = {}
             end
         end,
         Tooltip = 'Redirects Bullets :3'
     })
+
     SilentAim:CreateDropdown({Name='Aim Part', List={'Head','Body','Random'}, Default='Head', Function=function(v) aimPartSA=v end, Tooltip='Part to Redirect onto'})
     SilentAim:CreateSlider({Name='Smoothness', Min=1, Max=100, Default=100, Function=function(v) smoothnessSA=v/100 end, Suffix='%', Tooltip='smoothness'})
     SilentAim:CreateToggle({Name='Wall Check', Default=true, Function=function(v) wallCheckSA=v end, Tooltip='Only Redirect when visible'})
+    SilentAim:CreateToggle({Name='Prediction', Default=false, Function=function(v) predictionEnabled=v end, Tooltip='Predict enemy movement'})
+    SilentAim:CreateSlider({Name='Prediction Time (s)', Min=0.05, Max=0.5, Default=0.1, Decimal=100, Function=function(v) predictionTime=v end, Suffix='s', Tooltip='Time to predict ahead'})
     SilentAim:CreateSlider({Name='Hit Chance', Min=0, Max=100, Default=100, Function=function(v) lockChance=v end, Suffix='%', Tooltip='Chance to Redirect per check'})
     SilentAim:CreateSlider({Name='Click Interval', Min=1, Max=50, Default=10, Function=function(v) clickInterval=v/100 end, Suffix='s', Tooltip='Time between auto‑clicks'})
     ShowTargetSA = SilentAim:CreateToggle({Name='Show Target Info', Default=true})
