@@ -2804,9 +2804,6 @@ run(function()
     end
 end)
 
--- ============================================================================
--- ENHANCED VISUAL FEATURES (Kill Feed, Hit Direction, Damage Numbers, Hit Effects)
--- ============================================================================
 run(function()
     local playersService = game:GetService("Players")
     local runService = game:GetService("RunService")
@@ -2816,7 +2813,9 @@ run(function()
 
     local config = {
         killFeedEnabled = true,
-        killFeedDuration = 3,
+        killFeedDuration = 5,
+        hitLogEnabled = true,
+        hitLogCooldown = 0.2,
         hitDirectionEnabled = true,
         hitDirectionColor = Color3.fromRGB(255, 80, 80),
         damageNumbersEnabled = true,
@@ -2832,63 +2831,21 @@ run(function()
         bodyCloneTransparency = 0.6,
     }
 
-    local killFeedMessages = {}
-    local killFeedContainer = nil
+    local lastHitNotifTime = 0
 
-    local function createKillFeedContainer()
-        if killFeedContainer then return end
-        killFeedContainer = Instance.new("Frame")
-        killFeedContainer.Name = "KillFeedContainer"
-        killFeedContainer.Size = UDim2.new(0, 300, 0, 200)
-        killFeedContainer.Position = UDim2.new(1, -310, 0, 10)
-        killFeedContainer.BackgroundTransparency = 1
-        killFeedContainer.Parent = game:GetService("CoreGui")
-        
-        local layout = Instance.new("UIListLayout")
-        layout.Padding = UDim.new(0, 5)
-        layout.SortOrder = Enum.SortOrder.LayoutOrder
-        layout.Parent = killFeedContainer
+    local function killFeed(killerName, victimName, weaponName)
+        if not config.killFeedEnabled then return end
+        local msg = string.format("%s [%s] %s", killerName, weaponName or "?", victimName)
+        vape:CreateNotification("Elimination", msg, config.killFeedDuration, "alert")
     end
 
-    local function addKillFeed(killerName, victimName, weaponName)
-        if not config.killFeedEnabled then return end
-        createKillFeedContainer()
-        
-        local frame = Instance.new("Frame")
-        frame.Size = UDim2.new(1, 0, 0, 30)
-        frame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
-        frame.BackgroundTransparency = 0.3
-        frame.BorderSizePixel = 0
-        
-        local corner = Instance.new("UICorner")
-        corner.CornerRadius = UDim.new(0, 4)
-        corner.Parent = frame
-        
-        local label = Instance.new("TextLabel")
-        label.Size = UDim2.new(1, 0, 1, 0)
-        label.BackgroundTransparency = 1
-        label.Text = string.format("%s  [%s]  %s", killerName, weaponName, victimName)
-        label.TextColor3 = Color3.fromRGB(255, 255, 255)
-        label.Font = Enum.Font.GothamBold
-        label.TextSize = 13
-        label.TextXAlignment = Enum.TextXAlignment.Center
-        label.Parent = frame
-        
-        frame.Parent = killFeedContainer
-        
-        local startTime = tick()
-        local fadeConn
-        fadeConn = runService.RenderStepped:Connect(function()
-            local elapsed = tick() - startTime
-            if elapsed >= config.killFeedDuration then
-                frame:Destroy()
-                fadeConn:Disconnect()
-            else
-                local alpha = 1 - (elapsed / config.killFeedDuration)
-                frame.BackgroundTransparency = 0.3 + (1 - alpha) * 0.7
-                label.TextTransparency = 1 - alpha
-            end
-        end)
+    local function hitLog(sourceName, targetName, damage)
+        if not config.hitLogEnabled then return end
+        local now = tick()
+        if now - lastHitNotifTime < config.hitLogCooldown then return end
+        lastHitNotifTime = now
+        local msg = string.format("%s hit %s for %d damage", sourceName, targetName, math.floor(damage))
+        vape:CreateNotification("Hit", msg, 2, "info")
     end
 
     local hitDirectionArrows = {}
@@ -2898,7 +2855,8 @@ run(function()
         local camPos = camera.CFrame.Position
         local direction = (sourcePosition - camPos).Unit
         local lookAt = camera.CFrame.LookVector
-        local angle = math.deg(math.acos(lookAt:Dot(direction)))
+        local dot = lookAt:Dot(direction)
+        local angle = math.deg(math.acos(dot))
         local isBehind = angle > 90
         
         local arrow = Drawing.new("Triangle")
@@ -2927,7 +2885,6 @@ run(function()
         end
         
         table.insert(hitDirectionArrows, arrow)
-        
         task.delay(0.5, function()
             arrow.Visible = false
             arrow:Remove()
@@ -3038,9 +2995,12 @@ run(function()
             local root = sourcePlayer.Character:FindFirstChild("HumanoidRootPart")
             if root then addHitDirection(root.Position) end
         end
+        
+        if sourcePlayer and targetPlayer and sourcePlayer ~= targetPlayer then
+            hitLog(sourcePlayer.Name, targetPlayer.Name, damage)
+        end
     end
 
-    -- Hook into the game's HitNotify remote
     local replicatedStorage = game:GetService("ReplicatedStorage")
     local hitRemote = replicatedStorage:FindFirstChild("Remotes")
     if hitRemote then
@@ -3055,7 +3015,6 @@ run(function()
     
     if hitRemote then
         hitRemote.OnClientEvent:Connect(function(data)
-            -- data: table with keys utf8.char(0)=damage, utf8.char(2)=hitPart (Instance)
             local damage = data[utf8.char(0)] or 0
             local hitPart = data[utf8.char(2)]
             local victim = nil
@@ -3070,48 +3029,47 @@ run(function()
             end
         end)
     else
-        warn("HitNotify remote not found. Enhanced visuals won't trigger automatically.")
+        vape:CreateNotification("Rawr.xyz", "HitNotify remote not found – effects won't trigger", 5, "alert")
     end
 
-    -- Kill Feed: hook elimination display
     pcall(function()
         local EliminationsDisplay = require(localPlayer.PlayerScripts.Modules.EliminationsDisplay)
         if EliminationsDisplay and EliminationsDisplay.NewElimination then
             local oldNewElimination = EliminationsDisplay.NewElimination
             EliminationsDisplay.NewElimination = function(self, eliminator, victim, timestamp, weaponslot, weaponname, ...)
                 oldNewElimination(self, eliminator, victim, timestamp, weaponslot, weaponname, ...)
-                addKillFeed(eliminator.Name, victim.Name, weaponname or "Unknown")
+                killFeed(eliminator.Name, victim.Name, weaponname or "Unknown")
             end
         end
     end)
 
-    -- UI Controls
     local VisualModule = vape.Categories.Visual or vape.Categories.Render or vape.Categories.Utility
     if VisualModule then
-        local CustomEffects = VisualModule:CreateModule({
+        local HitEffects = VisualModule:CreateModule({
             Name = "Hit Effects",
-            Function = function(callback) end
+            Function = function() end
         })
         
-        CustomEffects:CreateToggle({ Name = "Kill Feed", Default = config.killFeedEnabled, Function = function(v) config.killFeedEnabled = v end })
-        CustomEffects:CreateSlider({ Name = "Kill Feed Duration (s)", Min = 1, Max = 10, Default = config.killFeedDuration, Function = function(v) config.killFeedDuration = v end })
-        CustomEffects:CreateToggle({ Name = "Hit Direction Indicator", Default = config.hitDirectionEnabled, Function = function(v) config.hitDirectionEnabled = v end })
-        CustomEffects:CreateColorSlider({ Name = "Direction Color", Function = function(h,s,v) config.hitDirectionColor = Color3.fromHSV(h,s,v) end })
-        CustomEffects:CreateToggle({ Name = "Damage Numbers", Default = config.damageNumbersEnabled, Function = function(v) config.damageNumbersEnabled = v end })
-        CustomEffects:CreateSlider({ Name = "Damage Number Size", Min = 10, Max = 30, Default = config.damageNumberSize, Function = function(v) config.damageNumberSize = v end })
-        CustomEffects:CreateSlider({ Name = "Damage Number Duration (s)", Min = 0.5, Max = 2, Default = config.damageNumberDuration, Decimal = 10, Function = function(v) config.damageNumberDuration = v end })
-        CustomEffects:CreateToggle({ Name = "Hit Chams (Neon)", Default = config.hitChamsEnabled, Function = function(v) config.hitChamsEnabled = v end })
-        CustomEffects:CreateSlider({ Name = "Hit Chams Duration (s)", Min = 0.1, Max = 1, Default = config.hitChamsDuration, Decimal = 10, Function = function(v) config.hitChamsDuration = v end })
-        CustomEffects:CreateColorSlider({ Name = "Hit Chams Color", Function = function(h,s,v) config.hitChamsColor = Color3.fromHSV(h,s,v) end })
-        CustomEffects:CreateSlider({ Name = "Hit Chams Transparency", Min = 0, Max = 1, Default = config.hitChamsTransparency, Decimal = 10, Function = function(v) config.hitChamsTransparency = v end })
-        CustomEffects:CreateToggle({ Name = "Body Clone Highlight", Default = config.bodyCloneEnabled, Function = function(v) config.bodyCloneEnabled = v end })
-        CustomEffects:CreateSlider({ Name = "Body Clone Duration (s)", Min = 0.2, Max = 1, Default = config.bodyCloneDuration, Decimal = 10, Function = function(v) config.bodyCloneDuration = v end })
-        CustomEffects:CreateSlider({ Name = "Body Clone Transparency", Min = 0, Max = 1, Default = config.bodyCloneTransparency, Decimal = 10, Function = function(v) config.bodyCloneTransparency = v end })
+        HitEffects:CreateToggle({ Name = "Kill Feed Notif", Default = config.killFeedEnabled, Function = function(v) config.killFeedEnabled = v end })
+        HitEffects:CreateSlider({ Name = "Kill Notif Duration", Min = 1, Max = 10, Default = config.killFeedDuration, Function = function(v) config.killFeedDuration = v end })
+        HitEffects:CreateToggle({ Name = "Hit Log Notif", Default = config.hitLogEnabled, Function = function(v) config.hitLogEnabled = v end })
+        HitEffects:CreateSlider({ Name = "Hit Log Cooldown", Min = 0.1, Max = 2, Default = config.hitLogCooldown, Decimal = 10, Function = function(v) config.hitLogCooldown = v end, Suffix = "s" })
+        HitEffects:CreateToggle({ Name = "Hit Direction Indicator", Default = config.hitDirectionEnabled, Function = function(v) config.hitDirectionEnabled = v end })
+        HitEffects:CreateColorSlider({ Name = "Direction Color", Function = function(h,s,v) config.hitDirectionColor = Color3.fromHSV(h,s,v) end })
+        HitEffects:CreateToggle({ Name = "Damage Numbers", Default = config.damageNumbersEnabled, Function = function(v) config.damageNumbersEnabled = v end })
+        HitEffects:CreateSlider({ Name = "Number Size", Min = 10, Max = 30, Default = config.damageNumberSize, Function = function(v) config.damageNumberSize = v end })
+        HitEffects:CreateSlider({ Name = "Number Duration", Min = 0.5, Max = 2, Default = config.damageNumberDuration, Decimal = 10, Function = function(v) config.damageNumberDuration = v end, Suffix = "s" })
+        HitEffects:CreateToggle({ Name = "Hit Chams (Neon)", Default = config.hitChamsEnabled, Function = function(v) config.hitChamsEnabled = v end })
+        HitEffects:CreateSlider({ Name = "Chams Duration", Min = 0.1, Max = 1, Default = config.hitChamsDuration, Decimal = 10, Function = function(v) config.hitChamsDuration = v end, Suffix = "s" })
+        HitEffects:CreateColorSlider({ Name = "Chams Color", Function = function(h,s,v) config.hitChamsColor = Color3.fromHSV(h,s,v) end })
+        HitEffects:CreateSlider({ Name = "Chams Transparency", Min = 0, Max = 1, Default = config.hitChamsTransparency, Decimal = 10, Function = function(v) config.hitChamsTransparency = v end })
+        HitEffects:CreateToggle({ Name = "Body Clone Highlight", Default = config.bodyCloneEnabled, Function = function(v) config.bodyCloneEnabled = v end })
+        HitEffects:CreateSlider({ Name = "Clone Duration", Min = 0.2, Max = 1, Default = config.bodyCloneDuration, Decimal = 10, Function = function(v) config.bodyCloneDuration = v end, Suffix = "s" })
+        HitEffects:CreateSlider({ Name = "Clone Transparency", Min = 0, Max = 1, Default = config.bodyCloneTransparency, Decimal = 10, Function = function(v) config.bodyCloneTransparency = v end })
     end
 
     -- Cleanup
     vape:Clean(function()
-        if killFeedContainer then killFeedContainer:Destroy() end
         for _, arrow in ipairs(hitDirectionArrows) do arrow:Remove() end
         for _, text in ipairs(damageNumbers) do text:Remove() end
         for _, part in ipairs(hitChamsList) do
