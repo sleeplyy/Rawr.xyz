@@ -32,7 +32,7 @@ local function checkBlacklist()
 end
 
 if checkBlacklist() then
-    while true do task.wait(10) end
+    while true do task.wait(7) end
 end
 
 local startWait = tick()
@@ -40,14 +40,14 @@ repeat
     task.wait()
 until (lplr and lplr.PlayerGui and lplr.PlayerGui:FindFirstChild("Home") 
        and lplr.Character and lplr.Character:FindFirstChild("HumanoidRootPart"))
-       or tick() - startWait > 15
+       or tick() - startWait > 5
 
 local startWait2 = tick()
 repeat
     task.wait()
 until (replicatedStorageService and replicatedStorageService:FindFirstChild("Remotes") 
        and replicatedStorageService.Remotes:FindFirstChild("RequestTeamChange"))
-       or tick() - startWait2 > 15
+       or tick() - startWait2 > 5
 
 task.wait(0.5)
 
