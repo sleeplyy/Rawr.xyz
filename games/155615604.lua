@@ -403,167 +403,68 @@ run(function()
     local debris = game:GetService("Debris")
     local tweenService = game:GetService("TweenService")
 
-    local config = {
-        enabled = true,
-        showTracers = true,
-        customColors = false,
-        rainbow = false,
-        rainbowSpeed = 1,
-        trailStyle = "Glow",
-        impactEffects = true,
-    }
+    local taserColor = Color3.fromRGB(0, 234, 255)
+    local sniperColor = Color3.fromRGB(255, 50, 50)
+    local bulletColor = Color3.fromRGB(255, 255, 0)
 
-    local weaponDefaults = {
-        Taser = { color = Color3.fromRGB(0, 234, 255), thickness = 0.2, duration = 2, hasLight = true },
-        Sniper = { color = Color3.fromRGB(255, 50, 50), thickness = 0.17, duration = 4, hasLight = false },
-        Bullet = { color = Color3.fromRGB(255, 255, 0), thickness = 0.1, duration = 0.05, hasLight = false },
-        Pistol = { color = Color3.fromRGB(255, 255, 0), thickness = 0.1, duration = 0.05, hasLight = false },
-        Rifle = { color = Color3.fromRGB(255, 100, 0), thickness = 0.12, duration = 0.08, hasLight = false },
-        Shotgun = { color = Color3.fromRGB(255, 80, 20), thickness = 0.15, duration = 0.1, hasLight = false },
-        SMG = { color = Color3.fromRGB(255, 200, 0), thickness = 0.11, duration = 0.07, hasLight = false },
-    }
-    local weaponColors = {}
-    for k, v in pairs(weaponDefaults) do
-        weaponColors[k] = v.color
-    end
-    local weaponThickness = { Taser = 0.2, Sniper = 0.17, Bullet = 0.1, Pistol = 0.1, Rifle = 0.12, Shotgun = 0.15, SMG = 0.11 }
-    local weaponDuration = { Taser = 2, Sniper = 4, Bullet = 0.05, Pistol = 0.05, Rifle = 0.08, Shotgun = 0.1, SMG = 0.07 }
-    local weaponHasLight = { Taser = true, Sniper = false, Bullet = false, Pistol = false, Rifle = false, Shotgun = false, SMG = false }
+    local customColorsEnabled = false
+    local showTracersEnabled = true
+    local lifetimeMultiplier = 1
 
-    local function getRainbowColor(speed)
-        local hue = (tick() * speed * 360) % 360
-        return Color3.fromHSV(hue, 1, 1)
-    end
-
-    local function createTracer(startPos, endPos, weapon)
-        if not startPos or not endPos then return end
-        local w = weapon or "Bullet"
-        local color = config.rainbow and getRainbowColor(config.rainbowSpeed) or weaponColors[w] or weaponColors.Bullet
-        local thickness = weaponThickness[w] or 0.1
-        local duration = weaponDuration[w] or 0.1
-        local light = weaponHasLight[w] and true or false
-
+    local function createColoredTracer(startPos, endPos, color, sizeThickness, duration, hasLight)
+        if not startPos or not endPos or not color then return end
         local distance = (endPos - startPos).magnitude
-        if distance <= 0 then return end
         local midPoint = (startPos + endPos) / 2
 
-        if config.trailStyle == "Glow" then
-            local part = Instance.new("Part")
-            part.Name = "CustomRayPart"
-            part.Material = Enum.Material.Neon
-            part.Anchored = true
-            part.Transparency = 0.5
-            part.formFactor = Enum.FormFactor.Custom
-            part.Size = Vector3.new(thickness, thickness, distance)
-            part.CFrame = CFrame.new(midPoint, endPos)
-            part.CanCollide = false
-            part.CanQuery = false
-            part.CanTouch = false
-            part.Color = color
-            part.Parent = workspace.CurrentCamera
+        local part = Instance.new("Part")
+        part.Name = "CustomRayPart"
+        part.Material = Enum.Material.Neon
+        part.Anchored = true
+        part.Transparency = 0.5
+        part.formFactor = Enum.FormFactor.Custom
+        part.Size = Vector3.new(sizeThickness, sizeThickness, distance)
+        part.CFrame = CFrame.new(midPoint, endPos)
+        part.CanCollide = false
+        part.CanQuery = false
+        part.CanTouch = false
+        part.Color = color
+        part.Parent = workspace.CurrentCamera
 
-            if light then
-                local lightObj = Instance.new("SurfaceLight", part)
-                lightObj.Color = color
-                lightObj.Range = 7
-                lightObj.Face = "Bottom"
-                lightObj.Brightness = 5
-                lightObj.Angle = 180
-                tweenService:Create(lightObj, TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Brightness = 0}):Play()
-            end
-
-            tweenService:Create(part, TweenInfo.new(duration, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Transparency = 1}):Play()
-            debris:AddItem(part, duration + 0.5)
-
-        elseif config.trailStyle == "Line" then
-            local line = Drawing.new("Line")
-            line.Visible = true
-            line.Color = color
-            line.From = game.Workspace.CurrentCamera:WorldToScreenPoint(startPos)
-            line.To = game.Workspace.CurrentCamera:WorldToScreenPoint(endPos)
-            line.Thickness = thickness * 10
-            line.Transparency = 0.5
-            task.delay(duration, function()
-                line:Remove()
-            end)
-
-        elseif config.trailStyle == "Particle" then
-            local part = Instance.new("Part")
-            part.Size = Vector3.new(thickness, thickness, 0.1)
-            part.Anchored = true
-            part.CanCollide = false
-            part.CanQuery = false
-            part.CanTouch = false
-            part.Transparency = 1
-            part.CFrame = CFrame.new(startPos, endPos)
-            part.Parent = game.Workspace.CurrentCamera
-
-            local emitter = Instance.new("ParticleEmitter", part)
-            emitter.Color = ColorSequence.new(color)
-            emitter.Size = NumberSequence.new(thickness * 5)
-            emitter.Texture = "rbxassetid://14736249347"
-            emitter.Lifetime = NumberRange.new(0.1, 0.2)
-            emitter.Rate = 500
-            emitter.Speed = NumberRange.new(0, 0)
-            emitter.RotSpeed = NumberRange.new(0)
-            emitter.Acceleration = Vector3.new(0, 0, 0)
-            emitter.SpreadAngle = Vector2.new(0, 0)
-            emitter.EmissionDirection = Enum.NormalId.Front
-            emitter.Enabled = true
-
-            task.delay(duration, function()
-                part:Destroy()
-            end)
+        if hasLight then
+            local light = Instance.new("SurfaceLight", part)
+            light.Color = color
+            light.Range = 7
+            light.Face = "Bottom"
+            light.Brightness = 5
+            light.Angle = 180
+            tweenService:Create(light, TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Brightness = 0}):Play()
         end
 
-        if config.impactEffects then
-            local spark = Instance.new("Part")
-            spark.Size = Vector3.new(0.2, 0.2, 0.2)
-            spark.Shape = Enum.PartType.Ball
-            spark.Material = Enum.Material.Neon
-            spark.Color = color
-            spark.Anchored = true
-            spark.CanCollide = false
-            spark.CanQuery = false
-            spark.CanTouch = false
-            spark.Transparency = 0
-            spark.Position = endPos
-            spark.Parent = workspace.CurrentCamera
-
-            local emitter = Instance.new("ParticleEmitter", spark)
-            emitter.Color = ColorSequence.new(color)
-            emitter.Size = NumberSequence.new(0.1, 0.3)
-            emitter.Texture = "rbxassetid://89017534241527"
-            emitter.Lifetime = NumberRange.new(0.1, 0.3)
-            emitter.Rate = 100
-            emitter.Speed = NumberRange.new(2, 5)
-            emitter.SpreadAngle = Vector2.new(360, 360)
-            emitter.Enabled = true
-
-            tweenService:Create(spark, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Transparency = 1}):Play()
-            debris:AddItem(spark, 0.5)
-        end
+        tweenService:Create(part, TweenInfo.new(duration, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Transparency = 1}):Play()
+        debris:AddItem(part, duration + 0.5)
     end
 
     local function customCreateTaser(startPos, endPos)
-        createTracer(startPos, endPos, "Taser")
+        createColoredTracer(startPos, endPos, taserColor, 0.2, 2 * lifetimeMultiplier, true)
     end
+
     local function customCreateSniper(startPos, endPos)
-        createTracer(startPos, endPos, "Sniper")
+        createColoredTracer(startPos, endPos, sniperColor, 0.17, 4 * lifetimeMultiplier, false)
     end
+
     local function customCreateBullet(startPos, endPos)
-        createTracer(startPos, endPos, "Bullet")
+        createColoredTracer(startPos, endPos, bulletColor, 0.1, 0.05 * lifetimeMultiplier, false)
     end
 
     local function emptyTracer() end
 
     local function updateTracerFunctions()
         if not GunTracers then return end
-        if not config.showTracers then
+        if not showTracersEnabled then
             GunTracers.createTaser = emptyTracer
             GunTracers.createSniper = emptyTracer
             GunTracers.createBullet = emptyTracer
-        elseif config.customColors then
+        elseif customColorsEnabled then
             GunTracers.createTaser = customCreateTaser
             GunTracers.createSniper = customCreateSniper
             GunTracers.createBullet = customCreateBullet
@@ -574,10 +475,9 @@ run(function()
         end
     end
 
-    local TracerModule = vape.Categories.Utility:CreateModule({
+    local TracerVisuals = vape.Categories.Utility:CreateModule({
         Name = "Bullet Tracers",
         Function = function(callback)
-            config.enabled = callback
             if callback then
                 updateTracerFunctions()
             else
@@ -590,135 +490,69 @@ run(function()
         end
     })
 
-    TracerModule:CreateToggle({
+    TracerVisuals:CreateToggle({
         Name = "Show Tracers",
         Default = true,
-        Function = function(v)
-            config.showTracers = v
+        Function = function(callback)
+            showTracersEnabled = callback
             updateTracerFunctions()
         end
     })
 
-    TracerModule:CreateDropdown({
-        Name = "Trail Style",
-        List = {"Glow", "Line", "Particle"},
-        Default = "Glow",
-        Function = function(v) config.trailStyle = v end
-    })
-
-    TracerModule:CreateToggle({
-        Name = "Impact Effects",
-        Default = true,
-        Function = function(v) config.impactEffects = v end
-    })
-
-    local rainbowSpeedSlider = TracerModule:CreateSlider({
-        Name = "Rainbow Speed",
-        Min = 0.1, Max = 5, Default = 1, Decimal = 10,
-        Function = function(v) config.rainbowSpeed = v end,
-        Visible = false
-    })
-                                
-    local rainbowToggle = TracerModule:CreateToggle({
-        Name = "Rainbow Mode",
-        Default = false,
-        Function = function(v)
-            config.rainbow = v
-            if rainbowSpeedSlider then rainbowSpeedSlider.Object.Visible = v end
-        end
-    })
-    rainbowSpeedSlider = TracerModule:CreateSlider({
-        Name = "Rainbow Speed",
-        Min = 0.1, Max = 5, Default = 1, Decimal = 10,
-        Function = function(v) config.rainbowSpeed = v end,
-        Visible = false
-    })
-
-    local weaponList = {"Taser", "Sniper", "Bullet", "Pistol", "Rifle", "Shotgun", "SMG"}
-    local weaponToggles = {}
-
-    for _, w in ipairs(weaponList) do
-        local colorSlider, thicknessSlider, durationSlider
-        local groupToggle = TracerModule:CreateToggle({
-            Name = w .. " Settings",
-            Default = false,
-            Function = function(v)
-                if colorSlider then colorSlider.Object.Visible = v end
-                if thicknessSlider then thicknessSlider.Object.Visible = v end
-                if durationSlider then durationSlider.Object.Visible = v end
-            end
-        })
-        colorSlider = TracerModule:CreateColorSlider({
-            Name = w .. " Color",
-            DefaultHue = nil,
-            Function = function(h, s, v)
-                weaponColors[w] = Color3.fromHSV(h, s, v)
-            end,
-            Visible = false
-        })
-        thicknessSlider = TracerModule:CreateSlider({
-            Name = w .. " Thickness",
-            Min = 0.05, Max = 2, Default = weaponThickness[w] or 0.1, Decimal = 100,
-            Function = function(val) weaponThickness[w] = val end,
-            Visible = false
-        })
-        durationSlider = TracerModule:CreateSlider({
-            Name = w .. " Duration",
-            Min = 0.05, Max = 5, Default = weaponDuration[w] or 0.1, Decimal = 100,
-            Function = function(val) weaponDuration[w] = val end,
-            Visible = false
-        })
-        weaponToggles[w] = { toggle = groupToggle, color = colorSlider, thickness = thicknessSlider, duration = durationSlider }
-    end
-
-    -- Presets
-    TracerModule:CreateDropdown({
-        Name = "Color Preset",
-        List = {"Default", "Classic", "Cyberpunk", "Inferno", "Forest"},
-        Default = "Default",
+    TracerVisuals:CreateSlider({
+        Name = "Lifetime Multiplier",
+        Min = 0.5,
+        Max = 5,
+        Default = 1,
+        Decimal = 10,
         Function = function(val)
-            if val == "Default" then
-                for w, def in pairs(weaponDefaults) do
-                    weaponColors[w] = def.color
-                    weaponThickness[w] = def.thickness
-                    weaponDuration[w] = def.duration
-                end
-            elseif val == "Classic" then
-                weaponColors = { Taser = Color3.fromRGB(0,234,255), Sniper = Color3.fromRGB(255,50,50), Bullet = Color3.fromRGB(255,255,0),
-                    Pistol = Color3.fromRGB(255,255,0), Rifle = Color3.fromRGB(255,100,0), Shotgun = Color3.fromRGB(255,80,20), SMG = Color3.fromRGB(255,200,0) }
-            elseif val == "Cyberpunk" then
-                for _, w in ipairs(weaponList) do weaponColors[w] = Color3.fromHSV(300/360, 1, 1) end
-            elseif val == "Inferno" then
-                for _, w in ipairs(weaponList) do weaponColors[w] = Color3.fromRGB(255,50,0) end
-            elseif val == "Forest" then
-                for _, w in ipairs(weaponList) do weaponColors[w] = Color3.fromRGB(0,200,0) end
+            lifetimeMultiplier = val
+        end
+    })
+
+    local TaserColorSlider = TracerVisuals:CreateColorSlider({
+        Name = "Taser Color",
+        Function = function(hue, sat, val)
+            taserColor = Color3.fromHSV(hue, sat, val)
+            if customColorsEnabled and showTracersEnabled then
+                updateTracerFunctions()
+            end
+        end
+    })
+    local SniperColorSlider = TracerVisuals:CreateColorSlider({
+        Name = "Sniper Color",
+        Function = function(hue, sat, val)
+            sniperColor = Color3.fromHSV(hue, sat, val)
+            if customColorsEnabled and showTracersEnabled then
+                updateTracerFunctions()
+            end
+        end
+    })
+    local BulletColorSlider = TracerVisuals:CreateColorSlider({
+        Name = "Bullet Color",
+        Function = function(hue, sat, val)
+            bulletColor = Color3.fromHSV(hue, sat, val)
+            if customColorsEnabled and showTracersEnabled then
+                updateTracerFunctions()
             end
         end
     })
 
-    TracerModule:CreateToggle({
+    TaserColorSlider.Object.Visible = false
+    SniperColorSlider.Object.Visible = false
+    BulletColorSlider.Object.Visible = false
+
+    TracerVisuals:CreateToggle({
         Name = "Custom Colors",
         Default = false,
-        Function = function(v)
-            config.customColors = v
-            for _, data in pairs(weaponToggles) do
-                if data.toggle then data.toggle.Object.Visible = v end
-                if not v then
-                    if data.color then data.color.Object.Visible = false end
-                    if data.thickness then data.thickness.Object.Visible = false end
-                    if data.duration then data.duration.Object.Visible = false end
-                end
-            end
+        Function = function(callback)
+            customColorsEnabled = callback
+            TaserColorSlider.Object.Visible = callback
+            SniperColorSlider.Object.Visible = callback
+            BulletColorSlider.Object.Visible = callback
             updateTracerFunctions()
         end
     })
-
-    for _, data in pairs(weaponToggles) do
-        if data.toggle then data.toggle.Object.Visible = config.customColors end
-    end
-    if rainbowSpeedSlider then rainbowSpeedSlider.Object.Visible = config.rainbow end
-
-    updateTracerFunctions()
 end)
                                                             
 run(function()
