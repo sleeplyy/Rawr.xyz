@@ -1034,7 +1034,6 @@ run(function()
         end
     })
 end)
-
 run(function()
     local SilentAim
     local Target
@@ -1261,11 +1260,9 @@ run(function()
                             if renderStepConnection then
                                 pcall(function() renderStepConnection:Disconnect() end)
                             end
-                            renderStepConnection = runService.RenderStepped:Connect(function()
-                                SilentAim:Toggle()
-                                task.wait(0.1)
-                                SilentAim:Toggle()
-                            end)
+                            SilentAim:Toggle()
+                            task.wait(0.1)
+                            SilentAim:Toggle()
                         end
                     end
                 end)
@@ -1513,6 +1510,51 @@ run(function()
         Suffix = "%",
         Tooltip = "Stretches the view horizontally."
     })
+end)
+                                                                                                                                
+run(function()
+    local GunMods
+    local Range
+    local SpreadRadius
+    local FireRate
+
+    local function itemAdded(v)
+        if v and v:IsA("Tool") and v:GetAttribute("Local_ReloadSession") then
+            v:SetAttribute("Range", Range and Range.Value)
+            v:SetAttribute("AccurateRange", Range and Range.Value)
+            v:SetAttribute("SpreadRadius", SpreadRadius and SpreadRadius.Value)
+            v:SetAttribute("FireRate", FireRate and FireRate.Value)
+        end
+    end
+
+    local function characterAdded(char)
+        if not char then return end
+        local character = char.Character
+        if character then
+            GunMods:Clean(character.ChildAdded:Connect(itemAdded))
+            local children = character:GetChildren()
+            for i = 1, #children do itemAdded(children[i]) end
+        end
+        local backpack = lplr and lplr.Backpack
+        if backpack then
+            GunMods:Clean(backpack.ChildAdded:Connect(itemAdded))
+            local children = backpack:GetChildren()
+            for i = 1, #children do itemAdded(children[i]) end
+        end
+    end
+
+    GunMods = vape.Categories.Combat:CreateModule({
+        Name = "GunMods",
+        Function = function(callback)
+            if callback then
+                if entitylib and entitylib.character then characterAdded(entitylib.character) end
+                GunMods:Clean(entitylib.Events.LocalAdded:Connect(characterAdded))
+            end
+        end
+    })
+    Range = GunMods:CreateSlider({ Name = "Range", Min=1, Max=9999, Default=150, Suffix=function(val) return val==1 and 'stud' or 'studs' end })
+    SpreadRadius = GunMods:CreateSlider({ Name = "Spread Radius", Min=0, Max=1, Default=0.03, Decimal=100, Suffix='studs' })
+    FireRate = GunMods:CreateSlider({ Name = "Fire Rate", Min=0, Max=1, Decimal=100, Default=0.1, Suffix=function(val) return val==1 and 'second' or 'seconds' end })
 end)
 
 run(function()
