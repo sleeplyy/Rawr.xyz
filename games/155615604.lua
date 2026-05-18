@@ -1652,94 +1652,98 @@ run(function()
     end
 
     local function meleeStep()
-        if not entitylib or not entitylib.isAlive then return end
-        local rootPart = entitylib.character and entitylib.character.RootPart
-        if not rootPart then return end
-        local attacked = {}
-        local selfpos = rootPart.Position
-        local localfacing = rootPart.CFrame.LookVector * Vector3.new(1,0,1)
+        pcall(function()
+            if not entitylib or not entitylib.isAlive then return end
+            local rootPart = entitylib.character and entitylib.character.RootPart
+            if not rootPart then return end
+            local attacked = {}
+            local selfpos = rootPart.Position
+            local localfacing = rootPart.CFrame.LookVector * Vector3.new(1,0,1)
 
-        local plrs = entitylib.AllPosition({
-            Range = AttackRange and AttackRange.Value or 13,
-            Wallcheck = Targets and Targets.Walls and Targets.Walls.Enabled or nil,
-            Part = 'RootPart',
-            Players = Targets and Targets.Players and Targets.Players.Enabled,
-            NPCs = Targets and Targets.NPCs and Targets.NPCs.Enabled,
-            Limit = Max and Max.Value or 10
-        })
+            local plrs = entitylib.AllPositions({
+                Range = AttackRange and AttackRange.Value or 13,
+                Wallcheck = Targets and Targets.Walls and Targets.Walls.Enabled or nil,
+                Part = 'RootPart',
+                Players = Targets and Targets.Players and Targets.Players.Enabled,
+                NPCs = Targets and Targets.NPCs and Targets.NPCs.Enabled,
+                Limit = Max and Max.Value or 10
+            })
 
-        for i = 1, #plrs do
-            local v = plrs[i]
-            if v and v.RootPart and v.RootPart.Position then
-                if v.Player and not passesTeamCheckKA(v.Player) then
-                    -- skip
-                else
-                    local delta = (v.RootPart.Position - selfpos)
-                    local deltaUnit = (delta * Vector3.new(1,0,1)).Unit
-                    local dot = localfacing:Dot(deltaUnit)
-                    if dot <= 1 and dot >= -1 then
-                        local angle = math.acos(dot)
-                        if angle <= math.rad((AngleSlider and AngleSlider.Value or 90) / 2) then
-                            local distMag = delta.Magnitude
-                            table.insert(attacked, {
-                                Entity = v,
-                                Check = distMag > (AttackRange and AttackRange.Value or 13) and BoxSwingColor or BoxAttackColor
-                            })
-                            if targetinfo then targetinfo.Targets[v] = tick() + 1 end
+            if not plrs then return end
 
-                            if AttackDelay < tick() then
-                                local aps = CPS and CPS.GetRandomValue() or 1
-                                if aps > 0 then
-                                    AttackDelay = tick() + (1 / aps)
+            for i = 1, #plrs do
+                local v = plrs[i]
+                if v and v.RootPart and v.RootPart.Position then
+                    if v.Player and not passesTeamCheckKA(v.Player) then
+                        -- skip
+                    else
+                        local delta = (v.RootPart.Position - selfpos)
+                        local deltaUnit = (delta * Vector3.new(1,0,1)).Unit
+                        local dot = localfacing:Dot(deltaUnit)
+                        if dot <= 1 and dot >= -1 then
+                            local angle = math.acos(dot)
+                            if angle <= math.rad((AngleSlider and AngleSlider.Value or 90) / 2) then
+                                local distMag = delta.Magnitude
+                                table.insert(attacked, {
+                                    Entity = v,
+                                    Check = distMag > (AttackRange and AttackRange.Value or 13) and BoxSwingColor or BoxAttackColor
+                                })
+                                if targetinfo then targetinfo.Targets[v] = tick() + 1 end
+
+                                if AttackDelay < tick() then
+                                    local aps = CPS and CPS.GetRandomValue() or 1
+                                    if aps > 0 then
+                                        AttackDelay = tick() + (1 / aps)
+                                    end
+                                    safeCall('meleeEvent', function()
+                                        meleeEvent:FireServer(v.Player, 1, 1)
+                                    end)
                                 end
-                                safeCall('meleeEvent', function()
-                                    meleeEvent:FireServer(v.Player, 1, 1)
-                                end)
                             end
                         end
                     end
                 end
             end
-        end
 
-        if Boxes then
-            for i, box in ipairs(Boxes) do
-                if attacked[i] and box then
-                    box.Adornee = attacked[i].Entity.RootPart
-                    local chk = attacked[i].Check
-                    if chk and chk.Hue then
-                        box.Color3 = Color3.fromHSV(chk.Hue, chk.Sat, chk.Value)
-                        box.Transparency = 1 - chk.Opacity
+            if Boxes then
+                for i, box in ipairs(Boxes) do
+                    if attacked[i] and box then
+                        box.Adornee = attacked[i].Entity.RootPart
+                        local chk = attacked[i].Check
+                        if chk and chk.Hue then
+                            box.Color3 = Color3.fromHSV(chk.Hue, chk.Sat, chk.Value)
+                            box.Transparency = 1 - chk.Opacity
+                        end
+                        box.Visible = true
+                    elseif box then
+                        box.Adornee = nil
+                        box.Visible = false
                     end
-                    box.Visible = true
-                elseif box then
-                    box.Adornee = nil
-                    box.Visible = false
                 end
             end
-        end
 
-        if Particles then
-            for i, part in ipairs(Particles) do
-                if attacked[i] and part then
-                    part.Position = attacked[i].Entity.RootPart.Position
-                    part.Parent = gameCamera
-                elseif part then
-                    part.Parent = nil
+            if Particles then
+                for i, part in ipairs(Particles) do
+                    if attacked[i] and part then
+                        part.Position = attacked[i].Entity.RootPart.Position
+                        part.Parent = gameCamera
+                    elseif part then
+                        part.Parent = nil
+                    end
                 end
             end
-        end
 
-        if Face and Face.Enabled and #attacked > 0 then
-            local root = attacked[1].Entity.RootPart
-            if root and entitylib.character and entitylib.character.RootPart then
-                local vec = root.Position * Vector3.new(1,0,1)
-                entitylib.character.RootPart.CFrame = CFrame.lookAt(
-                    entitylib.character.RootPart.Position,
-                    Vector3.new(vec.X, entitylib.character.RootPart.Position.Y + 0.01, vec.Z)
-                )
+            if Face and Face.Enabled and #attacked > 0 then
+                local root = attacked[1].Entity.RootPart
+                if root and entitylib.character and entitylib.character.RootPart then
+                    local vec = root.Position * Vector3.new(1,0,1)
+                    entitylib.character.RootPart.CFrame = CFrame.lookAt(
+                        entitylib.character.RootPart.Position,
+                        Vector3.new(vec.X, entitylib.character.RootPart.Position.Y + 0.01, vec.Z)
+                    )
+                end
             end
-        end
+        end) -- pcall
     end
 
     Killaura = vape.Categories.Blatant:CreateModule({
