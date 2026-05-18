@@ -275,8 +275,8 @@ run(function()
                     pcall(function()
                         local part = hit[3]
                         if typeof(part) == "Instance" and part.Parent and part.Parent:FindFirstChild("Humanoid") then
-                            local partName = typeof(part.Name) == "string" and part.Name or "??"
-                            local parentName = typeof(part.Parent.Name) == "string" and part.Parent.Name or "??"
+                            local partName = tostring(part.Name or "??")
+                            local parentName = tostring(part.Parent.Name or "??")
                             notif('Rawr.xyz', 'hit ' .. parentName .. "'s " .. partName, 3)
                         end
                     end)
