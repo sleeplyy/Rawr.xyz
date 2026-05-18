@@ -1113,6 +1113,7 @@ run(function()
         end
     })
 end)
+                                                                                
 run(function()
     local SilentAim
     local Target
@@ -1235,9 +1236,14 @@ run(function()
                 newHits[i] = {origin, targetPart.Position, targetPart}
             end
             args[1] = newHits
-            if t.hn.e and targetPart.Parent then
-                notif('Rawr.xyz', 'attempted to hit ' .. targetPart.Parent.Name .. "'s " .. targetPart.Name, 3)
-            end
+
+            pcall(function()
+                if t.hn.e and targetPart.Parent then
+                    local partName = typeof(targetPart.Name) == "string" and targetPart.Name or "??"
+                    local parentName = typeof(targetPart.Parent.Name) == "string" and targetPart.Parent.Name or "??"
+                    notif('Rawr.xyz', 'attempted to hit ' .. parentName .. "'s " .. partName, 3)
+                end
+            end)
         end
     end
 
