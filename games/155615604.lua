@@ -253,7 +253,6 @@ run(function()
         child.Transparency = 0
     end))
 end)
-
 run(function()
     local old
 
@@ -265,34 +264,48 @@ run(function()
         if checkcaller() then return old(self, ...) end
 
         local args = {...}
-        local success, err = pcall(function()
-            if typeof(args[1]) == "table" then
-                if t.sa and t.sa.redirect then
-                    t.sa.redirect(args)
-                end
-                if t.hn.e then
-                    for _, hit in ipairs(args[1]) do
+        local originalArgs = {...}   -- backup copy of original arguments
+
+        -- Safe redirect and notifications
+        local redirectSuccess = true
+        if typeof(args[1]) == "table" then
+            -- Silent Aim redirect (protected)
+            if t.sa and t.sa.redirect then
+                redirectSuccess = pcall(function() t.sa.redirect(args) end)
+            end
+
+            -- Hit notifications (absolutely safe)
+            if t.hn.e then
+                for _, hit in ipairs(args[1]) do
+                    pcall(function()
                         local part = hit[3]
                         if typeof(part) == "Instance" and part.Parent and part.Parent:FindFirstChild("Humanoid") then
                             local partName = tostring(part.Name or "??")
                             local parentName = tostring(part.Parent.Name or "??")
                             notif('Rawr.xyz', 'hit ' .. parentName .. "'s " .. partName, 3)
                         end
-                    end
+                    end)
                 end
             end
-        end)
-
-        if not success then
-            return old(self, ...)
         end
 
-        return old(self, args[1])
+        -- Try to fire with the (possibly modified) first argument
+        local success, result = pcall(function()
+            return old(self, args[1])
+        end)
+
+        if success then
+            return result
+        else
+            -- If the modified call fails, fall back to the original untouched arguments
+            return old(self, originalArgs[1])
+        end
     end)
 
     vape:Clean(function() hookmetamethod(game, "__namecall", old) end)
 end)
 
+-- HitNotifications module
 run(function()
     vape.Categories.Combat:CreateModule({
         Name = "HitNotifications",
