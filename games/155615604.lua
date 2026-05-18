@@ -359,15 +359,29 @@ local function isTeamMember(player)
     return nil
 end
 
-local function applyChatGradient(nameLabel)
-    if nameLabel:FindFirstChild("RawrGradient") then return end
+local function applyChatGradient(nameElement)
+    if not nameElement or nameElement:FindFirstChild("RawrGradient") then return end
     local grad = Instance.new("UIGradient")
     grad.Name = "RawrGradient"
     grad.Color = ColorSequence.new({
         ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
         ColorSequenceKeypoint.new(1, Color3.new(0, 0, 0))
     })
-    grad.Parent = nameLabel
+    grad.Parent = nameElement
+    nameElement.TextColor3 = Color3.new(1, 1, 1)
+end
+
+local function scanAndTagMessage(messageFrame)
+    if not messageFrame or not messageFrame:IsA("Frame") then return end
+
+    for _, child in ipairs(messageFrame:GetDescendants()) do
+        if (child:IsA("TextButton") or child:IsA("TextLabel")) and child.Text and child.Text ~= "" then
+            local teamInfo = nameLookup[child.Text:lower()]
+            if teamInfo and not child:FindFirstChild("RawrGradient") then
+                applyChatGradient(child)
+            end
+        end
+    end
 end
 
 local function setupChatHook()
@@ -377,27 +391,12 @@ local function setupChatHook()
     if not chatFrame then return end
 
     for _, message in ipairs(chatFrame:GetChildren()) do
-        if message:IsA("Frame") then
-            local nameLabel = message:FindFirstChild("NameLabel") or message:FindFirstChild("ChatNameLabel")
-            if nameLabel and nameLabel:IsA("TextLabel") then
-                local teamInfo = nameLookup[nameLabel.Text:lower()]
-                if teamInfo then
-                    applyChatGradient(nameLabel)
-                end
-            end
-        end
+        scanAndTagMessage(message)
     end
 
     chatFrame.ChildAdded:Connect(function(newMessage)
-        if not newMessage:IsA("Frame") then return end
         task.wait(0.05)
-        local nameLabel = newMessage:FindFirstChild("NameLabel") or newMessage:FindFirstChild("ChatNameLabel")
-        if nameLabel and nameLabel:IsA("TextLabel") then
-            local teamInfo = nameLookup[nameLabel.Text:lower()]
-            if teamInfo then
-                applyChatGradient(nameLabel)
-            end
-        end
+        scanAndTagMessage(newMessage)
     end)
 end
 
