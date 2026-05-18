@@ -32,7 +32,9 @@ local function checkBlacklist()
 end
 
 if checkBlacklist() then
-    while true do task.wait(7) end
+    task.wait(2)
+    if vape then vape:Uninject() end
+    return true
 end
 
 local startWait = tick()
