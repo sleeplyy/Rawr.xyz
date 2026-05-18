@@ -265,46 +265,18 @@ run(function()
         if checkcaller() then return old(self, ...) end
 
         local args = {...}
-        local originalArgs = {...}
 
-        if typeof(args[1]) == "table" then
-            if t.sa and t.sa.redirect then
-                t.sa.redirect(args)
-            end
-
-            if t.hn.e then
-                for _, hit in ipairs(args[1]) do
-                    pcall(function()
-                        local part = hit[3]
-                        if typeof(part) == "Instance" and part.Parent and part.Parent:FindFirstChild("Humanoid") then
-                            local partName = tostring(part.Name or "??")
-                            local parentName = tostring(part.Parent.Name or "??")
-                            notif('Rawr.xyz', 'hit ' .. parentName .. "'s " .. partName, 3)
-                        end
-                    end)
-                end
+        if t.sa and t.sa.redirect then
+            local ok, err = pcall(t.sa.redirect, args)
+            if not ok then
+                return old(self, ...)
             end
         end
 
-        local success, result = pcall(function()
-            return old(self, args[1])
-        end)
-
-        if success then
-            return result
-        else
-            return old(self, originalArgs[1])
-        end
+        return old(self, args[1])
     end)
 
     vape:Clean(function() hookmetamethod(game, "__namecall", old) end)
-end)
-
-run(function()
-    vape.Categories.Combat:CreateModule({
-        Name = "HitNotifications",
-        Function = function(callback) t.hn.e = callback end
-    })
 end)
 
 local teamLookup = {}
