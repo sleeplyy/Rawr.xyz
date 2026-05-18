@@ -842,6 +842,13 @@ run(function()
 end)
 
 run(function()
+    vape.Categories.Combat:CreateModule({
+        Name = "HitNotifications",
+        Function = function(callback) t.hn.e = callback end
+    })
+end)
+
+run(function()
     local crosshairEnabled = false
     local crosshairColor = Color3.fromRGB(128, 128, 128)
     local crosshairSpin = true
