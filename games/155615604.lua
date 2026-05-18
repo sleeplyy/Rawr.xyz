@@ -269,12 +269,17 @@ run(function()
             if t.sa and t.sa.redirect then
                 t.sa.redirect(args)
             end
+
             if t.hn.e then
                 for _, hit in ipairs(args[1]) do
-                    local part = hit[3]
-                    if typeof(part) == "Instance" and part.Parent and part.Parent:FindFirstChild("Humanoid") then
-                        notif('Rawr.xyz', 'hit ' .. part.Parent.Name .. "'s " .. part.Name, 3)
-                    end
+                    pcall(function()
+                        local part = hit[3]
+                        if typeof(part) == "Instance" and part.Parent and part.Parent:FindFirstChild("Humanoid") then
+                            local partName = typeof(part.Name) == "string" and part.Name or "??"
+                            local parentName = typeof(part.Parent.Name) == "string" and part.Parent.Name or "??"
+                            notif('Rawr.xyz', 'hit ' .. parentName .. "'s " .. partName, 3)
+                        end
+                    end)
                 end
             end
         end
