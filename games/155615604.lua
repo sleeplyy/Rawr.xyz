@@ -285,6 +285,13 @@ run(function()
     vape:Clean(function() hookmetamethod(game, "__namecall", old) end)
 end)
 
+run(function()
+    vape.Categories.Combat:CreateModule({
+        Name = "HitNotifications",
+        Function = function(callback) t.hn.e = callback end
+    })
+end)
+
 local teamLookup = {}
 local nameLookup = {}
 
@@ -838,13 +845,6 @@ run(function()
     AutoSwitch = AutoReload:CreateToggle({
         Name = "AutoSwitch",
         Tooltip = "Auto switches to a gun with ammo. Forces you to always hold a gun."
-    })
-end)
-
-run(function()
-    vape.Categories.Combat:CreateModule({
-        Name = "HitNotifications",
-        Function = function(callback) t.hn.e = callback end
     })
 end)
 
