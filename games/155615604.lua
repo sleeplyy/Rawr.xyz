@@ -267,7 +267,7 @@ run(function()
         local args = {...}
         if typeof(args[1]) == "table" then
             if t.sa and t.sa.redirect then
-                t.sa.redirect(args)
+                pcall(function() t.sa.redirect(args) end)
             end
 
             if t.hn.e then
