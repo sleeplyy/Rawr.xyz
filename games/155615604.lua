@@ -279,141 +279,170 @@ run(function()
     vape:Clean(function() hookmetamethod(game, "__namecall", old) end)
 end)
 
-local teamLookup = {}
-local nameLookup = {}
+run(function()
+    local teamLookup = {}
+    local nameLookup = {}
+    local activeBillboards = {}
+    local chatConnections = {}
 
-local function loadTeamMembers()
-    local url = "https://raw.githubusercontent.com/imcomingforyou6959-gif/whitelists/refs/heads/main/Team.json?t=" .. tick()
-    local suc, res = pcall(function() return game:HttpGet(url) end)
-    if not suc then return end
-    local ok, data = pcall(game.HttpService.JSONDecode, game:GetService("HttpService"), res)
-    if not ok or not data or type(data.TeamMembers) ~= "table" then return end
-    teamLookup = {}
-    nameLookup = {}
-    for _, mem in ipairs(data.TeamMembers) do
-        if mem.userId then
-            teamLookup[mem.userId] = mem
-        end
-        if mem.username then
-            nameLookup[mem.username:lower()] = mem
-        end
-    end
-end
-loadTeamMembers()
-
-task.spawn(function()
-    while true do
-        task.wait(60)
-        loadTeamMembers()
-    end
-end)
-
-local function attachNametag(char, role)
-    if not char then return end
-    local head = char:FindFirstChild("Head") or char:WaitForChild("Head", 5)
-    if not head then return end
-
-    local billboard = Instance.new("BillboardGui")
-    billboard.Adornee = head
-    billboard.Size = UDim2.new(0, 200, 0, 40)
-    billboard.StudsOffset = Vector3.new(0, 2.5, 0)
-    billboard.AlwaysOnTop = false
-    billboard.MaxDistance = 100
-    billboard.Parent = char
-
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, 0, 1, 0)
-    label.BackgroundTransparency = 1
-    label.Text = "Rawr.xyz | " .. (role or "Team")
-    label.TextColor3 = Color3.fromRGB(255, 255, 255)
-    label.Font = Enum.Font.GothamBold
-    label.TextSize = 18
-    label.TextStrokeTransparency = 0.2
-    label.TextStrokeColor3 = Color3.new(0, 0, 0)
-    label.Parent = billboard
-
-    local conn = runService.Heartbeat:Connect(function()
-        if billboard and billboard.Parent then
-            local t = tick() * 0.8
-            local factor = (math.sin(t) + 1) / 2
-            label.TextColor3 = Color3.fromRGB(255, 0, 0):Lerp(Color3.fromRGB(255, 255, 255), factor)
-        elseif conn then
-            conn:Disconnect()
-        end
-    end)
-
-    char.Destroying:Connect(function()
-        if billboard then billboard:Destroy() end
-        if conn then conn:Disconnect() end
-    end)
-end
-
-local function isTeamMember(player)
-    if teamLookup[player.UserId] then
-        return teamLookup[player.UserId]
-    end
-    local name = player.Name:lower()
-    if nameLookup[name] then
-        return nameLookup[name]
-    end
-    return nil
-end
-
-local function applyChatGradient(nameElement)
-    if not nameElement or nameElement:FindFirstChild("RawrGradient") then return end
-    local grad = Instance.new("UIGradient")
-    grad.Name = "RawrGradient"
-    grad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
-        ColorSequenceKeypoint.new(1, Color3.new(0, 0, 0))
-    })
-    grad.Parent = nameElement
-    nameElement.TextColor3 = Color3.new(1, 1, 1)
-end
-
-local function scanAndTagMessage(messageFrame)
-    if not messageFrame or not messageFrame:IsA("Frame") then return end
-
-    for _, child in ipairs(messageFrame:GetDescendants()) do
-        if (child:IsA("TextButton") or child:IsA("TextLabel")) and child.Text and child.Text ~= "" then
-            local teamInfo = nameLookup[child.Text:lower()]
-            if teamInfo and not child:FindFirstChild("RawrGradient") then
-                applyChatGradient(child)
+    local function loadTeamMembers()
+        local url = "https://raw.githubusercontent.com/imcomingforyou6959-gif/whitelists/refs/heads/main/Team.json?t=" .. tick()
+        local suc, res = pcall(function() return game:HttpGet(url) end)
+        if not suc then return end
+        local ok, data = pcall(game.HttpService.JSONDecode, game:GetService("HttpService"), res)
+        if not ok or not data or type(data.TeamMembers) ~= "table" then return end
+        teamLookup = {}
+        nameLookup = {}
+        for _, mem in ipairs(data.TeamMembers) do
+            if mem.userId then
+                teamLookup[mem.userId] = mem
+            end
+            if mem.username then
+                nameLookup[mem.username:lower()] = mem
             end
         end
     end
-end
+    loadTeamMembers()
 
-local function setupChatHook()
-    local chatGui = lplr.PlayerGui:WaitForChild("Chat", 5)
-    if not chatGui then return end
-    local chatFrame = chatGui:WaitForChild("Frame", 5) or chatGui:WaitForChild("ScrollingFrame", 5)
-    if not chatFrame then return end
+    local refreshThread = task.spawn(function()
+        while true do
+            task.wait(60)
+            loadTeamMembers()
+        end
+    end)
 
-    for _, message in ipairs(chatFrame:GetChildren()) do
-        scanAndTagMessage(message)
+    local function attachNametag(char, role)
+        if not char then return end
+        local head = char:FindFirstChild("Head") or char:WaitForChild("Head", 5)
+        if not head then return end
+
+        local billboard = Instance.new("BillboardGui")
+        billboard.Adornee = head
+        billboard.Size = UDim2.new(0, 200, 0, 40)
+        billboard.StudsOffset = Vector3.new(0, 2.5, 0)
+        billboard.AlwaysOnTop = false
+        billboard.MaxDistance = 100
+        billboard.Parent = char
+
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(1, 0, 1, 0)
+        label.BackgroundTransparency = 1
+        label.Text = "Rawr.xyz | " .. (role or "Team")
+        label.TextColor3 = Color3.fromRGB(255, 255, 255)
+        label.Font = Enum.Font.GothamBold
+        label.TextSize = 18
+        label.TextStrokeTransparency = 0.2
+        label.TextStrokeColor3 = Color3.new(0, 0, 0)
+        label.Parent = billboard
+
+        local conn = runService.Heartbeat:Connect(function()
+            if billboard and billboard.Parent and teamDetectionEnabled then
+                local t = tick() * 0.8
+                local factor = (math.sin(t) + 1) / 2
+                label.TextColor3 = Color3.fromRGB(255, 0, 0):Lerp(Color3.fromRGB(255, 255, 255), factor)
+            elseif conn then
+                conn:Disconnect()
+            end
+        end)
+
+        table.insert(activeBillboards, {billboard = billboard, conn = conn})
+
+        char.Destroying:Connect(function()
+            for i, data in ipairs(activeBillboards) do
+                if data.billboard == billboard then
+                    data.billboard:Destroy()
+                    data.conn:Disconnect()
+                    table.remove(activeBillboards, i)
+                    break
+                end
+            end
+        end)
     end
 
-    chatFrame.ChildAdded:Connect(function(newMessage)
-        task.wait(0.05)
-        scanAndTagMessage(newMessage)
+    local function isTeamMember(player)
+        if teamLookup[player.UserId] then
+            return teamLookup[player.UserId]
+        end
+        local name = player.Name:lower()
+        if nameLookup[name] then
+            return nameLookup[name]
+        end
+        return nil
+    end
+
+    local function applyChatGradient(nameElement)
+        if not nameElement or nameElement:FindFirstChild("RawrGradient") then return end
+        local grad = Instance.new("UIGradient")
+        grad.Name = "RawrGradient"
+        grad.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+            ColorSequenceKeypoint.new(1, Color3.new(0, 0, 0))
+        })
+        grad.Parent = nameElement
+        nameElement.TextColor3 = Color3.new(1, 1, 1)
+    end
+
+    local function scanAndTagMessage(messageFrame)
+        if not messageFrame or not messageFrame:IsA("Frame") then return end
+        for _, child in ipairs(messageFrame:GetDescendants()) do
+            if (child:IsA("TextButton") or child:IsA("TextLabel")) and child.Text and child.Text ~= "" then
+                local teamInfo = nameLookup[child.Text:lower()]
+                if teamInfo and not child:FindFirstChild("RawrGradient") then
+                    applyChatGradient(child)
+                end
+            end
+        end
+    end
+
+    local function setupChatHook()
+        local chatGui = lplr.PlayerGui:WaitForChild("Chat", 5)
+        if not chatGui then return end
+        local chatFrame = chatGui:WaitForChild("Frame", 5) or chatGui:WaitForChild("ScrollingFrame", 5)
+        if not chatFrame then return end
+
+        for _, message in ipairs(chatFrame:GetChildren()) do
+            scanAndTagMessage(message)
+        end
+
+        local conn = chatFrame.ChildAdded:Connect(function(newMessage)
+            task.wait(0.05)
+            scanAndTagMessage(newMessage)
+        end)
+        table.insert(chatConnections, conn)
+    end
+
+    local function onPlayerDetected(player)
+        local info = isTeamMember(player)
+        if not info then return end
+        notif('Rawr.xyz', 'A Rawr.xyz ' .. info.role .. ' is in the game | ' .. player.Name, 5, 'success')
+        if player.Character then attachNametag(player.Character, info.role) end
+        player.CharacterAdded:Connect(function(char) attachNametag(char, info.role) end)
+    end
+
+    for _, player in ipairs(playersService:GetPlayers()) do
+        onPlayerDetected(player)
+    end
+    playersService.PlayerAdded:Connect(onPlayerDetected)
+
+    setupChatHook()
+
+    vape:Clean(function()
+        for _, data in ipairs(activeBillboards) do
+            pcall(function() data.billboard:Destroy() end)
+            pcall(function() data.conn:Disconnect() end)
+        end
+        table.clear(activeBillboards)
+
+        for _, conn in ipairs(chatConnections) do
+            pcall(function() conn:Disconnect() end)
+        end
+        table.clear(chatConnections)
+
+        if refreshThread then
+            pcall(function() task.cancel(refreshThread) end)
+        end
     end)
-end
-
-local function onPlayerDetected(player)
-    local info = isTeamMember(player)
-    if not info then return end
-    notif('Rawr.xyz', 'A Rawr.xyz ' .. info.role .. ' is in the game | ' .. player.Name, 5, 'success')
-    if player.Character then attachNametag(player.Character, info.role) end
-    player.CharacterAdded:Connect(function(char) attachNametag(char, info.role) end)
-end
-
-for _, player in ipairs(playersService:GetPlayers()) do
-    onPlayerDetected(player)
-end
-playersService.PlayerAdded:Connect(onPlayerDetected)
-
-setupChatHook()
+end)
 
 local chatRemote = replicatedStorageService:WaitForChild("DefaultChatSystemChatEvents", 5)
 if chatRemote then
