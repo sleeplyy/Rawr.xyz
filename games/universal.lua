@@ -379,450 +379,459 @@ run(function()
 end)
 
 run(function()
-	function whitelist:get(plr)
-		local plrstr = self.hashes[plr.Name..plr.UserId]
-		for _, v in self.data.WhitelistedUsers do
-			if v.hash == plrstr then
-				return v.level, v.attackable or whitelist.localprio >= v.level, v.tags
-			end
-		end
-		return 0, true
-	end
+    function whitelist:get(plr)
+        local plrstr = self.hashes[plr.Name..plr.UserId]
+        for _, v in self.data.WhitelistedUsers do
+            if v.hash == plrstr then
+                return v.level, v.attackable or whitelist.localprio >= v.level, v.tags
+            end
+        end
+        return 0, true
+    end
 
-	function whitelist:isingame()
-		for _, v in playersService:GetPlayers() do
-			if self:get(v) ~= 0 then return true end
-		end
-		return false
-	end
+    function whitelist:isingame()
+        for _, v in playersService:GetPlayers() do
+            if self:get(v) ~= 0 then return true end
+        end
+        return false
+    end
 
-	function whitelist:tag(plr, text, rich)
-		local plrtag, newtag = select(3, self:get(plr)) or self.customtags[plr.Name] or {}, ''
-		if not text then return plrtag end
-		for _, v in plrtag do
-			newtag = newtag..(rich and '<font color="#'..v.color:ToHex()..'">['..v.text..']</font>' or '['..removeTags(v.text)..']')..' '
-		end
-		return newtag
-	end
+    function whitelist:tag(plr, text, rich)
+        local plrtag, newtag = select(3, self:get(plr)) or self.customtags[plr.Name] or {}, ''
+        if not text then return plrtag end
+        for _, v in plrtag do
+            newtag = newtag..(rich and '<font color="#'..v.color:ToHex()..'">['..v.text..']</font>' or '['..removeTags(v.text)..']')..' '
+        end
+        return newtag
+    end
 
-	function whitelist:getplayer(arg)
-		if arg == 'default' and self.localprio == 0 then return true end
-		if arg == 'private' and self.localprio == 1 then return true end
-		if arg and lplr.Name:lower():sub(1, arg:len()) == arg:lower() then return true end
-		return false
-	end
+    function whitelist:getplayer(arg)
+        if arg == 'default' and self.localprio == 0 then return true end
+        if arg == 'private' and self.localprio == 1 then return true end
+        if arg and lplr.Name:lower():sub(1, arg:len()) == arg:lower() then return true end
+        return false
+    end
 
-	local olduninject
-	function whitelist:playeradded(v, joined)
-		if self:get(v) ~= 0 then
-			if self.alreadychecked[v.UserId] then return end
-			self.alreadychecked[v.UserId] = true
-			self:hook()
-			if self.localprio == 0 then
-				olduninject = vape.Uninject
-				vape.Uninject = function()
-					notif('Rawr.xyz', 'No escaping the private members :)', 10)
-				end
-				if joined then
-					task.wait(10)
-				end
-				if textChatService.ChatVersion == Enum.ChatVersion.TextChatService then
-					local oldchannel = textChatService.ChatInputBarConfiguration.TargetTextChannel
-					local newchannel = cloneref(game:GetService('RobloxReplicatedStorage')).ExperienceChat.WhisperChat:InvokeServer(v.UserId)
-					if newchannel then
-						newchannel:SendAsync('helloimusinginhaler')
-					end
-					textChatService.ChatInputBarConfiguration.TargetTextChannel = oldchannel
-				elseif replicatedStorage:FindFirstChild('DefaultChatSystemChatEvents') then
-					replicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer('/w '..v.Name..' helloimusinginhaler', 'All')
-				end
-			end
-		end
-	end
+    local olduninject
+    function whitelist:playeradded(v, joined)
+        if self:get(v) ~= 0 then
+            if self.alreadychecked[v.UserId] then return end
+            self.alreadychecked[v.UserId] = true
+            self:hook()
+            if self.localprio == 0 then
+                olduninject = vape.Uninject
+                vape.Uninject = function()
+                    notif('Rawr.xyz', 'No escaping the private members :)', 10)
+                end
+                if joined then
+                    task.wait(10)
+                end
+                if textChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+                    local oldchannel = textChatService.ChatInputBarConfiguration.TargetTextChannel
+                    local newchannel = cloneref(game:GetService('RobloxReplicatedStorage')).ExperienceChat.WhisperChat:InvokeServer(v.UserId)
+                    if newchannel then
+                        newchannel:SendAsync('helloimusinginhaler')
+                    end
+                    textChatService.ChatInputBarConfiguration.TargetTextChannel = oldchannel
+                elseif replicatedStorage:FindFirstChild('DefaultChatSystemChatEvents') then
+                    replicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer('/w '..v.Name..' helloimusinginhaler', 'All')
+                end
+            end
+        end
+    end
 
-	function whitelist:process(msg, plr)
-		if plr == lplr and msg == 'helloimusinginhaler' then return true end
+    function whitelist:process(msg, plr)
+        if plr == lplr and msg == 'helloimusinginhaler' then return true end
 
-		if self.localprio > 0 and not self.said[plr.Name] and msg == 'helloimusinginhaler' and plr ~= lplr then
-			self.said[plr.Name] = true
-			notif('Rawr.xyz', plr.Name..' is using vape!', 60)
-			self.customtags[plr.Name] = {{
-				text = 'VAPE USER',
-				color = Color3.new(1, 1, 0)
-			}}
-			local newent = entitylib.getEntity(plr)
-			if newent then
-				entitylib.Events.EntityUpdated:Fire(newent)
-			end
-			return true
-		end
+        if self.localprio > 0 and not self.said[plr.Name] and msg == 'helloimusinginhaler' and plr ~= lplr then
+            self.said[plr.Name] = true
+            notif('Rawr.xyz', plr.Name..' is using vape!', 60)
+            self.customtags[plr.Name] = {{
+                text = 'VAPE USER',
+                color = Color3.new(1, 1, 0)
+            }}
+            local newent = entitylib.getEntity(plr)
+            if newent then
+                entitylib.Events.EntityUpdated:Fire(newent)
+            end
+            return true
+        end
 
-		if self.localprio < self:get(plr) or plr == lplr then
-			local args = msg:split(' ')
-			table.remove(args, 1)
-			if self:getplayer(args[1]) then
-				table.remove(args, 1)
-				for cmd, func in self.commands do
-					if msg:sub(1, cmd:len() + 1):lower() == ';'..cmd:lower() then
-						func(args, plr)
-						return true
-					end
-				end
-			end
-		end
+        if self.localprio < self:get(plr) or plr == lplr then
+            local args = msg:split(' ')
+            table.remove(args, 1)
+            if self:getplayer(args[1]) then
+                table.remove(args, 1)
+                for cmd, func in self.commands do
+                    if msg:sub(1, cmd:len() + 1):lower() == ';'..cmd:lower() then
+                        func(args, plr)
+                        return true
+                    end
+                end
+            end
+        end
 
-		return false
-	end
+        return false
+    end
 
-	function whitelist:newchat(obj, plr, skip)
-		obj.Text = self:tag(plr, true, true)..obj.Text
-		local sub = obj.ContentText:find(': ')
-		if sub then
-			if not skip and self:process(obj.ContentText:sub(sub + 3, #obj.ContentText), plr) then
-				obj.Visible = false
-			end
-		end
-	end
+    function whitelist:newchat(obj, plr, skip)
+        obj.Text = self:tag(plr, true, true)..obj.Text
+        local sub = obj.ContentText:find(': ')
+        if sub then
+            if not skip and self:process(obj.ContentText:sub(sub + 3, #obj.ContentText), plr) then
+                obj.Visible = false
+            end
+        end
+    end
 
-	function whitelist:oldchat(func)
-		local msgtable, oldchat = debug.getupvalue(func, 3)
-		if typeof(msgtable) == 'table' and msgtable.CurrentChannel then
-			whitelist.oldchattable = msgtable
-		end
+    function whitelist:oldchat(func)
+        local msgtable, oldchat = debug.getupvalue(func, 3)
+        if typeof(msgtable) == 'table' and msgtable.CurrentChannel then
+            whitelist.oldchattable = msgtable
+        end
 
-		oldchat = hookfunction(func, function(data, ...)
-			local plr = playersService:GetPlayerByUserId(data.SpeakerUserId)
-			if plr then
-				data.ExtraData.Tags = data.ExtraData.Tags or {}
-				for _, v in self:tag(plr) do
-					table.insert(data.ExtraData.Tags, {TagText = v.text, TagColor = v.color})
-				end
-				if data.Message and self:process(data.Message, plr) then
-					data.Message = ''
-				end
-			end
-			return oldchat(data, ...)
-		end)
+        oldchat = hookfunction(func, function(data, ...)
+            local plr = playersService:GetPlayerByUserId(data.SpeakerUserId)
+            if plr then
+                data.ExtraData.Tags = data.ExtraData.Tags or {}
+                for _, v in self:tag(plr) do
+                    table.insert(data.ExtraData.Tags, {TagText = v.text, TagColor = v.color})
+                end
+                if data.Message and self:process(data.Message, plr) then
+                    data.Message = ''
+                end
+            end
+            return oldchat(data, ...)
+        end)
 
-		vape:Clean(function()
-			hookfunction(func, oldchat)
-		end)
-	end
+        vape:Clean(function()
+            hookfunction(func, oldchat)
+        end)
+    end
 
-	function whitelist:hook()
-		if self.hooked then return end
-		self.hooked = true
+    function whitelist:hook()
+        if self.hooked then return end
+        self.hooked = true
 
-		local exp = coreGui:FindFirstChild('ExperienceChat')
-		if textChatService.ChatVersion == Enum.ChatVersion.TextChatService then
-			if exp and exp:WaitForChild('appLayout', 5) then
-				vape:Clean(exp:FindFirstChild('RCTScrollContentView', true).ChildAdded:Connect(function(obj)
-					local plr = playersService:GetPlayerByUserId(tonumber(obj.Name:split('-')[1]) or 0)
-					obj = obj:FindFirstChild('TextMessage', true)
-					if obj and obj:IsA('TextLabel') then
-						if plr then
-							self:newchat(obj, plr, true)
-							obj:GetPropertyChangedSignal('Text'):Wait()
-							self:newchat(obj, plr)
-						end
+        local exp = coreGui:FindFirstChild('ExperienceChat')
+        if textChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+            if exp and exp:WaitForChild('appLayout', 5) then
+                vape:Clean(exp:FindFirstChild('RCTScrollContentView', true).ChildAdded:Connect(function(obj)
+                    local plr = playersService:GetPlayerByUserId(tonumber(obj.Name:split('-')[1]) or 0)
+                    obj = obj:FindFirstChild('TextMessage', true)
+                    if obj and obj:IsA('TextLabel') then
+                        if plr then
+                            self:newchat(obj, plr, true)
+                            obj:GetPropertyChangedSignal('Text'):Wait()
+                            self:newchat(obj, plr)
+                        end
 
-						if obj.ContentText:sub(1, 35) == 'You are now privately chatting with' then
-							obj.Visible = false
-						end
-					end
-				end))
-			end
-		elseif replicatedStorage:FindFirstChild('DefaultChatSystemChatEvents') then
-			pcall(function()
-				for _, v in getconnections(replicatedStorage.DefaultChatSystemChatEvents.OnNewMessage.OnClientEvent) do
-					if v.Function and table.find(debug.getconstants(v.Function), 'UpdateMessagePostedInChannel') then
-						whitelist:oldchat(v.Function)
-						break
-					end
-				end
+                        if obj.ContentText:sub(1, 35) == 'You are now privately chatting with' then
+                            obj.Visible = false
+                        end
+                    end
+                end))
+            end
+        elseif replicatedStorage:FindFirstChild('DefaultChatSystemChatEvents') then
+            pcall(function()
+                for _, v in getconnections(replicatedStorage.DefaultChatSystemChatEvents.OnNewMessage.OnClientEvent) do
+                    if v.Function and table.find(debug.getconstants(v.Function), 'UpdateMessagePostedInChannel') then
+                        whitelist:oldchat(v.Function)
+                        break
+                    end
+                end
 
-				for _, v in getconnections(replicatedStorage.DefaultChatSystemChatEvents.OnMessageDoneFiltering.OnClientEvent) do
-					if v.Function and table.find(debug.getconstants(v.Function), 'UpdateMessageFiltered') then
-						whitelist:oldchat(v.Function)
-						break
-					end
-				end
-			end)
-		end
+                for _, v in getconnections(replicatedStorage.DefaultChatSystemChatEvents.OnMessageDoneFiltering.OnClientEvent) do
+                    if v.Function and table.find(debug.getconstants(v.Function), 'UpdateMessageFiltered') then
+                        whitelist:oldchat(v.Function)
+                        break
+                    end
+                end
+            end)
+        end
 
-		if exp then
-			local bubblechat = exp:WaitForChild('bubbleChat', 5)
-			if bubblechat then
-				vape:Clean(bubblechat.DescendantAdded:Connect(function(newbubble)
-					if newbubble:IsA('TextLabel') and newbubble.Text:find('helloimusinginhaler') then
-						newbubble.Parent.Parent.Visible = false
-					end
-				end))
-			end
-		end
-	end
+        if exp then
+            local bubblechat = exp:WaitForChild('bubbleChat', 5)
+            if bubblechat then
+                vape:Clean(bubblechat.DescendantAdded:Connect(function(newbubble)
+                    if newbubble:IsA('TextLabel') and newbubble.Text:find('helloimusinginhaler') then
+                        newbubble.Parent.Parent.Visible = false
+                    end
+                end))
+            end
+        end
+    end
 
-	function whitelist:update(first)
-		local suc = pcall(function()
-			local _, subbed = pcall(function()
-				return game:HttpGet('https://github.com/imcomingforyou6959-gif/whitelists/tree/main')
-			end)
-			local commit = subbed:find('currentOid')
-			commit = commit and subbed:sub(commit + 13, commit + 52) or nil
-			commit = commit and #commit == 40 and commit or 'main'
-			whitelist.textdata = game:HttpGet('https://raw.githubusercontent.com/imcomingforyou6959-gif/whitelists/'..commit..'/PlayerWhitelist.json', true)
-		end)
-		if not suc or not hash or not whitelist.get then return true end
-		whitelist.loaded = true
+    function whitelist:update(first)
+        local suc = pcall(function()
+            local _, subbed = pcall(function()
+                return game:HttpGet('https://github.com/imcomingforyou6959-gif/whitelists/tree/main')
+            end)
+            local commit = subbed:find('currentOid')
+            commit = commit and subbed:sub(commit + 13, commit + 52) or nil
+            commit = commit and #commit == 40 and commit or 'main'
+            whitelist.textdata = game:HttpGet('https://raw.githubusercontent.com/imcomingforyou6959-gif/whitelists/'..commit..'/PlayerWhitelist.json', true)
+        end)
+        if not suc or not hash or not whitelist.get then return true end
+        whitelist.loaded = true
 
-		if not first or whitelist.textdata ~= whitelist.olddata then
-			if not first then
-				whitelist.olddata = isfile('newvape/profiles/whitelist.json') and readfile('newvape/profiles/whitelist.json') or nil
-			end
+        if not first or whitelist.textdata ~= whitelist.olddata then
+            if not first then
+                whitelist.olddata = isfile('newvape/profiles/whitelist.json') and readfile('newvape/profiles/whitelist.json') or nil
+            end
 
-			local suc, res = pcall(function()
-				return httpService:JSONDecode(whitelist.textdata)
-			end)
+            local suc, res = pcall(function()
+                return httpService:JSONDecode(whitelist.textdata)
+            end)
 
-			whitelist.data = suc and type(res) == 'table' and res or whitelist.data
-			whitelist.localprio = whitelist:get(lplr)
+            whitelist.data = suc and type(res) == 'table' and res or whitelist.data
+            whitelist.localprio = whitelist:get(lplr)
 
-			for _, v in whitelist.data.WhitelistedUsers do
-				if v.tags then
-					for _, tag in v.tags do
-						tag.color = Color3.fromRGB(unpack(tag.color))
-					end
-				end
-			end
+            -- ===== FIXED UNPACK ISSUE =====
+            for _, v in whitelist.data.WhitelistedUsers do
+                if v.tags then
+                    for _, tag in v.tags do
+                        if type(tag.color) == "table" and #tag.color >= 3 then
+                            pcall(function()
+                                tag.color = Color3.new(tag.color[1], tag.color[2], tag.color[3])
+                            end)
+                        else
+                            tag.color = Color3.new(1, 1, 1) -- default white if missing
+                        end
+                    end
+                end
+            end
+            -- ===== END FIX =====
 
-			if not whitelist.connection then
-				whitelist.connection = playersService.PlayerAdded:Connect(function(v)
-					whitelist:playeradded(v, true)
-				end)
-				vape:Clean(whitelist.connection)
-			end
+            if not whitelist.connection then
+                whitelist.connection = playersService.PlayerAdded:Connect(function(v)
+                    whitelist:playeradded(v, true)
+                end)
+                vape:Clean(whitelist.connection)
+            end
 
-			for _, v in playersService:GetPlayers() do
-				whitelist:playeradded(v)
-			end
+            for _, v in playersService:GetPlayers() do
+                whitelist:playeradded(v)
+            end
 
-			if entitylib.Running and vape.Loaded then
-				entitylib.refresh()
-			end
+            if entitylib.Running and vape.Loaded then
+                entitylib.refresh()
+            end
 
-			if whitelist.textdata ~= whitelist.olddata then
-				if whitelist.data.Announcement.expiretime > os.time() then
-					local targets = whitelist.data.Announcement.targets
-					targets = targets == 'all' and {tostring(lplr.UserId)} or targets:split(',')
+            if whitelist.textdata ~= whitelist.olddata then
+                if whitelist.data.Announcement.expiretime > os.time() then
+                    local targets = whitelist.data.Announcement.targets
+                    targets = targets == 'all' and {tostring(lplr.UserId)} or targets:split(',')
 
-					if table.find(targets, tostring(lplr.UserId)) then
-						local hint = Instance.new('Hint')
-						hint.Text = 'VAPE ANNOUNCEMENT: '..whitelist.data.Announcement.text
-						hint.Parent = workspace
-						game:GetService('Debris'):AddItem(hint, 20)
-					end
-				end
-				whitelist.olddata = whitelist.textdata
-				pcall(function()
-					writefile('newvape/profiles/whitelist.json', whitelist.textdata)
-				end)
-			end
+                    if table.find(targets, tostring(lplr.UserId)) then
+                        local hint = Instance.new('Hint')
+                        hint.Text = 'VAPE ANNOUNCEMENT: '..whitelist.data.Announcement.text
+                        hint.Parent = workspace
+                        game:GetService('Debris'):AddItem(hint, 20)
+                    end
+                end
+                whitelist.olddata = whitelist.textdata
+                pcall(function()
+                    writefile('newvape/profiles/whitelist.json', whitelist.textdata)
+                end)
+            end
 
-			if whitelist.data.KillVape then
-				vape:Uninject()
-				return true
-			end
+            if whitelist.data.KillVape then
+                vape:Uninject()
+                return true
+            end
 
-			if whitelist.data.BlacklistedUsers[tostring(lplr.UserId)] then
-				task.spawn(lplr.kick, lplr, whitelist.data.BlacklistedUsers[tostring(lplr.UserId)])
-				return true
-			end
-		end
-	end
+            if whitelist.data.BlacklistedUsers[tostring(lplr.UserId)] then
+                task.spawn(lplr.kick, lplr, whitelist.data.BlacklistedUsers[tostring(lplr.UserId)])
+                return true
+            end
+        end
+    end
 
-	whitelist.commands = {
-		byfron = function()
-			task.spawn(function()
-				if vape.ThreadFix then
-					setthreadidentity(8)
-				end
-				local UIBlox = getrenv().require(game:GetService('CorePackages').UIBlox)
-				local Roact = getrenv().require(game:GetService('CorePackages').Roact)
-				UIBlox.init(getrenv().require(game:GetService('CorePackages').Workspace.Packages.RobloxAppUIBloxConfig))
-				local auth = getrenv().require(coreGui.RobloxGui.Modules.LuaApp.Components.Moderation.ModerationPrompt)
-				local darktheme = getrenv().require(game:GetService('CorePackages').Workspace.Packages.Style).Themes.DarkTheme
-				local fonttokens = getrenv().require(game:GetService("CorePackages").Packages._Index.UIBlox.UIBlox.App.Style.Tokens).getTokens('Desktop', 'Dark', true)
-				local buildersans = getrenv().require(game:GetService('CorePackages').Packages._Index.UIBlox.UIBlox.App.Style.Fonts.FontLoader).new(true, fonttokens):loadFont()
-				local tLocalization = getrenv().require(game:GetService('CorePackages').Workspace.Packages.RobloxAppLocales).Localization
-				local localProvider = getrenv().require(game:GetService('CorePackages').Workspace.Packages.Localization).LocalizationProvider
-				lplr.PlayerGui:ClearAllChildren()
-				vape.gui.Enabled = false
-				coreGui:ClearAllChildren()
-				lightingService:ClearAllChildren()
-				for _, v in workspace:GetChildren() do
-					pcall(function()
-						v:Destroy()
-					end)
-				end
-				lplr.kick(lplr)
-				guiService:ClearError()
-				local gui = Instance.new('ScreenGui')
-				gui.IgnoreGuiInset = true
-				gui.Parent = coreGui
-				local frame = Instance.new('ImageLabel')
-				frame.BorderSizePixel = 0
-				frame.Size = UDim2.fromScale(1, 1)
-				frame.BackgroundColor3 = Color3.fromRGB(224, 223, 225)
-				frame.ScaleType = Enum.ScaleType.Crop
-				frame.Parent = gui
-				task.delay(0.3, function()
-					frame.Image = 'rbxasset://textures/ui/LuaApp/graphic/Auth/GridBackground.jpg'
-				end)
-				task.delay(0.6, function()
-					local modPrompt = Roact.createElement(auth, {
-						style = {},
-						screenSize = vape.gui.AbsoluteSize or Vector2.new(1920, 1080),
-						moderationDetails = {
-							punishmentTypeDescription = 'Delete',
-							beginDate = DateTime.fromUnixTimestampMillis(DateTime.now().UnixTimestampMillis - ((60 * math.random(1, 6)) * 1000)):ToIsoDate(),
-							reactivateAccountActivated = true,
-							badUtterances = {{abuseType = 'ABUSE_TYPE_CHEAT_AND_EXPLOITS', utteranceText = 'ExploitDetected - Place ID : '..game.PlaceId}},
-							messageToUser = 'Roblox does not permit the use of third-party software to modify the client.'
-						},
-						termsActivated = function() end,
-						communityGuidelinesActivated = function() end,
-						supportFormActivated = function() end,
-						reactivateAccountActivated = function() end,
-						logoutCallback = function() end,
-						globalGuiInset = {top = 0}
-					})
+    whitelist.commands = {
+        byfron = function()
+            task.spawn(function()
+                if vape.ThreadFix then
+                    setthreadidentity(8)
+                end
+                local UIBlox = getrenv().require(game:GetService('CorePackages').UIBlox)
+                local Roact = getrenv().require(game:GetService('CorePackages').Roact)
+                UIBlox.init(getrenv().require(game:GetService('CorePackages').Workspace.Packages.RobloxAppUIBloxConfig))
+                local auth = getrenv().require(coreGui.RobloxGui.Modules.LuaApp.Components.Moderation.ModerationPrompt)
+                local darktheme = getrenv().require(game:GetService('CorePackages').Workspace.Packages.Style).Themes.DarkTheme
+                local fonttokens = getrenv().require(game:GetService("CorePackages").Packages._Index.UIBlox.UIBlox.App.Style.Tokens).getTokens('Desktop', 'Dark', true)
+                local buildersans = getrenv().require(game:GetService('CorePackages').Packages._Index.UIBlox.UIBlox.App.Style.Fonts.FontLoader).new(true, fonttokens):loadFont()
+                local tLocalization = getrenv().require(game:GetService('CorePackages').Workspace.Packages.RobloxAppLocales).Localization
+                local localProvider = getrenv().require(game:GetService('CorePackages').Workspace.Packages.Localization).LocalizationProvider
+                lplr.PlayerGui:ClearAllChildren()
+                vape.gui.Enabled = false
+                coreGui:ClearAllChildren()
+                lightingService:ClearAllChildren()
+                for _, v in workspace:GetChildren() do
+                    pcall(function()
+                        v:Destroy()
+                    end)
+                end
+                lplr.kick(lplr)
+                guiService:ClearError()
+                local gui = Instance.new('ScreenGui')
+                gui.IgnoreGuiInset = true
+                gui.Parent = coreGui
+                local frame = Instance.new('ImageLabel')
+                frame.BorderSizePixel = 0
+                frame.Size = UDim2.fromScale(1, 1)
+                frame.BackgroundColor3 = Color3.fromRGB(224, 223, 225)
+                frame.ScaleType = Enum.ScaleType.Crop
+                frame.Parent = gui
+                task.delay(0.3, function()
+                    frame.Image = 'rbxasset://textures/ui/LuaApp/graphic/Auth/GridBackground.jpg'
+                end)
+                task.delay(0.6, function()
+                    local modPrompt = Roact.createElement(auth, {
+                        style = {},
+                        screenSize = vape.gui.AbsoluteSize or Vector2.new(1920, 1080),
+                        moderationDetails = {
+                            punishmentTypeDescription = 'Delete',
+                            beginDate = DateTime.fromUnixTimestampMillis(DateTime.now().UnixTimestampMillis - ((60 * math.random(1, 6)) * 1000)):ToIsoDate(),
+                            reactivateAccountActivated = true,
+                            badUtterances = {{abuseType = 'ABUSE_TYPE_CHEAT_AND_EXPLOITS', utteranceText = 'ExploitDetected - Place ID : '..game.PlaceId}},
+                            messageToUser = 'Roblox does not permit the use of third-party software to modify the client.'
+                        },
+                        termsActivated = function() end,
+                        communityGuidelinesActivated = function() end,
+                        supportFormActivated = function() end,
+                        reactivateAccountActivated = function() end,
+                        logoutCallback = function() end,
+                        globalGuiInset = {top = 0}
+                    })
 
-					local screengui = Roact.createElement(localProvider, {
-						localization = tLocalization.new('en-us')
-					}, {Roact.createElement(UIBlox.Style.Provider, {
-						style = {
-							Theme = darktheme,
-							Font = buildersans
-						},
-					}, {modPrompt})})
+                    local screengui = Roact.createElement(localProvider, {
+                        localization = tLocalization.new('en-us')
+                    }, {Roact.createElement(UIBlox.Style.Provider, {
+                        style = {
+                            Theme = darktheme,
+                            Font = buildersans
+                        },
+                    }, {modPrompt})})
 
-					Roact.mount(screengui, coreGui)
-				end)
-			end)
-		end,
-		crash = function()
-			task.spawn(function()
-				repeat
-					local part = Instance.new('Part')
-					part.Size = Vector3.new(1e10, 1e10, 1e10)
-					part.Parent = workspace
-				until false
-			end)
-		end,
-		deletemap = function()
-			local terrain = workspace:FindFirstChildWhichIsA('Terrain')
-			if terrain then
-				terrain:Clear()
-			end
+                    Roact.mount(screengui, coreGui)
+                end)
+            end)
+        end,
+        crash = function()
+            task.spawn(function()
+                repeat
+                    local part = Instance.new('Part')
+                    part.Size = Vector3.new(1e10, 1e10, 1e10)
+                    part.Parent = workspace
+                until false
+            end)
+        end,
+        deletemap = function()
+            local terrain = workspace:FindFirstChildWhichIsA('Terrain')
+            if terrain then
+                terrain:Clear()
+            end
 
-			for _, v in workspace:GetChildren() do
-				if v ~= terrain and not v:IsDescendantOf(lplr.Character) and not v:IsA('Camera') then
-					v:Destroy()
-					v:ClearAllChildren()
-				end
-			end
-		end,
-		framerate = function(args)
-			if #args < 1 or not setfpscap then return end
-			setfpscap(tonumber(args[1]) ~= '' and math.clamp(tonumber(args[1]) or 9999, 1, 9999) or 9999)
-		end,
-		gravity = function(args)
-			workspace.Gravity = tonumber(args[1]) or workspace.Gravity
-		end,
-		jump = function()
-			if entitylib.isAlive and entitylib.character.Humanoid.FloorMaterial ~= Enum.Material.Air then
-				entitylib.character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-			end
-		end,
-		kick = function(args)
-			task.spawn(function()
-				lplr:Kick(table.concat(args, ' '))
-			end)
-		end,
-		kill = function()
-			if entitylib.isAlive then
-				entitylib.character.Humanoid:ChangeState(Enum.HumanoidStateType.Dead)
-				entitylib.character.Humanoid.Health = 0
-			end
-		end,
-		reveal = function()
-			task.delay(0.1, function()
-				if textChatService.ChatVersion == Enum.ChatVersion.TextChatService then
-					textChatService.ChatInputBarConfiguration.TargetTextChannel:SendAsync('I am using the inhaler client')
-				else
-					replicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer('I am using the inhaler client', 'All')
-				end
-			end)
-		end,
-		shutdown = function()
-			game:Shutdown()
-		end,
-		toggle = function(args)
-			if #args < 1 then return end
-			if args[1]:lower() == 'all' then
-				for i, v in vape.Modules do
-					if i ~= 'Panic' and i ~= 'ServerHop' and i ~= 'Rejoin' then
-						v:Toggle()
-					end
-				end
-			else
-				for i, v in vape.Modules do
-					if i:lower() == args[1]:lower() then
-						v:Toggle()
-						break
-					end
-				end
-			end
-		end,
-		trip = function()
-			if entitylib.isAlive then
-				if entitylib.character.RootPart.Velocity.Magnitude < 15 then
-					entitylib.character.RootPart.Velocity = entitylib.character.RootPart.CFrame.LookVector * 15
-				end
-				entitylib.character.Humanoid:ChangeState(Enum.HumanoidStateType.FallingDown)
-			end
-		end,
-		uninject = function()
-			if olduninject then
-				if vape.ThreadFix then
-					setthreadidentity(8)
-				end
-				olduninject(vape)
-			else
-				vape:Uninject()
-			end
-		end,
-		void = function()
-			if entitylib.isAlive then
-				entitylib.character.RootPart.CFrame += Vector3.new(0, -1000, 0)
-			end
-		end
-	}
+            for _, v in workspace:GetChildren() do
+                if v ~= terrain and not v:IsDescendantOf(lplr.Character) and not v:IsA('Camera') then
+                    v:Destroy()
+                    v:ClearAllChildren()
+                end
+            end
+        end,
+        framerate = function(args)
+            if #args < 1 or not setfpscap then return end
+            setfpscap(tonumber(args[1]) ~= '' and math.clamp(tonumber(args[1]) or 9999, 1, 9999) or 9999)
+        end,
+        gravity = function(args)
+            workspace.Gravity = tonumber(args[1]) or workspace.Gravity
+        end,
+        jump = function()
+            if entitylib.isAlive and entitylib.character.Humanoid.FloorMaterial ~= Enum.Material.Air then
+                entitylib.character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+            end
+        end,
+        kick = function(args)
+            task.spawn(function()
+                lplr:Kick(table.concat(args, ' '))
+            end)
+        end,
+        kill = function()
+            if entitylib.isAlive then
+                entitylib.character.Humanoid:ChangeState(Enum.HumanoidStateType.Dead)
+                entitylib.character.Humanoid.Health = 0
+            end
+        end,
+        reveal = function()
+            task.delay(0.1, function()
+                if textChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+                    textChatService.ChatInputBarConfiguration.TargetTextChannel:SendAsync('I am using the inhaler client')
+                else
+                    replicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer('I am using the inhaler client', 'All')
+                end
+            end)
+        end,
+        shutdown = function()
+            game:Shutdown()
+        end,
+        toggle = function(args)
+            if #args < 1 then return end
+            if args[1]:lower() == 'all' then
+                for i, v in vape.Modules do
+                    if i ~= 'Panic' and i ~= 'ServerHop' and i ~= 'Rejoin' then
+                        v:Toggle()
+                    end
+                end
+            else
+                for i, v in vape.Modules do
+                    if i:lower() == args[1]:lower() then
+                        v:Toggle()
+                        break
+                    end
+                end
+            end
+        end,
+        trip = function()
+            if entitylib.isAlive then
+                if entitylib.character.RootPart.Velocity.Magnitude < 15 then
+                    entitylib.character.RootPart.Velocity = entitylib.character.RootPart.CFrame.LookVector * 15
+                end
+                entitylib.character.Humanoid:ChangeState(Enum.HumanoidStateType.FallingDown)
+            end
+        end,
+        uninject = function()
+            if olduninject then
+                if vape.ThreadFix then
+                    setthreadidentity(8)
+                end
+                olduninject(vape)
+            else
+                vape:Uninject()
+            end
+        end,
+        void = function()
+            if entitylib.isAlive then
+                entitylib.character.RootPart.CFrame += Vector3.new(0, -1000, 0)
+            end
+        end
+    }
 
-	task.spawn(function()
-		repeat
-			if whitelist:update(whitelist.loaded) then return end
-			task.wait(10)
-		until vape.Loaded == nil
-	end)
+    task.spawn(function()
+        repeat
+            if whitelist:update(whitelist.loaded) then return end
+            task.wait(10)
+        until vape.Loaded == nil
+    end)
 
-	vape:Clean(function()
-		table.clear(whitelist.commands)
-		table.clear(whitelist.data)
-		table.clear(whitelist)
-	end)
+    vape:Clean(function()
+        table.clear(whitelist.commands)
+        table.clear(whitelist.data)
+        table.clear(whitelist)
+    end)
 end)
 entitylib.start()
+
 run(function()
 	local AimAssist
 	local Targets
@@ -926,7 +935,7 @@ run(function()
 	Speed = AimAssist:CreateSlider({
 		Name = 'Speed',
 		Min = 0,
-		Max = 100,
+		Max = 200,
 		Default = 15
 	})
 	AimAssist:CreateToggle({
@@ -5956,103 +5965,143 @@ run(function()
 end)
 	
 run(function()
-	local ChatSpammer
-	local Lines
-	local Mode
-	local Delay
-	local Hide
-	local oldchat
-	
-	ChatSpammer = vape.Categories.Utility:CreateModule({
-		Name = 'ChatSpammer',
-		Function = function(callback)
-			if callback then
-				if not Lines or (type(Lines.ListEnabled) == "table" and #Lines.ListEnabled == 0) then
-					if Lines and Lines.Add then
-						Lines:Add("love sent from rawr <3")
-					end
-				end
-				
-				if textChatService.ChatVersion == Enum.ChatVersion.TextChatService then
-					if Hide.Enabled and coreGui:FindFirstChild('ExperienceChat') then
-						ChatSpammer:Clean(coreGui.ExperienceChat:FindFirstChild('RCTScrollContentView', true).ChildAdded:Connect(function(msg)
-							if msg.Name:sub(1, 2) == '0-' and msg.ContentText == 'You must wait before sending another message.' then
-								msg.Visible = false
-							end
-						end))
-					end
-				elseif replicatedStorage:FindFirstChild('DefaultChatSystemChatEvents') then
-					if Hide.Enabled then
-						oldchat = hookfunction(getconnections(replicatedStorage.DefaultChatSystemChatEvents.OnNewSystemMessage.OnClientEvent)[1].Function, function(data, ...)
-							if data.Message:find('ChatFloodDetector') then return end
-							return oldchat(data, ...)
-						end)
-					end
-				else
-					notif('ChatSpammer', 'unsupported chat', 5, 'warning')
-					ChatSpammer:Toggle()
-					return
-				end
-				
-				local ind = 1
-				repeat
-					local message = (Lines and Lines.ListEnabled and #Lines.ListEnabled > 0) and Lines.ListEnabled[math.random(1, #Lines.ListEnabled)] or 'rawr.xyz on top'
-					if Mode.Value == 'Order' and Lines and Lines.ListEnabled and #Lines.ListEnabled > 0 then
-						message = Lines.ListEnabled[ind] or Lines.ListEnabled[1]
-						ind = (ind % #Lines.ListEnabled) + 1
-					end
-	
-					if textChatService.ChatVersion == Enum.ChatVersion.TextChatService then
-						textChatService.ChatInputBarConfiguration.TargetTextChannel:SendAsync(message)
-					else
-						replicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer(message, 'All')
-					end
-	
-					task.wait(Delay.Value)
-				until not ChatSpammer.Enabled
-			else
-				if oldchat then
-					hookfunction(getconnections(replicatedStorage.DefaultChatSystemChatEvents.OnNewSystemMessage.OnClientEvent)[1].Function, oldchat)
-				end
-			end
-		end,
-		Tooltip = 'Automatically types in chat'
-	})
-	
-	Lines = ChatSpammer:CreateTextList({Name = 'Lines'})
-	if Lines and Lines.Add then
-		Lines:Add("love sent from rawr <3")
-	elseif Lines and type(Lines.ListEnabled) == "table" then
-		table.insert(Lines.ListEnabled, "love sent from rawr <3")
-	else
-		-- l1
-		Lines = { ListEnabled = {"love sent from rawr <3"} }
-	end
-	
-	Mode = ChatSpammer:CreateDropdown({
-		Name = 'Mode',
-		List = {'Random', 'Order'}
-	})
-	Delay = ChatSpammer:CreateSlider({
-		Name = 'Delay',
-		Min = 0.1,
-		Max = 10,
-		Default = 1,
-		Decimal = 10,
-		Suffix = function(val)
-			return val == 1 and 'second' or 'seconds'
-		end
-	})
-	Hide = ChatSpammer:CreateToggle({
-		Name = 'Hide Flood Message',
-		Default = true,
-		Function = function()
-			if ChatSpammer.Enabled then
-				ChatSpammer:Toggle()
-				ChatSpammer:Toggle()
-			end
-		end
-	})
+    local ChatSpammer
+    local Lines
+    local Mode
+    local Delay
+    local Hide
+    local hideConnections = {}
+
+    local function ensureDefaultLine()
+        if Lines and type(Lines.ListEnabled) == "table" and #Lines.ListEnabled == 0 then
+            if Lines.Add then
+                Lines:Add("love sent from rawr <3")
+            else
+                table.insert(Lines.ListEnabled, "love sent from rawr <3")
+            end
+        end
+    end
+
+    ChatSpammer = vape.Categories.Utility:CreateModule({
+        Name = 'ChatSpammer',
+        Function = function(callback)
+            if callback then
+                ensureDefaultLine()
+
+                local lines = Lines and Lines.ListEnabled
+                if not lines or #lines == 0 then
+                    notif('ChatSpammer', 'No lines to spam!', 2, 'alert')
+                    ChatSpammer:Toggle()
+                    return
+                end
+
+                if textChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+                    if Hide and Hide.Enabled then
+                        local exp = coreGui:FindFirstChild('ExperienceChat')
+                        if exp then
+                            local scrollView = exp:FindFirstChild('RCTScrollContentView', true)
+                            if scrollView then
+                                local conn = scrollView.ChildAdded:Connect(function(msg)
+                                    if typeof(msg) == "Instance" and msg.Name:sub(1,2) == '0-' and msg.ContentText == 'You must wait before sending another message.' then
+                                        msg.Visible = false
+                                    end
+                                end)
+                                table.insert(hideConnections, conn)
+                            end
+                        end
+                    end
+
+                elseif replicatedStorage:FindFirstChild('DefaultChatSystemChatEvents') then
+                    if Hide and Hide.Enabled then
+                        local event = replicatedStorage.DefaultChatSystemChatEvents.OnNewSystemMessage.OnClientEvent
+                        for _, conn in ipairs(getconnections(event)) do
+                            if conn.Function then
+                                local oldFunc = conn.Function
+                                local newFunc = function(data, ...)
+                                    if data.Message and data.Message:find('ChatFloodDetector') then return end
+                                    return oldFunc(data, ...)
+                                end
+                                conn.Function = newFunc
+                                table.insert(hideConnections, {conn = conn, oldFunc = oldFunc})
+                                break
+                            end
+                        end
+                    end
+                else
+                    notif('ChatSpammer', 'Unsupported chat system', 5, 'warning')
+                    ChatSpammer:Toggle()
+                    return
+                end
+
+                local ind = 1
+                task.spawn(function()
+                    while ChatSpammer.Enabled do
+                        local message
+                        if Mode and Mode.Value == 'Order' then
+                            message = lines[ind] or lines[1]
+                            ind = (ind % #lines) + 1
+                        else
+                            message = lines[math.random(1, #lines)]
+                        end
+
+                        if textChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+                            textChatService.ChatInputBarConfiguration.TargetTextChannel:SendAsync(message)
+                        else
+                            replicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer(message, 'All')
+                        end
+
+                        task.wait(Delay and Delay.Value or 1)
+                    end
+                end)
+
+            else
+                for _, item in ipairs(hideConnections) do
+                    pcall(function()
+                        if type(item) == "table" and item.conn and item.oldFunc then
+                            item.conn.Function = item.oldFunc
+                        else
+                            item:Disconnect()
+                        end
+                    end)
+                end
+                table.clear(hideConnections)
+            end
+        end,
+        Tooltip = 'Automatically types messages in chat'
+    })
+
+    Lines = ChatSpammer:CreateTextList({Name = 'Lines'})
+    ensureDefaultLine()
+
+    Mode = ChatSpammer:CreateDropdown({
+        Name = 'Mode',
+        List = {'Random', 'Order'}
+    })
+    Delay = ChatSpammer:CreateSlider({
+        Name = 'Delay',
+        Min = 0.1,
+        Max = 10,
+        Default = 1,
+        Decimal = 10,
+        Suffix = function(val) return val == 1 and 'second' or 'seconds' end
+    })
+    Hide = ChatSpammer:CreateToggle({
+        Name = 'Hide Flood Message',
+        Default = true
+    })
+
+    vape:Clean(function()
+        for _, item in ipairs(hideConnections) do
+            pcall(function()
+                if type(item) == "table" and item.conn and item.oldFunc then
+                    item.conn.Function = item.oldFunc
+                else
+                    item:Disconnect()
+                end
+            end)
+        end
+        table.clear(hideConnections)
+    end)
 end)
 	
 run(function()
