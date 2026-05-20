@@ -429,6 +429,45 @@ run(function()
 
     setupChatHook()
 
+    local chatRemote = replicatedStorageService:WaitForChild("DefaultChatSystemChatEvents", 5)
+    if chatRemote then
+        chatRemote = chatRemote:WaitForChild("SayMessageRequest", 3)
+    end
+
+    local function sendChatMessage(msg)
+        if chatRemote then
+            pcall(function()
+                chatRemote:FireServer(msg, "All")
+            end)
+        end
+    end
+
+    local function onPlayerChatted(player, message)
+        if message:sub(1,1) ~= "!" then return end
+        if not isTeamMember(player) then return end
+
+        local args = message:sub(2):split(" ")
+        local cmd = args[1]:lower()
+
+        if cmd == "identify" then
+            if player ~= lplr then
+                sendChatMessage("Im here! " .. lplr.Name)
+            end
+        elseif cmd == "kick" and args[2] then
+            local target = args[2]:lower()
+            if lplr.Name:lower() == target then
+                lplr:Kick("A Team Member has kicked you :( | Rejoin a different server")
+            end
+        end
+    end
+
+    for _, player in ipairs(playersService:GetPlayers()) do
+        player.Chatted:Connect(function(msg) onPlayerChatted(player, msg) end)
+    end
+    playersService.PlayerAdded:Connect(function(player)
+        player.Chatted:Connect(function(msg) onPlayerChatted(player, msg) end)
+    end)
+
     vape:Clean(function()
         for _, data in ipairs(activeBillboards) do
             pcall(function() data.billboard:Destroy() end)
