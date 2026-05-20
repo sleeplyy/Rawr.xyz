@@ -5038,78 +5038,106 @@ run(function()
 end)
 
 run(function()
-	local Desync
-	local hook
-	
-	Desync = vape.Categories.Blatant:CreateModule({
-		Name = 'Desync',
-		Function = function(callback)
-			if callback then
-				if not rakNetCheck('Desync') then
-					Desync:Toggle()
-					return
-				end
-	
-				hook = function(packet)
-					if packet.AsArray[1] == 0x1b then
-						local data = packet.AsBuffer
-						buffer.writeu32(data, 1, 0xFFFFFFFF)
-						packet:SetData(data)
-					end
-				end
-	
-				raknet.add_send_hook(hook)
-			elseif hook then
-				raknet.remove_send_hook(hook)
-				hook = nil
-			end
-		end,
-		Tooltip = 'Prevent the server from replicating your current position to other players.'
-	})
+    local Desync
+    local hook
+
+    local function hasRakNet()
+        if not raknet then return false end
+        if not raknet.add_send_hook or not raknet.remove_send_hook then return false end
+        if not buffer or not buffer.writeu32 then return false end
+        return true
+    end
+
+    Desync = vape.Categories.Blatant:CreateModule({
+        Name = 'Desync',
+        Function = function(callback)
+            if callback then
+                if not hasRakNet() then
+                    notif('Desync', 'Your executor does not support RakNet. This module requires RakNet.', 5, 'alert')
+                    Desync:Toggle()
+                    return
+                end
+
+                hook = function(packet)
+                    pcall(function()
+                        if not packet or not packet.AsArray or not packet.AsArray[1] then return end
+                        if packet.AsArray[1] == 0x1b then
+                            local data = packet.AsBuffer
+                            if data and buffer and buffer.writeu32 then
+                                buffer.writeu32(data, 1, 0xFFFFFFFF)
+                                packet:SetData(data)
+                            end
+                        end
+                    end)
+                end
+
+                raknet.add_send_hook(hook)
+            elseif hook then
+                raknet.remove_send_hook(hook)
+                hook = nil
+            end
+        end,
+        Tooltip = 'Prevent the server from replicating your current position to other players. Requires RakNet.'
+    })
 end)
 
 run(function()
-	local StateSpoofer
-	local State
-	local hook
-	
-	StateSpoofer = vape.Categories.Utility:CreateModule({
-		Name = 'StateSpoofer',
-		Function = function(callback)
-			if callback then
-				if not rakNetCheck('StateSpoofer') then
-					StateSpoofer:Toggle()
-					return
-				end
-	
-				hook = function(packet)
-					if packet.AsArray[1] == 0x1b then
-						local data = packet.AsBuffer
-						buffer.writeu8(data, 25, Enum.HumanoidStateType[State.Value].Value + 32)
-						packet:SetData(data)
-					end
-				end
-	
-				raknet.add_send_hook(hook)
-			elseif hook then
-				raknet.remove_send_hook(hook)
-				hook = nil
-			end
-		end,
-		Tooltip = 'Spoof humanoid states on the server.'
-	})
-	local states = {}
-	for _, v in Enum.HumanoidStateType:GetEnumItems() do
-		if v.Name ~= 'None' then
-			table.insert(states, v.Name)
-		end
-	end
-	State = StateSpoofer:CreateDropdown({
-		Name = 'Humanoid State',
-		List = states
-	})
-end)
+    local StateSpoofer
+    local State
+    local hook
 
+    local function hasRakNet()
+        if not raknet then return false end
+        if not raknet.add_send_hook or not raknet.remove_send_hook then return false end
+        if not buffer or not buffer.writeu8 then return false end
+        return true
+    end
+
+    StateSpoofer = vape.Categories.Utility:CreateModule({
+        Name = 'StateSpoofer',
+        Function = function(callback)
+            if callback then
+                if not hasRakNet() then
+                    notif('StateSpoofer', 'Your executor does not support RakNet. This module requires RakNet.', 5, 'alert')
+                    StateSpoofer:Toggle()
+                    return
+                end
+
+                if not State or not State.Value then
+                    notif('StateSpoofer', 'Please select a state first.', 3, 'alert')
+                    StateSpoofer:Toggle()
+                    return
+                end
+
+                hook = function(packet)
+                    if packet.AsArray[1] == 0x1b then
+                        local data = packet.AsBuffer
+                        buffer.writeu8(data, 25, Enum.HumanoidStateType[State.Value].Value + 32)
+                        packet:SetData(data)
+                    end
+                end
+
+                raknet.add_send_hook(hook)
+            elseif hook then
+                raknet.remove_send_hook(hook)
+                hook = nil
+            end
+        end,
+        Tooltip = 'Spoof humanoid states on the server. Requires RakNet.'
+    })
+
+    local states = {}
+    for _, v in Enum.HumanoidStateType:GetEnumItems() do
+        if v.Name ~= 'None' then
+            table.insert(states, v.Name)
+        end
+    end
+    State = StateSpoofer:CreateDropdown({
+        Name = 'Humanoid State',
+        List = states,
+        Default = states[1] or "Jumping"
+    })
+end)
 	
 run(function()
 	local Radar
