@@ -504,102 +504,125 @@ end)
 
 run(function()
     local GunTracers = require(replicatedStorageService:WaitForChild("SharedModules"):WaitForChild("GunTracers"))
-    local originalCreateTaser = GunTracers and GunTracers.createTaser or function() end
-    local originalCreateSniper = GunTracers and GunTracers.createSniper or function() end
-    local originalCreateBullet = GunTracers and GunTracers.createBullet or function() end
-
     local debris = game:GetService("Debris")
     local tweenService = game:GetService("TweenService")
 
-    local taserColor = Color3.fromRGB(0, 234, 255)
-    local sniperColor = Color3.fromRGB(255, 50, 50)
-    local bulletColor = Color3.fromRGB(255, 255, 0)
+    local originalCreateTaser  = GunTracers and GunTracers.createTaser  or function() end
+    local originalCreateSniper = GunTracers and GunTracers.createSniper or function() end
+    local originalCreateBullet = GunTracers and GunTracers.createBullet or function() end
 
     local customColorsEnabled = false
-    local showTracersEnabled = true
-    local tracerLifetime = 1  -- seconds
+    local showTracersEnabled  = true
+    local tracerLifetime      = 1
 
-    local function createColoredTracer(startPos, endPos, color, sizeThickness, duration, hasLight)
+    local colors = {
+        Taser  = Color3.fromRGB(0, 234, 255),
+        Sniper = Color3.fromRGB(255, 50, 50),
+        Bullet = Color3.fromRGB(255, 255, 0),
+    }
+
+    local thickness = {
+        Taser  = 0.2,
+        Sniper = 0.17,
+        Bullet = 0.1,
+    }
+
+    local hasLight = {
+        Taser  = true,
+        Sniper = false,
+        Bullet = false,
+    }
+
+    local function createTracer(startPos, endPos, color, sizeThickness, duration, addLight)
         if not startPos or not endPos or not color then return end
-        local distance = (endPos - startPos).magnitude
-        local midPoint = (startPos + endPos) / 2
+        local distance  = (endPos - startPos).magnitude
+        local midPoint  = (startPos + endPos) / 2
 
         local part = Instance.new("Part")
-        part.Name = "CustomRayPart"
-        part.Material = Enum.Material.Neon
-        part.Anchored = true
+        part.Name        = "CustomRayPart"
+        part.Material    = Enum.Material.Neon
+        part.Anchored    = true
         part.Transparency = 0.5
-        part.formFactor = Enum.FormFactor.Custom
-        part.Size = Vector3.new(sizeThickness, sizeThickness, distance)
-        part.CFrame = CFrame.new(midPoint, endPos)
-        part.CanCollide = false
-        part.CanQuery = false
-        part.CanTouch = false
-        part.Color = color
-        part.Parent = workspace.CurrentCamera
+        part.formFactor  = Enum.FormFactor.Custom
+        part.Size        = Vector3.new(sizeThickness, sizeThickness, distance)
+        part.CFrame      = CFrame.new(midPoint, endPos)
+        part.CanCollide  = false
+        part.CanQuery    = false
+        part.CanTouch    = false
+        part.Color       = color
+        part.Parent      = workspace.CurrentCamera
 
-        if hasLight then
+        if addLight then
             local light = Instance.new("SurfaceLight", part)
-            light.Color = color
-            light.Range = 7
-            light.Face = "Bottom"
+            light.Color     = color
+            light.Range     = 7
+            light.Face      = "Bottom"
             light.Brightness = 5
-            light.Angle = 180
-            tweenService:Create(light, TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Brightness = 0}):Play()
+            light.Angle     = 180
+            tweenService:Create(light,
+                TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+                {Brightness = 0}
+            ):Play()
         end
 
-        tweenService:Create(part, TweenInfo.new(duration, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Transparency = 1}):Play()
+        tweenService:Create(part,
+            TweenInfo.new(duration, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+            {Transparency = 1}
+        ):Play()
+
         debris:AddItem(part, duration + 0.5)
     end
 
     local function customCreateTaser(startPos, endPos)
-        createColoredTracer(startPos, endPos, taserColor, 0.2, tracerLifetime, true)
+        createTracer(startPos, endPos, colors.Taser, thickness.Taser, tracerLifetime, hasLight.Taser)
     end
 
     local function customCreateSniper(startPos, endPos)
-        createColoredTracer(startPos, endPos, sniperColor, 0.17, tracerLifetime, false)
+        createTracer(startPos, endPos, colors.Sniper, thickness.Sniper, tracerLifetime, hasLight.Sniper)
     end
 
     local function customCreateBullet(startPos, endPos)
-        createColoredTracer(startPos, endPos, bulletColor, 0.1, tracerLifetime, false)
+        createTracer(startPos, endPos, colors.Bullet, thickness.Bullet, tracerLifetime, hasLight.Bullet)
     end
 
     local function emptyTracer() end
 
     local function updateTracerFunctions()
         if not GunTracers then return end
+
         if not showTracersEnabled then
-            GunTracers.createTaser = emptyTracer
+            GunTracers.createTaser  = emptyTracer
             GunTracers.createSniper = emptyTracer
             GunTracers.createBullet = emptyTracer
         elseif customColorsEnabled then
-            GunTracers.createTaser = customCreateTaser
+            GunTracers.createTaser  = customCreateTaser
             GunTracers.createSniper = customCreateSniper
             GunTracers.createBullet = customCreateBullet
         else
-            GunTracers.createTaser = originalCreateTaser
+            GunTracers.createTaser  = originalCreateTaser
             GunTracers.createSniper = originalCreateSniper
             GunTracers.createBullet = originalCreateBullet
         end
     end
 
-    local TracerVisuals = vape.Categories.Utility:CreateModule({
+    local TracerModule = vape.Categories.Utility:CreateModule({
         Name = "Bullet Tracers",
         Function = function(callback)
             if callback then
                 updateTracerFunctions()
             else
                 if GunTracers then
-                    GunTracers.createTaser = originalCreateTaser
+                    GunTracers.createTaser  = originalCreateTaser
                     GunTracers.createSniper = originalCreateSniper
                     GunTracers.createBullet = originalCreateBullet
                 end
             end
-        end
+        end,
+        Tooltip = "Customizable bullet tracers"
     })
 
-    TracerVisuals:CreateToggle({
-        Name = "Show Tracers",
+    TracerModule:CreateToggle({
+        Name    = "Show Tracers",
         Default = true,
         Function = function(callback)
             showTracersEnabled = callback
@@ -607,55 +630,47 @@ run(function()
         end
     })
 
-    TracerVisuals:CreateSlider({
-        Name = "Lifetime (seconds)",
-        Min = 0.1,
-        Max = 10,
+    TracerModule:CreateSlider({
+        Name    = "Lifetime (seconds)",
+        Min     = 0.1,
+        Max     = 10,
         Default = 1,
         Decimal = 10,
-        Function = function(val)
-            tracerLifetime = val
-        end
+        Function = function(val) tracerLifetime = val end
     })
 
-    local TaserColorSlider = TracerVisuals:CreateColorSlider({
+    local TaserColorSlider = TracerModule:CreateColorSlider({
         Name = "Taser Color",
-        Function = function(hue, sat, val)
-            taserColor = Color3.fromHSV(hue, sat, val)
-            if customColorsEnabled and showTracersEnabled then
-                updateTracerFunctions()
-            end
+        Function = function(h, s, v)
+            colors.Taser = Color3.fromHSV(h, s, v)
+            if customColorsEnabled and showTracersEnabled then updateTracerFunctions() end
         end
     })
-    local SniperColorSlider = TracerVisuals:CreateColorSlider({
+    local SniperColorSlider = TracerModule:CreateColorSlider({
         Name = "Sniper Color",
-        Function = function(hue, sat, val)
-            sniperColor = Color3.fromHSV(hue, sat, val)
-            if customColorsEnabled and showTracersEnabled then
-                updateTracerFunctions()
-            end
+        Function = function(h, s, v)
+            colors.Sniper = Color3.fromHSV(h, s, v)
+            if customColorsEnabled and showTracersEnabled then updateTracerFunctions() end
         end
     })
-    local BulletColorSlider = TracerVisuals:CreateColorSlider({
+    local BulletColorSlider = TracerModule:CreateColorSlider({
         Name = "Bullet Color",
-        Function = function(hue, sat, val)
-            bulletColor = Color3.fromHSV(hue, sat, val)
-            if customColorsEnabled and showTracersEnabled then
-                updateTracerFunctions()
-            end
+        Function = function(h, s, v)
+            colors.Bullet = Color3.fromHSV(h, s, v)
+            if customColorsEnabled and showTracersEnabled then updateTracerFunctions() end
         end
     })
 
-    TaserColorSlider.Object.Visible = false
+    TaserColorSlider.Object.Visible  = false
     SniperColorSlider.Object.Visible = false
     BulletColorSlider.Object.Visible = false
 
-    TracerVisuals:CreateToggle({
-        Name = "Custom Colors",
+    TracerModule:CreateToggle({
+        Name    = "Custom Colors",
         Default = false,
         Function = function(callback)
             customColorsEnabled = callback
-            TaserColorSlider.Object.Visible = callback
+            TaserColorSlider.Object.Visible  = callback
             SniperColorSlider.Object.Visible = callback
             BulletColorSlider.Object.Visible = callback
             updateTracerFunctions()
