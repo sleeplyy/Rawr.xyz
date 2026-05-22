@@ -1849,7 +1849,7 @@ run(function()
             char.Destroying:Connect(function()
                 t.d.s = CFrame.new()
                 disconnectPlayerConnections(v)
-            end
+            end)
 
             local targetHumanoid = char:FindFirstChildOfClass("Humanoid")
             if targetHumanoid then
