@@ -305,9 +305,7 @@ run(function()
         end
 
         if t.mb and t.mb.enabled and t.mb.redirect then
-            local ok, err = pcall(t.mb.redirect, args)
-            if not ok then
-            end
+            pcall(t.mb.redirect, args)
         end
 
         return old(self, args[1])
@@ -1544,11 +1542,9 @@ run(function()
         local direction = (target - origin).Unit
         local distance = (target - origin).Magnitude
         if distance <= 0.01 then return {} end
-
         local rayParams = RaycastParams.new()
         rayParams.FilterType = Enum.RaycastFilterType.Whitelist
         rayParams.FilterDescendantsInstances = {workspace}
-
         local result = workspace:Raycast(origin, direction * distance, rayParams)
         if result then
             return {{
@@ -1564,14 +1560,12 @@ run(function()
         pcall(function()
             if not args or typeof(args[1]) ~= "table" then return end
             local hits = args[1]
-
             local mode = Mode and Mode.Value or "Through"
             local originOff = OriginOffset and OriginOffset.Value or 0
             local curveVal = CurveStrength and CurveStrength.Value or 5
             local randOff = RandomOffset and RandomOffset.Value or 5
             local penetration = maxPenetration and maxPenetration.Value or 0
             local losCheck = useLineOfSight and useLineOfSight.Enabled or false
-
             local rand = Random.new()
 
             for _, hit in ipairs(hits) do
@@ -1588,12 +1582,10 @@ run(function()
                 if mode == "Through" then
                     local dir = (endpoint - origin).Unit
                     hit[1] = origin + dir * originOff
-
                 elseif mode == "Curve" then
                     local dir = (endpoint - origin).Unit
                     local perp = Vector3.new(-dir.Z, 0, dir.X).Unit
                     hit[2] = endpoint + perp * curveVal
-
                 elseif mode == "Random" then
                     local offset = Vector3.new(
                         (rand:NextNumber() - 0.5) * randOff * 2,
@@ -1602,7 +1594,6 @@ run(function()
                     )
                     hit[1] = origin + offset
                     hit[2] = endpoint + offset
-
                 elseif mode == "Smart" then
                     local walls = getWallsBetween(origin, endpoint)
                     local newOrigin = origin
@@ -1636,11 +1627,7 @@ run(function()
         Name = "Mode",
         List = {"Through", "Curve", "Random", "Smart"},
         Default = "Through",
-        Tooltip = [[
-Through - Direct penetration
-Curve - Arc trajectory
-Random - Unpredictable offsets
-Smart - Auto-detect walls & push origin]]
+        Tooltip = "Through / Curve / Random / Smart"
     })
 
     OriginOffset = MagicBullet:CreateSlider({
