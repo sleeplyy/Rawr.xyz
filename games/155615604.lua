@@ -1901,6 +1901,85 @@ run(function()
         t.d.s = CFrame.new()
     end)
 end)
+                                                                                                                                        
+run(function()
+    local HideInFloor
+    local hideEnabled = false
+    local connections = {}
+
+    local function enableHide()
+        if not entitylib or not entitylib.isAlive then return end
+        local char = entitylib.character.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+        if not root or not humanoid then return end
+
+        local originalHipHeight = humanoid.HipHeight
+        local originalRootCFrame = root.CFrame
+
+        humanoid.HipHeight = -3
+        root.CFrame = originalRootCFrame * CFrame.Angles(math.rad(90), 0, 0)
+
+        local heartbeatConn = runService.Heartbeat:Connect(function()
+            if not hideEnabled then return end
+            if not char or not char.Parent then return end
+            local currentRoot = char:FindFirstChild("HumanoidRootPart")
+            if currentRoot then
+                local vel = currentRoot.Velocity
+                currentRoot.CFrame = CFrame.new(currentRoot.Position) * CFrame.Angles(math.rad(90), 0, 0)
+                currentRoot.Velocity = vel
+            end
+        end)
+        table.insert(connections, heartbeatConn)
+
+        local deathConn
+        if humanoid then
+            deathConn = humanoid.Died:Connect(function()
+                humanoid.HipHeight = originalHipHeight
+            end)
+            table.insert(connections, deathConn)
+        end
+    end
+
+    local function disableHide()
+        if not entitylib or not entitylib.isAlive then return end
+        local char = entitylib.character.Character
+        local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if humanoid then humanoid.HipHeight = 2 end
+        if root then root.CFrame = CFrame.new(root.Position) end
+
+        for _, conn in ipairs(connections) do
+            pcall(function() conn:Disconnect() end)
+        end
+        table.clear(connections)
+    end
+
+    HideInFloor = vape.Categories.Blatant:CreateModule({
+        Name = "Hide In Floor",
+        Function = function(callback)
+            hideEnabled = callback
+            if callback then
+                enableHide()
+            else
+                disableHide()
+            end
+        end,
+        Tooltip = "Hides your character underground while still being able to move and shoot"
+    })
+
+    localPlayer.CharacterAdded:Connect(function()
+        if hideEnabled then
+            task.wait(0.2)
+            enableHide()
+        end
+    end)
+
+    vape:Clean(function()
+        hideEnabled = false
+        disableHide()
+    end)
+end)
 
 run(function()
     local NameChanger = vape.Categories.Utility:CreateModule({
