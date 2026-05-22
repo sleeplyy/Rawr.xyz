@@ -870,28 +870,46 @@ run(function()
 
     local function setupForceReload()
         if oldInvoke then return end
-        local FuncReload = nil
         local gunRemotes = replicatedStorageService:FindFirstChild("GunRemotes")
-        if gunRemotes then
-            for _, obj in ipairs(gunRemotes:GetDescendants()) do
-                if obj:IsA("RemoteFunction") and obj.Name == "FuncReload" then
-                    FuncReload = obj
-                    break
-                end
+        if not gunRemotes then return end
+
+        local FuncReload = nil
+        for _, obj in ipairs(gunRemotes:GetDescendants()) do
+            if obj:IsA("RemoteFunction") and obj.Name == "FuncReload" then
+                FuncReload = obj
+                break
             end
         end
         if not FuncReload then return end
 
-        oldInvoke = hookfunction(FuncReload, "InvokeServer", function(self, ...)
-            if forceReloadEnabled then
-                local char = lplr.Character
-                local tool = char and char:FindFirstChildOfClass("Tool")
-                if tool and tool:GetAttribute("Local_CurrentAmmo") then
-                    doForceReload(tool)
+        local mt = getrawmetatable and getrawmetatable(FuncReload)
+        if mt then
+            local oldNamecall = mt.__namecall
+            setreadonly(mt, false)
+            mt.__namecall = newcclosure(function(self, ...)
+                local method = getnamecallmethod()
+                if method == "InvokeServer" and forceReloadEnabled then
+                    local char = lplr.Character
+                    local tool = char and char:FindFirstChildOfClass("Tool")
+                    if tool and tool:GetAttribute("Local_CurrentAmmo") then
+                        doForceReload(tool)
+                    end
                 end
-            end
-            return oldInvoke(self, ...)
-        end)
+                return oldNamecall(self, ...)
+            end)
+            oldInvoke = oldNamecall
+        else
+            oldInvoke = hookfunction(FuncReload, "InvokeServer", function(self, ...)
+                if forceReloadEnabled then
+                    local char = lplr.Character
+                    local tool = char and char:FindFirstChildOfClass("Tool")
+                    if tool and tool:GetAttribute("Local_CurrentAmmo") then
+                        doForceReload(tool)
+                    end
+                end
+                return oldInvoke(self, ...)
+            end)
+        end
     end
 
     local function itemAdded(v)
@@ -1003,18 +1021,24 @@ run(function()
         if backpackConn then backpackConn:Disconnect() end
         clearToolConns()
         if oldInvoke then
-            local FuncReload = nil
             local gunRemotes = replicatedStorageService:FindFirstChild("GunRemotes")
             if gunRemotes then
+                local FuncReload = nil
                 for _, obj in ipairs(gunRemotes:GetDescendants()) do
                     if obj:IsA("RemoteFunction") and obj.Name == "FuncReload" then
                         FuncReload = obj
                         break
                     end
                 end
-            end
-            if FuncReload then
-                hookfunction(FuncReload, "InvokeServer", oldInvoke)
+                if FuncReload then
+                    local mt = getrawmetatable and getrawmetatable(FuncReload)
+                    if mt then
+                        setreadonly(mt, false)
+                        mt.__namecall = oldInvoke
+                    else
+                        hookfunction(FuncReload, "InvokeServer", oldInvoke)
+                    end
+                end
             end
         end
     end)
