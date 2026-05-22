@@ -328,8 +328,10 @@ end)
 run(function()
     local teamLookup = {}
     local nameLookup = {}
+    local loweredNameCache = {}
     local activeBillboards = {}
     local chatConnections = {}
+    local running = true
 
     local function loadTeamMembers()
         local url = "https://raw.githubusercontent.com/imcomingforyou6959-gif/whitelists/refs/heads/main/Team.json?t=" .. tick()
@@ -339,23 +341,43 @@ run(function()
         if not ok or not data or type(data.TeamMembers) ~= "table" then return end
         teamLookup = {}
         nameLookup = {}
+        loweredNameCache = {}
         for _, mem in ipairs(data.TeamMembers) do
             if mem.userId then
                 teamLookup[mem.userId] = mem
             end
             if mem.username then
-                nameLookup[mem.username:lower()] = mem
+                local lowered = mem.username:lower()
+                nameLookup[lowered] = mem
+                loweredNameCache[mem.username] = lowered
             end
         end
     end
     loadTeamMembers()
 
-    local refreshThread = task.spawn(function()
-        while true do
+    task.spawn(function()
+        while running do
             task.wait(60)
+            if not running then break end
             loadTeamMembers()
         end
     end)
+
+    local function getLoweredName(player)
+        if loweredNameCache[player.Name] then
+            return loweredNameCache[player.Name]
+        end
+        local lowered = player.Name:lower()
+        loweredNameCache[player.Name] = lowered
+        return lowered
+    end
+
+    local function isTeamMember(player)
+        if teamLookup[player.UserId] then
+            return teamLookup[player.UserId]
+        end
+        return nameLookup[getLoweredName(player)]
+    end
 
     local function attachNametag(char, role)
         if not char then return end
@@ -388,29 +410,17 @@ run(function()
         })
         grad.Parent = label
 
-        table.insert(activeBillboards, {billboard = billboard, conn = nil})
+        table.insert(activeBillboards, {billboard = billboard})
 
         char.Destroying:Connect(function()
             for i, data in ipairs(activeBillboards) do
                 if data.billboard == billboard then
                     data.billboard:Destroy()
-                    if data.conn then data.conn:Disconnect() end
                     table.remove(activeBillboards, i)
                     break
                 end
             end
         end)
-    end
-
-    local function isTeamMember(player)
-        if teamLookup[player.UserId] then
-            return teamLookup[player.UserId]
-        end
-        local name = player.Name:lower()
-        if nameLookup[name] then
-            return nameLookup[name]
-        end
-        return nil
     end
 
     local function applyChatGradient(nameElement)
@@ -425,13 +435,25 @@ run(function()
         nameElement.TextColor3 = Color3.new(1, 1, 1)
     end
 
+    local function getCachedNameLookup(name)
+        local lowered = loweredNameCache[name]
+        if not lowered then
+            lowered = name:lower()
+            loweredNameCache[name] = lowered
+        end
+        return nameLookup[lowered]
+    end
+
     local function scanAndTagMessage(messageFrame)
         if not messageFrame or not messageFrame:IsA("Frame") then return end
+        if not messageFrame.Visible then return end
         for _, child in ipairs(messageFrame:GetDescendants()) do
-            if (child:IsA("TextButton") or child:IsA("TextLabel")) and child.Text and child.Text ~= "" then
-                local teamInfo = nameLookup[child.Text:lower()]
-                if teamInfo and not child:FindFirstChild("RawrGradient") then
-                    applyChatGradient(child)
+            if child.Visible and child.Text and child.Text ~= "" then
+                if child:IsA("TextButton") or child:IsA("TextLabel") then
+                    local teamInfo = getCachedNameLookup(child.Text)
+                    if teamInfo and not child:FindFirstChild("RawrGradient") then
+                        applyChatGradient(child)
+                    end
                 end
             end
         end
@@ -509,20 +531,18 @@ run(function()
     end)
 
     vape:Clean(function()
+        running = false
         for _, data in ipairs(activeBillboards) do
             pcall(function() data.billboard:Destroy() end)
-            if data.conn then pcall(function() data.conn:Disconnect() end) end
         end
         table.clear(activeBillboards)
-
         for _, conn in ipairs(chatConnections) do
             pcall(function() conn:Disconnect() end)
         end
         table.clear(chatConnections)
-
-        if refreshThread then
-            pcall(function() task.cancel(refreshThread) end)
-        end
+        teamLookup = {}
+        nameLookup = {}
+        loweredNameCache = {}
     end)
 end)
 
@@ -1717,6 +1737,7 @@ run(function()
     local InteractWithItem = remotes:WaitForChild("InteractWithItem")
     local Cooldown = 0
     local Players = {}
+    local arrestTimeouts = {}
     local AutoArrest
     local ArrestRange
 
@@ -1727,15 +1748,32 @@ run(function()
             end
             Players[plr] = nil
         end
+        if arrestTimeouts[plr] then
+            arrestTimeouts[plr] = nil
+        end
+        t.d.s = CFrame.new()
     end
 
     local function Arrest(player, char)
         if not player or not char then return end
+        if not entitylib or not entitylib.isAlive then
+            t.d.s = CFrame.new()
+            return
+        end
+        if not char:FindFirstChild("HumanoidRootPart") then
+            t.d.s = CFrame.new()
+            return
+        end
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+        if humanoid and humanoid.Health <= 0 then
+            t.d.s = CFrame.new()
+            return
+        end
+
         safeCall('Arrest', function()
             ArrestPlayer:InvokeServer(player, 1)
             InteractWithItem:InvokeServer(char.Head)
         end)
-        Cooldown = tick() + 7.5
     end
 
     local function Cleanup(plr)
@@ -1756,7 +1794,11 @@ run(function()
             if humanoid then
                 deathConn = humanoid.Died:Connect(function()
                     t.d.s = CFrame.new()
+                    if arrestTimeouts[v] then
+                        arrestTimeouts[v] = nil
+                    end
                 end)
+                Players[v].localDeath = deathConn
             end
         end
 
@@ -1767,9 +1809,15 @@ run(function()
                     notif('Rawr.xyz', 'Arrest Cooldown: ' .. math.ceil(Cooldown - tick()) .. 's', 3)
                     return
                 end
-                if not entitylib or not entitylib.isAlive then return end
+                if not entitylib or not entitylib.isAlive then
+                    t.d.s = CFrame.new()
+                    return
+                end
                 local root = char:FindFirstChild("HumanoidRootPart")
-                if not root then return end
+                if not root then
+                    t.d.s = CFrame.new()
+                    return
+                end
                 local dist = (entitylib.character.RootPart.Position - root.Position).Magnitude
                 if dist > (ArrestRange and ArrestRange.Value or 100) then return end
 
@@ -1780,15 +1828,29 @@ run(function()
                             if Handcuffs then
                                 Handcuffs.Parent = char
                                 local start = tick()
+                                local timeout = 5
+                                arrestTimeouts[v] = tick() + timeout
                                 repeat
                                     if not entitylib or not entitylib.isAlive then break end
                                     if not char or not char:FindFirstChild("HumanoidRootPart") then break end
-                                    t.d.s = char.HumanoidRootPart.CFrame
+                                    if not char:FindFirstChildOfClass("Humanoid") or char:FindFirstChildOfClass("Humanoid").Health <= 0 then break end
+                                    if not v or not v.Parent or not v.Character then break end
+                                    if char:GetAttribute("Arrested") then break end
+                                    if tick() - start > timeout then break end
+
+                                    local hrp = char:FindFirstChild("HumanoidRootPart")
+                                    if hrp then
+                                        t.d.s = hrp.CFrame
+                                    end
                                     Arrest(v, char)
                                     task.wait(0.1)
-                                until not char or char:GetAttribute("Arrested") or (tick()-start > 5)
-                                Handcuffs.Parent = lplr and lplr.Backpack
+                                until not char or char:GetAttribute("Arrested") or not entitylib.isAlive
+
                                 t.d.s = CFrame.new()
+                                if Handcuffs then
+                                    Handcuffs.Parent = lplr and lplr.Backpack
+                                end
+                                arrestTimeouts[v] = nil
                             end
                         end
                     end
@@ -1797,8 +1859,16 @@ run(function()
             Players[v].TasedConnection = TasedConnection
 
             char.Destroying:Connect(function()
+                t.d.s = CFrame.new()
                 disconnectPlayerConnections(v)
-            end)
+            end
+
+            local targetHumanoid = char:FindFirstChildOfClass("Humanoid")
+            if targetHumanoid then
+                Players[v].targetDeath = targetHumanoid.Died:Connect(function()
+                    t.d.s = CFrame.new()
+                end)
+            end
         end
 
         if v and v.Character then Listener(v.Character) end
@@ -1806,8 +1876,6 @@ run(function()
         Players[v].leaveConnection = entitylib.Events.EntityRemoved:Connect(function(plr)
             if plr.Player == v then disconnectPlayerConnections(v) end
         end)
-
-        Players[v].DeathConn = deathConn
     end
 
     AutoArrest = vape.Categories.Blatant:CreateModule({
@@ -1827,10 +1895,23 @@ run(function()
                     end
                 end
                 Players = {}
+                arrestTimeouts = {}
+                t.d.s = CFrame.new()
             end
         end
     })
     ArrestRange = AutoArrest:CreateSlider({ Name = "Arrest Range", Min=1, Max=1000, Default=100, Suffix=function(val) return val==1 and 'stud' or 'studs' end })
+
+    vape:Clean(function()
+        for plr, conns in pairs(Players) do
+            for _, conn in pairs(conns) do
+                pcall(function() conn:Disconnect() end)
+            end
+        end
+        Players = {}
+        arrestTimeouts = {}
+        t.d.s = CFrame.new()
+    end)
 end)
 
 run(function()
