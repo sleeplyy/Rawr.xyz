@@ -1561,62 +1561,62 @@ run(function()
     end
 
     local function magicBulletRedirect(args)
-        if not args or typeof(args[1]) ~= "table" then return end
-        local hits = args[1]
+        pcall(function()
+            if not args or typeof(args[1]) ~= "table" then return end
+            local hits = args[1]
 
-        local mode = Mode and Mode.Value or "Through"
-        local originOff = OriginOffset and OriginOffset.Value or 0
-        local curveVal = CurveStrength and CurveStrength.Value or 5
-        local randOff = RandomOffset and RandomOffset.Value or 5
-        local wallsIgnored = ignoreWalls and ignoreWalls.Enabled or false
-        local penetration = maxPenetration and maxPenetration.Value or 0
-        local losCheck = useLineOfSight and useLineOfSight.Enabled or false
+            local mode = Mode and Mode.Value or "Through"
+            local originOff = OriginOffset and OriginOffset.Value or 0
+            local curveVal = CurveStrength and CurveStrength.Value or 5
+            local randOff = RandomOffset and RandomOffset.Value or 5
+            local penetration = maxPenetration and maxPenetration.Value or 0
+            local losCheck = useLineOfSight and useLineOfSight.Enabled or false
 
-        local rand = Random.new()
+            local rand = Random.new()
 
-        for _, hit in ipairs(hits) do
-            local origin = hit[1]
-            local endpoint = hit[2]
-            local targetPart = hit[3]
+            for _, hit in ipairs(hits) do
+                local origin = hit[1]
+                local endpoint = hit[2]
 
-            if losCheck then
-                local walls = getWallsBetween(origin, endpoint)
-                if #walls == 0 then
-                    goto continue
+                if losCheck then
+                    local walls = getWallsBetween(origin, endpoint)
+                    if #walls == 0 then
+                        goto continue
+                    end
                 end
-            end
 
-            if mode == "Through" then
-                local dir = (endpoint - origin).Unit
-                hit[1] = origin + dir * originOff
+                if mode == "Through" then
+                    local dir = (endpoint - origin).Unit
+                    hit[1] = origin + dir * originOff
 
-            elseif mode == "Curve" then
-                local dir = (endpoint - origin).Unit
-                local perp = Vector3.new(-dir.Z, 0, dir.X).Unit
-                hit[2] = endpoint + perp * curveVal
+                elseif mode == "Curve" then
+                    local dir = (endpoint - origin).Unit
+                    local perp = Vector3.new(-dir.Z, 0, dir.X).Unit
+                    hit[2] = endpoint + perp * curveVal
 
-            elseif mode == "Random" then
-                local offset = Vector3.new(
-                    (rand:NextNumber() - 0.5) * randOff * 2,
-                    (rand:NextNumber() - 0.5) * randOff * 2,
-                    (rand:NextNumber() - 0.5) * randOff * 2
-                )
-                hit[1] = origin + offset
-                hit[2] = endpoint + offset
+                elseif mode == "Random" then
+                    local offset = Vector3.new(
+                        (rand:NextNumber() - 0.5) * randOff * 2,
+                        (rand:NextNumber() - 0.5) * randOff * 2,
+                        (rand:NextNumber() - 0.5) * randOff * 2
+                    )
+                    hit[1] = origin + offset
+                    hit[2] = endpoint + offset
 
-            elseif mode == "Smart" then
-                local walls = getWallsBetween(origin, endpoint)
-                local newOrigin = origin
-                for i = 1, math.min(#walls, penetration) do
-                    local wall = walls[i]
-                    local pushDist = wall.distance + 2
-                    newOrigin = newOrigin + (endpoint - newOrigin).Unit * pushDist
+                elseif mode == "Smart" then
+                    local walls = getWallsBetween(origin, endpoint)
+                    local newOrigin = origin
+                    for i = 1, math.min(#walls, penetration) do
+                        local wall = walls[i]
+                        local pushDist = wall.distance + 2
+                        newOrigin = newOrigin + (endpoint - newOrigin).Unit * pushDist
+                    end
+                    hit[1] = newOrigin
                 end
-                hit[1] = newOrigin
-            end
 
-            ::continue::
-        end
+                ::continue::
+            end
+        end)
     end
 
     MagicBullet = vape.Categories.Combat:CreateModule({
@@ -1640,7 +1640,7 @@ run(function()
 Through - Direct penetration
 Curve - Arc trajectory
 Random - Unpredictable offsets
-Smart - Auto‑detect walls & push origin]]
+Smart - Auto-detect walls & push origin]]
     })
 
     OriginOffset = MagicBullet:CreateSlider({
@@ -1675,7 +1675,7 @@ Smart - Auto‑detect walls & push origin]]
     })
 
     maxPenetration = MagicBullet:CreateSlider({
-        Name = "Max Penetration",
+        Name = "Max Penetration (Smart)",
         Min = 1, Max = 5, Default = 1,
         Visible = false,
         Function = function() end,
@@ -1684,7 +1684,7 @@ Smart - Auto‑detect walls & push origin]]
     useLineOfSight = MagicBullet:CreateToggle({
         Name = "Line of Sight Check",
         Default = false,
-        Tooltip = "Only TP when target is behind a wall"
+        Tooltip = "Only wallbang when target is behind a wall"
     })
 
     OriginOffset.Object.Visible = true
