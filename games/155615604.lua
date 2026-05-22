@@ -930,7 +930,7 @@ run(function()
 end)
 
 run(function()
-    local remotesFolder = replicatedStorageService:FindFirstChild("Remotes")
+    local remotesFolder = replicatedStorageService:FindFirstChild("GunRemotes")
     if not remotesFolder then
         notif('Force Reload', 'Remotes folder not found', 3, 'alert')
         return
