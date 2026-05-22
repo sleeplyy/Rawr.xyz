@@ -930,65 +930,85 @@ run(function()
 end)
 
 run(function()
-    local FuncReload = replicatedStorageService:WaitForChild("Remotes"):WaitForChild("FuncReload", 5)
+    local remotesFolder = replicatedStorageService:FindFirstChild("Remotes")
+    if not remotesFolder then
+        notif('Force Reload', 'Remotes folder not found', 3, 'alert')
+        return
+    end
+
+    local FuncReload = nil
+    for _, obj in ipairs(remotesFolder:GetDescendants()) do
+        if obj:IsA("RemoteFunction") and obj.Name == "FuncReload" then
+            FuncReload = obj
+            break
+        end
+    end
+
     if not FuncReload then
-        notif('Force Reload', 'FuncReload remote not found', 3, 'alert')
+        notif('Force Reload', 'FuncReload not found anywhere in Remotes', 3, 'alert')
         return
     end
 
     local forceReloadEnabled = false
     local oldInvoke
 
-    local function hookReload()
-        if oldInvoke then return end
-        local mt = getrawmetatable(FuncReload)
-        local oldNamecall = mt.__namecall
-        setreadonly(mt, false)
-        mt.__namecall = newcclosure(function(self, ...)
-            local method = getnamecallmethod()
-            if method ~= "InvokeServer" then
-                return oldNamecall(self, ...)
-            end
-            if not forceReloadEnabled then
-                return oldNamecall(self, ...)
-            end
+    local function doReload(tool)
+        local ammo = tool:GetAttribute("Local_CurrentAmmo")
+        local maxAmmo = tool:GetAttribute("MaxAmmo")
+        if not ammo or not maxAmmo or ammo >= maxAmmo then return end
 
-            local char = lplr.Character
-            local tool = char and char:FindFirstChildOfClass("Tool")
-            if not tool then
-                return oldNamecall(self, ...)
-            end
+        tool:SetAttribute("Local_CurrentAmmo", maxAmmo)
+        tool:SetAttribute("Local_ReloadSession", 0)
 
-            local ammo = tool:GetAttribute("Local_CurrentAmmo")
-            local maxAmmo = tool:GetAttribute("MaxAmmo")
-            if ammo and maxAmmo and ammo >= maxAmmo then
-                return oldNamecall(self, ...)
-            end
-
-            tool:SetAttribute("Local_CurrentAmmo", maxAmmo)
-            tool:SetAttribute("Local_ReloadSession", 0)
-
-            if hud then
-                local BottomRightFrame = hud:FindFirstChild("BottomRightFrame")
-                if BottomRightFrame then
-                    local gunFrame = BottomRightFrame:FindFirstChild("GunFrame")
-                    if gunFrame then
-                        local bulletsLabel = gunFrame:FindFirstChild("BulletsLabel")
-                        if bulletsLabel then
-                            local behavior = tool:GetAttribute("Behavior")
-                            if behavior == "Sniper" then
-                                bulletsLabel.Text = maxAmmo .. " | " .. (tool:GetAttribute("StoredAmmo") or 0)
-                            else
-                                bulletsLabel.Text = maxAmmo .. "/" .. maxAmmo
-                            end
+        if hud then
+            local BottomRightFrame = hud:FindFirstChild("BottomRightFrame")
+            if BottomRightFrame then
+                local gunFrame = BottomRightFrame:FindFirstChild("GunFrame")
+                if gunFrame then
+                    local bulletsLabel = gunFrame:FindFirstChild("BulletsLabel")
+                    if bulletsLabel then
+                        local behavior = tool:GetAttribute("Behavior")
+                        if behavior == "Sniper" then
+                            bulletsLabel.Text = maxAmmo .. " | " .. (tool:GetAttribute("StoredAmmo") or 0)
+                        else
+                            bulletsLabel.Text = maxAmmo .. "/" .. maxAmmo
                         end
                     end
                 end
             end
+        end
+    end
 
-            return oldNamecall(self, ...)
-        end)
-        oldInvoke = oldNamecall
+    local function hookReload()
+        if oldInvoke then return end
+
+        local mt = getrawmetatable and getrawmetatable(FuncReload)
+        if mt then
+            local oldNamecall = mt.__namecall
+            setreadonly(mt, false)
+            mt.__namecall = newcclosure(function(self, ...)
+                local method = getnamecallmethod()
+                if method ~= "InvokeServer" then
+                    return oldNamecall(self, ...)
+                end
+                if forceReloadEnabled then
+                    local char = lplr.Character
+                    local tool = char and char:FindFirstChildOfClass("Tool")
+                    if tool then doReload(tool) end
+                end
+                return oldNamecall(self, ...)
+            end)
+            oldInvoke = oldNamecall
+        else
+            oldInvoke = hookfunction(FuncReload, "InvokeServer", function(self, ...)
+                if forceReloadEnabled then
+                    local char = lplr.Character
+                    local tool = char and char:FindFirstChildOfClass("Tool")
+                    if tool then doReload(tool) end
+                end
+                return oldInvoke(self, ...)
+            end)
+        end
     end
 
     local ForceReload = vape.Categories.Combat:CreateModule({
@@ -1007,9 +1027,8 @@ run(function()
         Function = function()
             local char = lplr.Character
             local tool = char and char:FindFirstChildOfClass("Tool")
-            if tool and FuncReload then
-                tool:SetAttribute("Local_CurrentAmmo", tool:GetAttribute("MaxAmmo"))
-                tool:SetAttribute("Local_ReloadSession", 0)
+            if tool then
+                doReload(tool)
                 notif('Force Reload', 'Reloaded ' .. tool.Name, 1.5, 'success')
             end
         end
@@ -1017,9 +1036,13 @@ run(function()
 
     vape:Clean(function()
         if oldInvoke then
-            local mt = getrawmetatable(FuncReload)
-            setreadonly(mt, false)
-            mt.__namecall = oldInvoke
+            local mt = getrawmetatable and getrawmetatable(FuncReload)
+            if mt then
+                setreadonly(mt, false)
+                mt.__namecall = oldInvoke
+            else
+                hookfunction(FuncReload, "InvokeServer", oldInvoke)
+            end
         end
     end)
 end)
