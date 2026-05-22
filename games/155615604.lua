@@ -941,21 +941,28 @@ run(function()
 
     local function hookReload()
         if oldInvoke then return end
-        oldInvoke = hookfunction(FuncReload, "InvokeServer", function(self, ...)
+        local mt = getrawmetatable(FuncReload)
+        local oldNamecall = mt.__namecall
+        setreadonly(mt, false)
+        mt.__namecall = newcclosure(function(self, ...)
+            local method = getnamecallmethod()
+            if method ~= "InvokeServer" then
+                return oldNamecall(self, ...)
+            end
             if not forceReloadEnabled then
-                return oldInvoke(self, ...)
+                return oldNamecall(self, ...)
             end
 
             local char = lplr.Character
             local tool = char and char:FindFirstChildOfClass("Tool")
             if not tool then
-                return oldInvoke(self, ...)
+                return oldNamecall(self, ...)
             end
 
             local ammo = tool:GetAttribute("Local_CurrentAmmo")
             local maxAmmo = tool:GetAttribute("MaxAmmo")
             if ammo and maxAmmo and ammo >= maxAmmo then
-                return oldInvoke(self, ...)
+                return oldNamecall(self, ...)
             end
 
             tool:SetAttribute("Local_CurrentAmmo", maxAmmo)
@@ -979,8 +986,9 @@ run(function()
                 end
             end
 
-            return oldInvoke(self, ...)
+            return oldNamecall(self, ...)
         end)
+        oldInvoke = oldNamecall
     end
 
     local ForceReload = vape.Categories.Combat:CreateModule({
@@ -1009,7 +1017,9 @@ run(function()
 
     vape:Clean(function()
         if oldInvoke then
-            hookfunction(FuncReload, "InvokeServer", oldInvoke)
+            local mt = getrawmetatable(FuncReload)
+            setreadonly(mt, false)
+            mt.__namecall = oldInvoke
         end
     end)
 end)
