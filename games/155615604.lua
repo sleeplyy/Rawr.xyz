@@ -192,6 +192,10 @@ local t = {
 }
 
 run(function()
+    if not hookmetamethod then return end
+    if not newcclosure then return end
+    if not checkcaller then return end
+
     local oldHumanoidNewindex
     oldHumanoidNewindex = hookmetamethod(game, "__newindex", newcclosure(function(self, key, value)
         if typeof(self) == "Instance" and self:IsA("Humanoid") then
@@ -1627,7 +1631,7 @@ run(function()
         Name = "Mode",
         List = {"Through", "Curve", "Random", "Smart"},
         Default = "Through",
-        Tooltip = "Through / Curve / Random / Smart"
+        Tooltip = "Through/nCurve/nRandom/nSmart"
     })
 
     OriginOffset = MagicBullet:CreateSlider({
