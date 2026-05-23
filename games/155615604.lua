@@ -1349,7 +1349,7 @@ run(function()
         return targetPart.Position
     end
 
-    local function silentAimRedirect(args)
+       local function silentAimRedirect(args)
         if not entitylib or not entitylib.isAlive then return end
         local ent, targetPart, origin = getTarget(entitylib.character.Head.Position, nil)
         if not ent or not targetPart or typeof(args[1]) ~= "table" then return end
@@ -1369,10 +1369,12 @@ run(function()
             end
 
             pcall(function()
-                if t.hn.e and targetPart.Parent then
-                    local partName = tostring(targetPart.Name or "??")
-                    local parentName = tostring(targetPart.Parent.Name or "??")
-                    notif('Rawr.xyz', 'attempted to hit ' .. parentName .. "'s " .. partName, 3)
+                if t.hn.e and targetPart and targetPart.Parent then
+                    local partName = tostring(targetPart.Name) or "??"
+                    local parentName = tostring(targetPart.Parent.Name) or "??"
+                    if type(partName) == "string" and type(parentName) == "string" then
+                        notif('Rawr.xyz', 'attempted to hit ' .. parentName .. "'s " .. partName, 3)
+                    end
                 end
             end)
         end
