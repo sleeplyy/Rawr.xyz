@@ -2388,22 +2388,25 @@ run(function()
             end
             return
         end
-
-    local inputFunc = clientItemModule.Input
-        oldInput = hookfunction(inputFunc, function(data)
-            if gunModsEnabled and type(data) == "table" then
+        local inputFunc = clientItemModule.Input
+        oldInput = hookfunction(inputFunc, function(...)
+            local args = {...}
+            local data = args[1]
+            if type(data) == "table" then
                 local info = data.Info
                 if type(info) == "table" then
-                    if info.ShootRecoil ~= nil then info.ShootRecoil = recoilVal end
-                    if info.ShootSpread ~= nil then info.ShootSpread = spreadVal end
-                    if info.ProjectileSpeed ~= nil then info.ProjectileSpeed = projSpeedVal end
-                    if info.ShootCooldown ~= nil then info.ShootCooldown = shootCooldownVal end
-                    if info.QuickShotCooldown ~= nil then info.QuickShotCooldown = quickShotCooldownVal end
+                    info.ShootRecoil = recoilVal
+                    info.ShootSpread = spreadVal
+                    info.ProjectileSpeed = projSpeedVal
+                    info.ShootCooldown = shootCooldownVal
+                    info.QuickShotCooldown = quickShotCooldownVal
                 end
             end
-            return oldInput(data)
+            return oldInput(...)
         end)
-                                                                                                                                                                                                                                                                        
+        hookActive = true
+    end
+
     local function cancelPending()
         if pendingTask then
             pcall(task.cancel, pendingTask)
@@ -2419,6 +2422,7 @@ run(function()
         end)
         if ok and clientItemModule and clientItemModule.Input then
             pcall(function() hookfunction(clientItemModule.Input, oldInput) end)
+            pcall(function() clientItemModule.Input = oldInput end)
         end
         hookActive = false
         oldInput = nil
@@ -2469,7 +2473,7 @@ run(function()
         Suffix = "s"
     })
 end)
-
+                                                                                                                                                                                                                                                                                    
 run(function()
     if hookmetamethod and getnamecallmethod then
         local SkinModule = vape.Categories.Utility:CreateModule({Name = "Skin Unlocker", Function = function(callback)
