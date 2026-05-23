@@ -132,6 +132,14 @@ local vape = shared.vape
 local entitylib = vape.Libraries.entity
 local targetinfo = vape.Libraries.targetinfo
 
+local SolveTrajectory = nil
+pcall(function()
+    local predModule = loadstring(game:HttpGet("https://raw.githubusercontent.com/imcomingforyou6959-gif/RPL/main/libraries/prediction.lua"))()
+    if predModule and predModule.SolveTrajectory then
+        SolveTrajectory = predModule.SolveTrajectory
+    end
+end)
+
 local function notif(...) return vape:CreateNotification(...) end
 
 if identifyexecutor then
@@ -1207,6 +1215,7 @@ run(function()
     local ShowTarget
     local filterTeamSA
     local TeamFilterSA
+    local PredictionToggle
     local rand = Random.new()
     local delayCheck = tick()
     local GunTracers = require(replicatedStorageService:WaitForChild("SharedModules"):WaitForChild("GunTracers"))
@@ -1215,6 +1224,18 @@ run(function()
     local mouseClicked = false
     local renderStepConnection
     local watchdogConnection
+
+    local function getPing()
+        local ping = 0
+        pcall(function()
+            ping = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue()
+        end)
+        return ping / 1000
+    end
+
+    local function getFPS()
+        return 1 / (runService.RenderStepped:Wait() or 0.016)
+    end
 
     local function tryShoot(origin, targetPart, tool)
         if not tool or not targetPart or not targetPart.Parent then return end
@@ -1299,6 +1320,35 @@ run(function()
         return ent, ent and ent[targetPart], origin
     end
 
+    local function getPredictedPosition(origin, targetPart, tool)
+        if not SolveTrajectory then return targetPart.Position end
+        if not PredictionToggle or not PredictionToggle.Enabled then return targetPart.Position end
+        if not tool then return targetPart.Position end
+
+        local projSpeed = tool:GetAttribute("ProjectileSpeed") or tool:GetAttribute("BulletSpeed") or 1500
+        local gravity = workspace.Gravity
+        local targetVel = Vector3.new()
+        local rootPart = targetPart.Parent and targetPart.Parent:FindFirstChild("HumanoidRootPart")
+        if rootPart then
+            targetVel = rootPart.Velocity
+        end
+
+        if targetVel.Magnitude < 2 then return targetPart.Position end
+
+        local ping = getPing()
+        local fps = getFPS()
+        local networkFactor = 1 + ping + (1 / math.max(fps, 1))
+        local speedFactor = math.clamp(targetVel.Magnitude / 30, 0.5, 2)
+
+        local predictedVel = targetVel * speedFactor * networkFactor
+
+        local success, predicted = pcall(SolveTrajectory, origin, projSpeed, gravity, targetPart.Position, predictedVel)
+        if success and predicted then
+            return predicted
+        end
+        return targetPart.Position
+    end
+
     local function silentAimRedirect(args)
         if not entitylib or not entitylib.isAlive then return end
         local ent, targetPart, origin = getTarget(entitylib.character.Head.Position, nil)
@@ -1306,11 +1356,15 @@ run(function()
 
         local originalHits = args[1]
         if SilentAim and SilentAim.Enabled then
+            local char = entitylib.character.Character
+            local tool = char and char:FindFirstChildOfClass("Tool")
+            local predictedPos = getPredictedPosition(origin, targetPart, tool)
+
             for _, hit in ipairs(originalHits) do
                 if typeof(hit) == "table" then
-                    hit[1] = origin                -- origin position
-                    hit[2] = targetPart.Position   -- target position
-                    hit[3] = targetPart            -- target part
+                    hit[1] = origin
+                    hit[2] = predictedPos
+                    hit[3] = targetPart
                 end
             end
 
@@ -1525,6 +1579,11 @@ run(function()
     })
     Face = SilentAim:CreateToggle({ Name = 'Face target' })
     ShowTarget = SilentAim:CreateToggle({ Name = "Show Target Info" })
+    PredictionToggle = SilentAim:CreateToggle({
+        Name = "Prediction",
+        Default = false,
+        Tooltip = "Automatically leads moving targets"
+    })
 end)
                                                                                                                     
 run(function()
