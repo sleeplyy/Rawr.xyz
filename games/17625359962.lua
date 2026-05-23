@@ -2389,21 +2389,20 @@ run(function()
             end
             return
         end
+
         local inputFunc = clientItemModule.Input
-        oldInput = hookfunction(inputFunc, function(...)
-            local args = {...}
-            local data = args[1]
-            if type(data) == "table" then
-                local info = data.Info
+        oldInput = hookfunction(inputFunc, function(data)
+            if gunModsEnabled and type(data) == "table" then
+                local info = rawget(data, "Info")
                 if type(info) == "table" then
-                    info.ShootRecoil = recoilVal
-                    info.ShootSpread = spreadVal
-                    info.ProjectileSpeed = projSpeedVal
-                    info.ShootCooldown = shootCooldownVal
-                    info.QuickShotCooldown = quickShotCooldownVal
+                    rawset(info, "ShootRecoil", recoilVal)
+                    rawset(info, "ShootSpread", spreadVal)
+                    rawset(info, "ProjectileSpeed", projSpeedVal)
+                    rawset(info, "ShootCooldown", shootCooldownVal)
+                    rawset(info, "QuickShotCooldown", quickShotCooldownVal)
                 end
             end
-            return oldInput(...)
+            return oldInput(data)
         end)
         hookActive = true
     end
@@ -2423,7 +2422,6 @@ run(function()
         end)
         if ok and clientItemModule and clientItemModule.Input then
             pcall(function() hookfunction(clientItemModule.Input, oldInput) end)
-            pcall(function() clientItemModule.Input = oldInput end)
         end
         hookActive = false
         oldInput = nil
