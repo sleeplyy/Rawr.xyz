@@ -137,6 +137,8 @@ run(function()
     local screenCache = {}
     local visibilityCache = {}
     local CACHE_DURATION = 0.1
+    local cacheCleanupTick = 0
+    local CACHE_CLEANUP_INTERVAL = 30
 
     local function getScreenPosition(part)
         if not part then return nil, false end
@@ -266,15 +268,24 @@ run(function()
     end
 
     local function startAutoClick()
-        if autoClickConnection then autoClickConnection:Disconnect() end
+        if autoClickConnection then
+            autoClickConnection:Disconnect()
+            autoClickConnection = nil
+        end
+        if not silentAimEnabled then return end
+        if not (isLeftMouseDown or isRightMouseDown) then return end
+
         autoClickConnection = runService.Heartbeat:Connect(function()
-            if (isLeftMouseDown or isRightMouseDown) and silentAimEnabled then
-                if not isLobbyVisible() and canClick() and (tick() - lastRightClick) >= clickInterval then
-                    mouse1click()
-                    lastRightClick = tick()
+            if not (isLeftMouseDown or isRightMouseDown) or not silentAimEnabled then
+                if autoClickConnection then
+                    autoClickConnection:Disconnect()
+                    autoClickConnection = nil
                 end
-            else
-                if autoClickConnection then autoClickConnection:Disconnect(); autoClickConnection = nil end
+                return
+            end
+            if not isLobbyVisible() and canClick() and (tick() - lastRightClick) >= clickInterval then
+                mouse1click()
+                lastRightClick = tick()
             end
         end)
     end
@@ -284,12 +295,12 @@ run(function()
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
             if not isLeftMouseDown then
                 isLeftMouseDown = true
-                if silentAimEnabled then startAutoClick() end
+                startAutoClick()
             end
         elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
             if not isRightMouseDown then
                 isRightMouseDown = true
-                if silentAimEnabled then startAutoClick() end
+                startAutoClick()
             end
         end
     end)
@@ -298,8 +309,16 @@ run(function()
         if gameProcessed then return end
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
             isLeftMouseDown = false
+            if autoClickConnection and not isRightMouseDown then
+                autoClickConnection:Disconnect()
+                autoClickConnection = nil
+            end
         elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
             isRightMouseDown = false
+            if autoClickConnection and not isLeftMouseDown then
+                autoClickConnection:Disconnect()
+                autoClickConnection = nil
+            end
         end
     end)
 
@@ -310,6 +329,13 @@ run(function()
             if CircleObject then CircleObject.Visible = callback end
             if callback then
                 cameraLockConnection = runService.Heartbeat:Connect(function()
+                    local now = tick()
+                    if now - cacheCleanupTick >= CACHE_CLEANUP_INTERVAL then
+                        cacheCleanupTick = now
+                        screenCache = {}
+                        visibilityCache = {}
+                    end
+
                     if CircleObject then
                         CircleObject.Position = inputService:GetMouseLocation()
                     end
@@ -326,6 +352,7 @@ run(function()
                 targetPlayer = nil
                 screenCache = {}
                 visibilityCache = {}
+                cacheCleanupTick = 0
             end
         end,
         Tooltip = '<3'
@@ -363,7 +390,7 @@ run(function()
 end)
                                         
 run(function()
-    local CROSSHAIR_STYLES = {"Cross", "Dot", "Diagonal"}
+    local crosshair_styles = {"Cross", "Dot", "Diagonal"}
     local DRAWING_COUNT = {lines = 8, outlines = 4}
     local DEFAULT_CONFIG = {
         enabled = false,
@@ -407,6 +434,26 @@ run(function()
         
         drawings.dot = Drawing.new('Circle')
         drawingsCreated = true
+    end
+    
+    local function destroyAllDrawings()
+        for i = 1, DRAWING_COUNT.lines do
+            if drawings.lines[i] then
+                pcall(function() drawings.lines[i]:Remove() end)
+                drawings.lines[i] = nil
+            end
+        end
+        for i = 1, DRAWING_COUNT.outlines do
+            if drawings.outlines[i] then
+                pcall(function() drawings.outlines[i]:Remove() end)
+                drawings.outlines[i] = nil
+            end
+        end
+        if drawings.dot then
+            pcall(function() drawings.dot:Remove() end)
+            drawings.dot = nil
+        end
+        drawingsCreated = false
     end
     
     local function hideAllDrawings()
@@ -526,6 +573,7 @@ run(function()
             
             if enabled then
                 if not drawingsCreated then createDrawings() end
+                if crosshairRenderConnection then crosshairRenderConnection:Disconnect() end
                 crosshairRenderConnection = runService.RenderStepped:Connect(updateCrosshair)
             else
                 if crosshairRenderConnection then
@@ -539,7 +587,7 @@ run(function()
     
     CrosshairModule:CreateDropdown({
         Name = "Style",
-        List = CROSSHAIR_STYLES,
+        List = crosshair_styles,
         Default = DEFAULT_CONFIG.style,
         Function = function(value)
             config.style = value
@@ -639,8 +687,9 @@ run(function()
     vape:Clean(function()
         if crosshairRenderConnection then
             crosshairRenderConnection:Disconnect()
+            crosshairRenderConnection = nil
         end
-        hideAllDrawings()
+        destroyAllDrawings()
     end)
 end)
 
@@ -1321,6 +1370,11 @@ run(function()
     local useNotification = true
     local alertSoundId = "rbxassetid://138118203571469"
 
+    local lastCheck = 0
+    local CHECK_INTERVAL = 0.5
+    local cleanupTick = 0
+    local CLEANUP_INTERVAL = 10
+
     local function findWeaponName(player)
         if not player then return nil end
         local now = tick()
@@ -1376,9 +1430,23 @@ run(function()
 
     local function detectKatana()
         if not katanaEnabled then return end
+        local now = tick()
+        if now - lastCheck < CHECK_INTERVAL then return end
+        lastCheck = now
         if not lplr.Character then return end
 
-        local now = tick()
+        if now - cleanupTick >= CLEANUP_INTERVAL then
+            cleanupTick = now
+            for player, _ in pairs(weaponCache) do
+                if not player or not player.Parent then
+                    weaponCache[player] = nil
+                    weaponCacheExpiry[player] = nil
+                    detectedCache[player] = nil
+                    lastNotifTime[player] = nil
+                end
+            end
+        end
+
         for _, player in ipairs(playersService:GetPlayers()) do
             if player == lplr then continue end
             if not isEnemy(player) then continue end
@@ -1414,6 +1482,8 @@ run(function()
                 end
                 detectedCache = {}
                 lastNotifTime = {}
+                lastCheck = 0
+                cleanupTick = 0
             else
                 if heartbeatConn then
                     heartbeatConn:Disconnect()
@@ -1458,7 +1528,7 @@ run(function()
         lastNotifTime = {}
     end)
 end)
-
+                                                                                                                                                                
 run(function()
     local camera = workspace.CurrentCamera
     local defaultVert = 70; local defaultHoriz = 100
