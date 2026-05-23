@@ -132,14 +132,6 @@ local vape = shared.vape
 local entitylib = vape.Libraries.entity
 local targetinfo = vape.Libraries.targetinfo
 
-local SolveTrajectory = nil
-pcall(function()
-    local predModule = loadstring(game:HttpGet("https://raw.githubusercontent.com/imcomingforyou6959-gif/RPL/main/libraries/prediction.lua"))()
-    if predModule and predModule.SolveTrajectory then
-        SolveTrajectory = predModule.SolveTrajectory
-    end
-end)
-
 local function notif(...) return vape:CreateNotification(...) end
 
 if identifyexecutor then
