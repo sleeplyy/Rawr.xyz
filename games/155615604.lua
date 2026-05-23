@@ -551,17 +551,6 @@ run(function()
     local showTracersEnabled = true
     local tracerLifetime = 1
 
-    local TRAIL_TEXTURES = {
-        ["Default"] = nil,
-        ["Energy"] = "rbxassetid://7151778302",
-        ["Cosmic Ray"] = "rbxassetid://7151777149",
-        ["Fog"] = "rbxassetid://3517446796",
-        ["DNA"] = "rbxassetid://7071778278",
-        ["Interstellar"] = "rbxassetid://6091341618",
-        ["Photon Stream"] = "rbxassetid://7151842823",
-    }
-    local selectedTrailTexture = "Default"
-
     local function createColoredTracer(startPos, endPos, color, sizeThickness, duration, hasLight)
         if not startPos or not endPos or not color then return end
         local distance = (endPos - startPos).magnitude
@@ -580,18 +569,6 @@ run(function()
         part.CanTouch = false
         part.Color = color
         part.Parent = workspace.CurrentCamera
-
-        local textureId = TRAIL_TEXTURES[selectedTrailTexture]
-        if textureId then
-            local beam = Instance.new("Beam", part)
-            beam.Texture = textureId
-            beam.TextureSpeed = 1
-            beam.Width0 = sizeThickness * 2
-            beam.Width1 = sizeThickness * 2
-            beam.Color = ColorSequence.new(color)
-            beam.Transparency = NumberSequence.new(0.5, 1)
-            beam.FaceCamera = true
-        end
 
         if hasLight then
             local light = Instance.new("SurfaceLight", part)
@@ -671,20 +648,6 @@ run(function()
         Function = function(val)
             tracerLifetime = val
         end
-    })
-
-    local trailNames = {}
-    for name in pairs(TRAIL_TEXTURES) do table.insert(trailNames, name) end
-    table.sort(trailNames)
-
-    TracerVisuals:CreateDropdown({
-        Name = "Trail Texture",
-        List = trailNames,
-        Default = "Default",
-        Function = function(val)
-            selectedTrailTexture = val
-        end,
-        Tooltip = "Changes the beam texture of the tracer"
     })
 
     local TaserColorSlider = TracerVisuals:CreateColorSlider({
