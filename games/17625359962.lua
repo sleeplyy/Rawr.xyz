@@ -310,6 +310,9 @@ run(function()
             if CircleObject then CircleObject.Visible = callback end
             if callback then
                 cameraLockConnection = runService.Heartbeat:Connect(function()
+                    if CircleObject then
+                        CircleObject.Position = inputService:GetMouseLocation()
+                    end
                     if not isLobbyVisible() then
                         targetPlayer = getClosestPlayerToMouse(fovRadiusSA)
                         if targetPlayer and math.random(100) <= lockChance then
@@ -325,7 +328,7 @@ run(function()
                 visibilityCache = {}
             end
         end,
-        Tooltip = 'Snaps camera to nearest enemy inside FOV circle'
+        Tooltip = '<3'
     })
 
     SilentAim:CreateDropdown({Name='Aim Part', List={'Head','Body','Random'}, Default='Head', Function=function(v) aimPartSA=v end, Tooltip='Part to aim at'})
@@ -345,7 +348,7 @@ run(function()
             CircleObject = Drawing.new('Circle')
             CircleObject.Filled = CircleFilled and CircleFilled.Enabled
             CircleObject.Color = Color3.fromHSV(CircleColor and CircleColor.Hue or 0, 1, 1)
-            CircleObject.Position = vape.gui.AbsoluteSize/2
+            CircleObject.Position = inputService:GetMouseLocation()
             CircleObject.Radius = fovRadiusSA
             CircleObject.NumSides = 100
             CircleObject.Transparency = 1-(CircleTransparency and CircleTransparency.Value or 0.5)
