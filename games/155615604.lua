@@ -145,7 +145,8 @@ if identifyexecutor then
     local allowed = {
         Madium = true, Velocity = true, Sirhurt = true, Volt = true, LX63 = true,
         ["Synapse Z"] = true, Seliware = true, Potassium = true, Cosmic = true,
-        Volcano = true, Wave = true, Luna = true, Yubx = true, Ronix = true
+        Volcano = true, Wave = true, Luna = true, Yubx = true, Ronix = true,
+        Real = true, Luna = true, Voidclient = true, Yubx = true, Isaeva = true
     }
     if not allowed[execName] then
         notif('Rawr.xyz', 'Your Executor is too bad to use all features :(', 6, 'alert')
