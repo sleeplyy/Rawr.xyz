@@ -399,12 +399,14 @@ run(function()
         })
         grad.Parent = label
 
-        table.insert(activeBillboards, {billboard = billboard})
+        table.insert(activeBillboards, billboard)
 
         char.Destroying:Connect(function()
-            for i, data in ipairs(activeBillboards) do
-                if data.billboard == billboard then
-                    data.billboard:Destroy()
+            if billboard and billboard.Parent then
+                billboard:Destroy()
+            end
+            for i, b in ipairs(activeBillboards) do
+                if b == billboard then
                     table.remove(activeBillboards, i)
                     break
                 end
@@ -521,8 +523,8 @@ run(function()
 
     vape:Clean(function()
         running = false
-        for _, data in ipairs(activeBillboards) do
-            pcall(function() data.billboard:Destroy() end)
+        for _, billboard in ipairs(activeBillboards) do
+            pcall(function() billboard:Destroy() end)
         end
         table.clear(activeBillboards)
         for _, conn in ipairs(chatConnections) do
@@ -694,6 +696,14 @@ run(function()
             updateTracerFunctions()
         end
     })
+
+    vape:Clean(function()
+        if GunTracers then
+            GunTracers.createTaser = originalCreateTaser
+            GunTracers.createSniper = originalCreateSniper
+            GunTracers.createBullet = originalCreateBullet
+        end
+    end)
 end)
                                                             
 run(function()
@@ -817,10 +827,10 @@ run(function()
 
     local function clearToolConns()
         if toolConns then
-            for _, conn in pairs(toolConns) do
-                conn:Disconnect()
+            for v, conn in pairs(toolConns) do
+                pcall(function() conn:Disconnect() end)
+                toolConns[v] = nil
             end
-            table.clear(toolConns)
         end
     end
 
@@ -835,7 +845,10 @@ run(function()
             Shotgun = v
         end
 
-        if toolConns[v] then toolConns[v]:Disconnect() end
+        if toolConns[v] then
+            pcall(function() toolConns[v]:Disconnect() end)
+            toolConns[v] = nil
+        end
 
         local conn = v:GetAttributeChangedSignal("Local_CurrentAmmo"):Connect(function()
             if not entitylib.isAlive then return end
@@ -861,7 +874,7 @@ run(function()
 
         v.Destroying:Connect(function()
             if toolConns and toolConns[v] then
-                toolConns[v]:Disconnect()
+                pcall(function() toolConns[v]:Disconnect() end)
                 toolConns[v] = nil
             end
         end)
@@ -869,7 +882,10 @@ run(function()
 
     local function characterAdded(char)
         clearToolConns()
-        if backpackConn then backpackConn:Disconnect() end
+        if backpackConn then
+            pcall(function() backpackConn:Disconnect() end)
+            backpackConn = nil
+        end
         if lplr and lplr.Backpack then
             backpackConn = lplr.Backpack.ChildAdded:Connect(function(child)
                 itemAdded(child)
@@ -903,8 +919,14 @@ run(function()
                     characterAdded(entitylib.character)
                 end
             else
-                if reloadConnection then reloadConnection:Disconnect() end
-                if backpackConn then backpackConn:Disconnect() end
+                if reloadConnection then
+                    pcall(function() reloadConnection:Disconnect() end)
+                    reloadConnection = nil
+                end
+                if backpackConn then
+                    pcall(function() backpackConn:Disconnect() end)
+                    backpackConn = nil
+                end
                 clearToolConns()
             end
         end
@@ -926,6 +948,7 @@ run(function()
     local renderConnection
     local text_x = 0
     local lastSpinAngle = 0
+    local drawingsCreated = false
 
     local function solve(angle, radius)
         local rad = math.rad(angle)
@@ -933,6 +956,7 @@ run(function()
     end
 
     local function createDrawings()
+        if drawingsCreated then return end
         for i = 1, 8 do
             drawings.lines[i] = Drawing.new('Line')
         end
@@ -947,20 +971,39 @@ run(function()
             Color = crosshairColor
         })
         text_x = drawings.texts[1].TextBounds.X + drawings.texts[2].TextBounds.X
+        drawingsCreated = true
+    end
+
+    local function destroyDrawings()
+        for i = 1, 8 do
+            if drawings.lines[i] then
+                pcall(function() drawings.lines[i]:Remove() end)
+                drawings.lines[i] = nil
+            end
+        end
+        for i = 1, 2 do
+            if drawings.texts[i] then
+                pcall(function() drawings.texts[i]:Remove() end)
+                drawings.texts[i] = nil
+            end
+        end
+        drawingsCreated = false
     end
 
     local function updateCrosshair()
         local pos = inputService:GetMouseLocation()
-        drawings.texts[1].Visible = crosshairEnabled
-        drawings.texts[2].Visible = crosshairEnabled
+        if drawings.texts[1] then drawings.texts[1].Visible = crosshairEnabled end
+        if drawings.texts[2] then drawings.texts[2].Visible = crosshairEnabled end
 
         if crosshairEnabled then
-            if text_x == 0 then
+            if text_x == 0 and drawings.texts[1] and drawings.texts[2] then
                 text_x = drawings.texts[1].TextBounds.X + drawings.texts[2].TextBounds.X
             end
-            drawings.texts[1].Position = pos + Vector2.new(-text_x / 2, crosshairRadius + crosshairLength + 15)
-            drawings.texts[2].Position = drawings.texts[1].Position + Vector2.new(drawings.texts[1].TextBounds.X, 0)
-            drawings.texts[2].Color = crosshairColor
+            if drawings.texts[1] and drawings.texts[2] then
+                drawings.texts[1].Position = pos + Vector2.new(-text_x / 2, crosshairRadius + crosshairLength + 15)
+                drawings.texts[2].Position = drawings.texts[1].Position + Vector2.new(drawings.texts[1].TextBounds.X, 0)
+                drawings.texts[2].Color = crosshairColor
+            end
 
             if crosshairSpin then
                 lastSpinAngle = (tick() * 360) % 360
@@ -969,6 +1012,7 @@ run(function()
             for idx = 1, 4 do
                 local outline = drawings.lines[idx]
                 local inline = drawings.lines[idx + 4]
+                if not outline or not inline then continue end
                 local angle = (idx - 1) * 90 + lastSpinAngle
 
                 local dir = solve(angle, 1)
@@ -990,7 +1034,7 @@ run(function()
             end
         else
             for i = 1, 8 do
-                drawings.lines[i].Visible = false
+                if drawings.lines[i] then drawings.lines[i].Visible = false end
             end
         end
     end
@@ -1000,15 +1044,20 @@ run(function()
         Function = function(callback)
             crosshairEnabled = callback
             if callback then
-                if not drawings.lines[1] then createDrawings() end
+                if not drawingsCreated then createDrawings() end
+                if renderConnection then renderConnection:Disconnect() end
                 renderConnection = runService.RenderStepped:Connect(updateCrosshair)
             else
                 if renderConnection then
                     renderConnection:Disconnect()
                     renderConnection = nil
                 end
-                for _, d in ipairs(drawings.lines) do if d then d.Visible = false end end
-                for _, d in ipairs(drawings.texts) do if d then d.Visible = false end end
+                for i = 1, 8 do
+                    if drawings.lines[i] then drawings.lines[i].Visible = false end
+                end
+                for i = 1, 2 do
+                    if drawings.texts[i] then drawings.texts[i].Visible = false end
+                end
             end
         end
     })
@@ -1044,6 +1093,14 @@ run(function()
         Function = function(val) crosshairWidth = val end,
         Suffix = "px"
     })
+
+    vape:Clean(function()
+        if renderConnection then
+            renderConnection:Disconnect()
+            renderConnection = nil
+        end
+        destroyDrawings()
+    end)
 end)
 
 run(function()
@@ -1201,6 +1258,8 @@ run(function()
     local mouseClicked = false
     local renderStepConnection
     local watchdogConnection
+    local cacheCleanupTick = 0
+    local CACHE_CLEANUP_INTERVAL = 30
 
     local function tryShoot(origin, targetPart, tool)
         if not tool or not targetPart or not targetPart.Parent then return end
@@ -1318,6 +1377,12 @@ run(function()
                             return
                         end
 
+                        local now = tick()
+                        if now - cacheCleanupTick >= CACHE_CLEANUP_INTERVAL then
+                            cacheCleanupTick = now
+                            t.bt = {m = false, q = false, p = Vector3.new()}
+                        end
+
                         local origin = head.CFrame
                         local ent = entitylib['Entity' .. (Mode and Mode.Value or 'Mouse')]({
                             Range = Range and Range.Value or 150,
@@ -1420,6 +1485,7 @@ run(function()
                     mouseClicked = false
                 end
                 t.sa = nil
+                cacheCleanupTick = 0
             end
         end,
         Tooltip = 'Silently adjusts your aim towards the enemy'
@@ -1859,8 +1925,8 @@ run(function()
                     for _, conn in pairs(conns) do
                         pcall(function() conn:Disconnect() end)
                     end
+                    Players[plr] = nil
                 end
-                Players = {}
                 arrestTimeouts = {}
                 t.d.s = CFrame.new()
             end
@@ -1873,54 +1939,11 @@ run(function()
             for _, conn in pairs(conns) do
                 pcall(function() conn:Disconnect() end)
             end
+            Players[plr] = nil
         end
-        Players = {}
         arrestTimeouts = {}
         t.d.s = CFrame.new()
     end)
-end)
-                                                                                                                                        
-run(function()
-    local NameChanger = vape.Categories.Utility:CreateModule({
-        Name = "Name Changer",
-        Function = function(callback) end
-    })
-
-    local displayNameBox = NameChanger:CreateTextBox({
-        Name = "Display Name",
-        Default = lplr and (lplr.DisplayName or lplr.Name) or "",
-        Placeholder = "New display name"
-    })
-    local userNameBox = NameChanger:CreateTextBox({
-        Name = "User Name",
-        Default = lplr and lplr.Name or "",
-        Placeholder = "New username"
-    })
-    NameChanger:CreateButton({
-        Name = "Set Names",
-        Function = function()
-            local newDisplay = displayNameBox and displayNameBox.Value
-            local newUser = userNameBox and userNameBox.Value
-            local success = false
-            if newDisplay and newDisplay ~= "" and #newDisplay <= 100 then
-                if lplr then
-                    lplr.DisplayName = newDisplay
-                    success = true
-                end
-            end
-            if newUser and newUser ~= "" and #newUser <= 100 then
-                if lplr then
-                    lplr.Name = newUser
-                    success = true
-                end
-            end
-            if success then
-                notif('Name Changer', 'Names have been updated!', 2, 'success')
-            else
-                notif('Name Changer', 'Failed to update names.', 2, 'alert')
-            end
-        end
-    })
 end)
                                                                                                                                                                                 
 run(function()
