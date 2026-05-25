@@ -100,7 +100,7 @@ local function canClick()
 end
 
 for _, v in {'SilentAim', 'Reach', 'AntiFall', 'Killaura', 'AntiRagdoll', 'Blink',
-    'Disabler', 'SafeWalk', 'MurderMystery', 'TriggerBot'} do vape:Remove(v) end
+    'Disabler', 'SafeWalk', 'MurderMystery', 'TriggerBot', 'Self Visuals'} do vape:Remove(v) end
 
 local function chid_to_id(chid)
     return string.byte(chid or string.char(0))
@@ -1034,15 +1034,12 @@ run(function()
     }
 
     local configPath = "newvape/assets/self_visuals.json"
-    local modifications = {}
     local originalProperties = {}
-
     local selectedMaterial = "Plastic"
     local selectedColor = Color3.new(1, 1, 1)
     local selectedTransparency = 0
 
-    local viewModelsFolder = nil
-
+    -- (config save/load helpers same as before, omitted for brevity – keep them from your original)
     local function ensureFolders()
         if not isfolder("newvape") then makefolder("newvape") end
         if not isfolder("newvape/assets") then makefolder("newvape/assets") end
@@ -1066,9 +1063,7 @@ run(function()
             color = colorToTable(selectedColor),
             transparency = selectedTransparency
         }
-        pcall(function()
-            writefile(configPath, HttpService:JSONEncode(data))
-        end)
+        pcall(function() writefile(configPath, HttpService:JSONEncode(data)) end)
     end
 
     local function loadConfig()
@@ -1122,39 +1117,10 @@ run(function()
         end
     end
 
-    local function applyToPart(part, material, color, transparency)
-        if not part or not part:IsA("BasePart") then return end
-        part.Material = Enum.Material[material] or Enum.Material.Plastic
-        part.Color = color
-        part.Transparency = transparency or 0
-    end
-
-    local function colorViewModel(model)
-        if not model or not model:IsA("Model") then return end
-        for _, part in ipairs(model:GetDescendants()) do
-            applyToPart(part, selectedMaterial, selectedColor, selectedTransparency)
-        end
-    end
-
-    local function applyAllViewModels()
-        if not viewModelsFolder then return end
-        for _, model in ipairs(viewModelsFolder:GetChildren()) do
-            colorViewModel(model)
-        end
-    end
-
     local function applyAll()
-        modifications = {}
         for _, partName in ipairs(R15_PARTS) do
-            table.insert(modifications, {
-                partName = partName,
-                material = selectedMaterial,
-                color = selectedColor,
-                transparency = selectedTransparency
-            })
             applyPart(partName, selectedMaterial, selectedColor, selectedTransparency)
         end
-        applyAllViewModels()
     end
 
     local function restoreAll()
@@ -1164,30 +1130,6 @@ run(function()
             restorePart(partName)
         end
     end
-
-    local function setupViewModelHook()
-        viewModelsFolder = replicatedStorageService:FindFirstChild("Assets")
-        if viewModelsFolder then
-            viewModelsFolder = viewModelsFolder:FindFirstChild("Temp")
-            if viewModelsFolder then
-                viewModelsFolder = viewModelsFolder:FindFirstChild("ViewModels")
-            end
-        end
-        if not viewModelsFolder then return end
-
-        for _, model in ipairs(viewModelsFolder:GetChildren()) do
-            task.wait(0.05)
-            colorViewModel(model)
-        end
-
-        viewModelsFolder.ChildAdded:Connect(function(model)
-            if not model:IsA("Model") then return end
-            task.wait(0.05)
-            colorViewModel(model)
-        end)
-    end
-
-    setupViewModelHook()
 
     localPlayer.CharacterAdded:Connect(function(char)
         task.wait(0.1)
