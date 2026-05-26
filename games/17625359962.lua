@@ -60,6 +60,9 @@ local coreGui = cloneref(game:GetService('CoreGui'))
 local guiService = cloneref(game:GetService('GuiService'))
 local tweenService = game:GetService('TweenService')
 
+local UtilityModule = require(replicatedStorageService:WaitForChild("Modules"):WaitForChild("Utility"))
+local originalRaycastGlobal = UtilityModule.Raycast
+
 local gameCamera = workspace.CurrentCamera
 local lplr = playersService.LocalPlayer
 local vape = shared.vape
@@ -397,6 +400,7 @@ run(function()
 
     local enabled = false
     local gameReady = false
+    local hookActive = false
 
     local aimPart = "Head"
     local fovRadius = 100
@@ -409,7 +413,6 @@ run(function()
     local CircleColor, CircleTransparency, CircleFilled
 
     local rand = Random.new()
-    local originalRaycast = nil
 
     local function isGameActive()
         local mainGui = lplr.PlayerGui:FindFirstChild("MainGui")
@@ -424,11 +427,6 @@ run(function()
             end
         end
         return false
-    end
-
-    local function getScreenPosition(part)
-        if not part then return nil, false end
-        return gameCamera:WorldToViewportPoint(part.Position)
     end
 
     local function isVisible(part, targetChar)
@@ -498,36 +496,30 @@ run(function()
         return winner
     end
 
-    local function setupHook()
-        if originalRaycast then return end
-        local mod = require(replicatedStorageService:WaitForChild("Modules"):WaitForChild("Utility"))
-        if not mod or not mod.Raycast then return end
-        originalRaycast = mod.Raycast
-
-        mod.Raycast = function(...)
+    local function applyHook()
+        if hookActive then return end
+        UtilityModule.Raycast = function(...)
             local args = {...}
             if not enabled or not gameReady then
-                return originalRaycast(...)
+                return originalRaycastGlobal(...)
             end
             if math.random(100) > hitChance then
-                return originalRaycast(...)
+                return originalRaycastGlobal(...)
             end
             local target = getClosestPlayerToCrosshair()
             if target and target.part and target.part.Parent then
                 args[3] = target.pos
             end
-            return originalRaycast(table.unpack(args))
+            return originalRaycastGlobal(table.unpack(args))
         end
+        hookActive = true
     end
 
     local function removeHook()
-        if originalRaycast then
-            local mod = require(replicatedStorageService:WaitForChild("Modules"):WaitForChild("Utility"))
-            if mod then
-                mod.Raycast = originalRaycast
-            end
+        if UtilityModule then
+            UtilityModule.Raycast = originalRaycastGlobal
         end
-        originalRaycast = nil
+        hookActive = false
     end
 
     task.spawn(function()
@@ -553,7 +545,7 @@ run(function()
             enabled = callback
             if CircleObject then CircleObject.Visible = callback end
             if callback then
-                setupHook()
+                applyHook()
             else
                 removeHook()
             end
