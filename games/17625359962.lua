@@ -418,6 +418,8 @@ run(function()
 
     local enabled = false
     local gameReady = false
+    local cacheCleanupTick = 0
+    local CACHE_CLEANUP_INTERVAL = 30
 
     local aimPart = "Head"
     local fovRadius = 100
@@ -514,6 +516,7 @@ run(function()
         return winner
     end
 
+    -- Only hook Raycast once, toggle controls whether it redirects
     X.mod.Raycast = function(...)
         local args = {...}
         if not enabled or not gameReady then
@@ -529,20 +532,21 @@ run(function()
         return X.original(table.unpack(args))
     end
 
+    -- Circle updater runs continuously while the circle exists
+    task.spawn(function()
+        while true do
+            if CircleObject then
+                CircleObject.Position = inputService:GetMouseLocation()
+                CircleObject.Radius = fovRadius
+            end
+            task.wait()
+        end
+    end)
+
     task.spawn(function()
         repeat
             task.wait(0.5)
         until isGameActive() and lplr.Character and lplr.Character:FindFirstChild("HumanoidRootPart")
-        for _ = 1, 30 do
-            task.wait(0.5)
-            local firstPerson = workspace:FindFirstChild("ViewModels")
-            if firstPerson then
-                firstPerson = firstPerson:FindFirstChild("FirstPerson")
-                if firstPerson and #firstPerson:GetChildren() > 0 then
-                    break
-                end
-            end
-        end
         gameReady = true
     end)
 
@@ -552,11 +556,11 @@ run(function()
             enabled = callback
             if CircleObject then CircleObject.Visible = callback end
         end,
-        Tooltip = 'Raycast redirect – silently moves your bullet to the target'
+        Tooltip = 'testin for coolness'
     })
 
     SilentAimV2:CreateDropdown({Name='Aim Part', List={'Head','Body','Random'}, Default='Head', Function=function(v) aimPart=v end, Tooltip='Part to redirect onto'})
-    SilentAimV2:CreateSlider({Name='FOV', Min=10, Max=500, Default=100, Function=function(v) fovRadius=v; if CircleObject then CircleObject.Radius=v end end, Suffix='px', Tooltip='Max distance from crosshair'})
+    SilentAimV2:CreateSlider({Name='FOV', Min=10, Max=500, Default=100, Function=function(v) fovRadius=v end, Suffix='px', Tooltip='Max distance from crosshair'})
     SilentAimV2:CreateToggle({Name='Wall Check', Default=true, Function=function(v) wallCheck=v end, Tooltip='Only redirect when target is visible'})
     SilentAimV2:CreateToggle({Name='Prediction', Default=false, Function=function(v) predictionEnabled=v end, Tooltip='Lead moving targets'})
     SilentAimV2:CreateSlider({Name='Prediction Time (s)', Min=0.05, Max=0.5, Default=0.1, Decimal=100, Function=function(v) predictionTime=v end, Suffix='s', Tooltip='Time to predict ahead'})
