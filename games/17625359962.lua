@@ -248,55 +248,6 @@ run(function()
     local predictionEnabled = false
     local predictionTime = 0.1
 
-    -- Raycast redirect state
-    local UtilityModule = nil
-    local originalRaycast = nil
-    local raycastActive = false
-
-    local function setupRaycastHook()
-        if raycastActive then return end
-        if not UtilityModule then
-            local ok, mod = pcall(function()
-                return require(replicatedStorageService:WaitForChild("Modules"):WaitForChild("Utility"))
-            end)
-            if not ok or not mod or not mod.Raycast then
-                notif('Silent Aim', 'Raycast method not supported on this executor', 3, 'alert')
-                return
-            end
-            UtilityModule = mod
-        end
-        originalRaycast = UtilityModule.Raycast
-        UtilityModule.Raycast = function(...)
-            local args = {...}
-            if not silentAimEnabled or Method.Value ~= "Raycast" then
-                return originalRaycast(...)
-            end
-            if math.random(100) > lockChance then
-                return originalRaycast(...)
-            end
-
-            local target = getClosestPlayerToMouse(fovRadiusSA)
-            if target and target.Character then
-                local part, pos = getTargetPart(target.Character, aimPartSA, predictionEnabled and predictionTime or 0)
-                if part and pos then
-                    if not wallCheckSA or isVisibleCached(part, target.Character) then
-                        args[3] = pos
-                    end
-                end
-            end
-            return originalRaycast(table.unpack(args))
-        end
-        raycastActive = true
-    end
-
-    local function removeRaycastHook()
-        if UtilityModule and originalRaycast then
-            UtilityModule.Raycast = originalRaycast
-        end
-        originalRaycast = nil
-        raycastActive = false
-    end
-
     local function lockCameraToHead()
         if not targetPlayer or not targetPlayer.Character then return end
         local part, targetPos = getTargetPart(targetPlayer.Character, aimPartSA, predictionEnabled and predictionTime or 0)
@@ -371,61 +322,12 @@ run(function()
         end
     end)
 
-    -- Vape module
     local SilentAim = vape.Categories.Combat:CreateModule({
         Name = 'Silent Aim',
         Function = function(callback)
             silentAimEnabled = callback
             if CircleObject then CircleObject.Visible = callback end
-            
-            -- Disable any running method first
-            if cameraLockConnection then cameraLockConnection:Disconnect(); cameraLockConnection = nil end
-            removeRaycastHook()
-            
             if callback then
-                local method = Method.Value or "Camera Lock"
-                if method == "Camera Lock" then
-                    cameraLockConnection = runService.Heartbeat:Connect(function()
-                        local now = tick()
-                        if now - cacheCleanupTick >= CACHE_CLEANUP_INTERVAL then
-                            cacheCleanupTick = now
-                            screenCache = {}
-                            visibilityCache = {}
-                        end
-                        if CircleObject then
-                            CircleObject.Position = inputService:GetMouseLocation()
-                        end
-                        if not isLobbyVisible() then
-                            targetPlayer = getClosestPlayerToMouse(fovRadiusSA)
-                            if targetPlayer and math.random(100) <= lockChance then
-                                lockCameraToHead()
-                            end
-                        end
-                    end)
-                elseif method == "Raycast" then
-                    setupRaycastHook()
-                end
-            else
-                screenCache = {}
-                visibilityCache = {}
-                cacheCleanupTick = 0
-            end
-        end,
-        Tooltip = '<3'
-    })
-
-    -- Method dropdown (must be created before module Function uses it)
-    local Method = SilentAim:CreateDropdown({
-        Name = 'Method',
-        List = {'Camera Lock', 'Raycast'},
-        Default = 'Camera Lock',
-        Function = function(v)
-            if not silentAimEnabled then return end
-            -- Disable old method
-            if cameraLockConnection then cameraLockConnection:Disconnect(); cameraLockConnection = nil end
-            removeRaycastHook()
-            -- Enable new method
-            if v == "Camera Lock" then
                 cameraLockConnection = runService.Heartbeat:Connect(function()
                     local now = tick()
                     if now - cacheCleanupTick >= CACHE_CLEANUP_INTERVAL then
@@ -433,6 +335,7 @@ run(function()
                         screenCache = {}
                         visibilityCache = {}
                     end
+
                     if CircleObject then
                         CircleObject.Position = inputService:GetMouseLocation()
                     end
@@ -443,11 +346,16 @@ run(function()
                         end
                     end
                 end)
-            elseif v == "Raycast" then
-                setupRaycastHook()
+            else
+                if cameraLockConnection then cameraLockConnection:Disconnect(); cameraLockConnection = nil end
+                if autoClickConnection then autoClickConnection:Disconnect(); autoClickConnection = nil end
+                targetPlayer = nil
+                screenCache = {}
+                visibilityCache = {}
+                cacheCleanupTick = 0
             end
         end,
-        Tooltip = 'Camera Lock works on all executors. Raycast redirects bullets silently.'
+        Tooltip = '<3'
     })
 
     SilentAim:CreateDropdown({Name='Aim Part', List={'Head','Body','Random'}, Default='Head', Function=function(v) aimPartSA=v end, Tooltip='Part to aim at'})
@@ -479,11 +387,189 @@ run(function()
         if CircleTransparency then CircleTransparency.Object.Visible=c end
         if CircleFilled then CircleFilled.Object.Visible=c end
     end})
+end)
+
+run(function()
+    if not hookfunction then
+        notif('Silent Aim V2', 'Your executor does not support hookfunction.', 5, 'alert')
+        return
+    end
+
+    local UtilityModule = nil
+    local originalRaycast = nil
+    local hookActive = false
+    local enabled = false
+
+    local aimPart = "Head"
+    local fovRadius = 100
+    local wallCheck = true
+    local hitChance = 100
+    local predictionEnabled = false
+    local predictionTime = 0.1
+    local showTarget = true
+
+    local CircleObject = nil
+    local CircleColor, CircleTransparency, CircleFilled
+
+    local rand = Random.new()
+
+    local function getScreenPosition(part)
+        if not part then return nil, false end
+        local pos, onScreen = gameCamera:WorldToViewportPoint(part.Position)
+        return pos, onScreen
+    end
+
+    local function isVisible(part, targetChar)
+        if not part then return false end
+        local origin = gameCamera.CFrame.Position
+        local direction = (part.Position - origin).Unit
+        local rayParams = RaycastParams.new()
+        rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+        rayParams.FilterDescendantsInstances = {lplr.Character, targetChar}
+        local result = workspace:Raycast(origin, direction * (part.Position - origin).Magnitude, rayParams)
+        return not result or result.Instance:IsDescendantOf(part.Parent)
+    end
+
+    local function getPredictedPosition(part)
+        if not part then return nil end
+        local vel = part.Velocity
+        if vel.Magnitude < 0.5 then return part.Position end
+        return part.Position + vel * predictionTime
+    end
+
+    local function getTargetPart(character)
+        if not character then return nil end
+        local part = nil
+        if aimPart == "Head" then
+            part = character:FindFirstChild("Head")
+        elseif aimPart == "Body" then
+            part = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("UpperTorso") or character:FindFirstChild("Head")
+        elseif aimPart == "Random" then
+            local parts = {"Head", "HumanoidRootPart", "UpperTorso", "LowerTorso"}
+            local valid = {}
+            for _, p in ipairs(parts) do
+                local bp = character:FindFirstChild(p)
+                if bp then table.insert(valid, bp) end
+            end
+            if #valid > 0 then part = valid[math.random(1, #valid)] end
+        else
+            part = character:FindFirstChild("Head")
+        end
+        if part and predictionEnabled then
+            return part, getPredictedPosition(part)
+        end
+        return part, part and part.Position
+    end
+
+    local function getClosestPlayerToMouse()
+        local closest = nil
+        local shortest = math.huge
+        local mousePos = inputService:GetMouseLocation()
+
+        for _, player in ipairs(playersService:GetPlayers()) do
+            if player ~= lplr and isEnemy(player) then
+                local char = player.Character
+                if not char then continue end
+                local part, pos = getTargetPart(char)
+                if not part then continue end
+                local screenPos, onScreen = getScreenPosition(part)
+                if onScreen and screenPos.Z > 0 then
+                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                    if dist < shortest and dist <= fovRadius then
+                        if not wallCheck or isVisible(part, char) then
+                            shortest = dist
+                            closest = {player = player, part = part, pos = pos}
+                        end
+                    end
+                end
+            end
+        end
+        return closest
+    end
+
+    local function setupHook()
+        if hookActive then return end
+        local ok, mod = pcall(function()
+            return require(replicatedStorageService:WaitForChild("Modules"):WaitForChild("Utility"))
+        end)
+        if not ok or not mod or not mod.Raycast then
+            notif('Silent Aim V2', 'Could not hook Utility.Raycast.', 3, 'alert')
+            return
+        end
+        UtilityModule = mod
+        originalRaycast = mod.Raycast
+
+        mod.Raycast = function(...)
+            local args = {...}
+            if not enabled then
+                return originalRaycast(...)
+            end
+            if math.random(100) > hitChance then
+                return originalRaycast(...)
+            end
+
+            local target = getClosestPlayerToMouse()
+            if target and target.part then
+                args[3] = target.pos
+            end
+            return originalRaycast(table.unpack(args))
+        end
+        hookActive = true
+    end
+
+    local function removeHook()
+        if UtilityModule and originalRaycast then
+            UtilityModule.Raycast = originalRaycast
+        end
+        hookActive = false
+        originalRaycast = nil
+        UtilityModule = nil
+    end
+
+    local SilentAimV2 = vape.Categories.Combat:CreateModule({
+        Name = 'Silent Aim V2',
+        Function = function(callback)
+            enabled = callback
+            if CircleObject then CircleObject.Visible = callback end
+            if callback then
+                setupHook()
+            else
+                removeHook()
+            end
+        end,
+        Tooltip = 'New 4 u <3'
+    })
+
+    SilentAimV2:CreateDropdown({Name='Aim Part', List={'Head','Body','Random'}, Default='Head', Function=function(v) aimPart=v end, Tooltip='Part to redirect onto'})
+    SilentAimV2:CreateSlider({Name='FOV', Min=10, Max=500, Default=100, Function=function(v) fovRadius=v; if CircleObject then CircleObject.Radius=v end end, Suffix='px', Tooltip='Max distance from crosshair'})
+    SilentAimV2:CreateToggle({Name='Wall Check', Default=true, Function=function(v) wallCheck=v end, Tooltip='Only redirect when target is visible'})
+    SilentAimV2:CreateToggle({Name='Prediction', Default=false, Function=function(v) predictionEnabled=v end, Tooltip='Lead moving targets'})
+    SilentAimV2:CreateSlider({Name='Prediction Time (s)', Min=0.05, Max=0.5, Default=0.1, Decimal=100, Function=function(v) predictionTime=v end, Suffix='s', Tooltip='Time to predict ahead'})
+    SilentAimV2:CreateSlider({Name='Hit Chance', Min=0, Max=100, Default=100, Function=function(v) hitChance=v end, Suffix='%', Tooltip='Chance to redirect'})
+    SilentAimV2:CreateToggle({Name='Show Target Info', Default=true, Function=function(v) showTarget=v end})
+    CircleColor = SilentAimV2:CreateColorSlider({Name='Circle Color', Darker=true, Visible=false, Function=function(h,s,v) if CircleObject then CircleObject.Color=Color3.fromHSV(h,s,v) end end})
+    CircleTransparency = SilentAimV2:CreateSlider({Name='Transparency', Min=0, Max=1, Decimal=10, Default=0.5, Darker=true, Visible=false, Function=function(v) if CircleObject then CircleObject.Transparency=1-v end end})
+    CircleFilled = SilentAimV2:CreateToggle({Name='Circle Filled', Darker=true, Visible=false, Function=function(c) if CircleObject then CircleObject.Filled=c end end})
+    SilentAimV2:CreateToggle({Name='Range Circle', Function=function(c)
+        if c then
+            CircleObject = Drawing.new('Circle')
+            CircleObject.Filled = CircleFilled and CircleFilled.Enabled
+            CircleObject.Color = Color3.fromHSV(CircleColor and CircleColor.Hue or 0, 1, 1)
+            CircleObject.Position = inputService:GetMouseLocation()
+            CircleObject.Radius = fovRadius
+            CircleObject.NumSides = 100
+            CircleObject.Transparency = 1-(CircleTransparency and CircleTransparency.Value or 0.5)
+            CircleObject.Visible = enabled
+        else
+            pcall(function() CircleObject:Remove() end); CircleObject = nil
+        end
+        if CircleColor then CircleColor.Object.Visible=c end
+        if CircleTransparency then CircleTransparency.Object.Visible=c end
+        if CircleFilled then CircleFilled.Object.Visible=c end
+    end})
 
     vape:Clean(function()
-        removeRaycastHook()
-        if cameraLockConnection then cameraLockConnection:Disconnect() end
-        if autoClickConnection then autoClickConnection:Disconnect() end
+        removeHook()
         if CircleObject then pcall(function() CircleObject:Remove() end) end
     end)
 end)
