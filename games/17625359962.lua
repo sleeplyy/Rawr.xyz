@@ -399,6 +399,7 @@ run(function()
     local originalRaycast = nil
     local hookActive = false
     local enabled = false
+    local gameReady = false
 
     local aimPart = "Head"
     local fovRadius = 100
@@ -412,6 +413,21 @@ run(function()
     local CircleColor, CircleTransparency, CircleFilled
 
     local rand = Random.new()
+
+    local function isGameActive()
+        local mainGui = lplr.PlayerGui:FindFirstChild("MainGui")
+        if mainGui then
+            local mainFrame = mainGui:FindFirstChild("MainFrame")
+            if mainFrame then
+                local lobby = mainFrame:FindFirstChild("Lobby")
+                if lobby then
+                    local currency = lobby:FindFirstChild("Currency")
+                    return currency and currency.Visible == false
+                end
+            end
+        end
+        return false
+    end
 
     local function getScreenPosition(part)
         if not part then return nil, false end
@@ -462,6 +478,7 @@ run(function()
     end
 
     local function getClosestPlayerToMouse()
+        if not gameReady then return nil end
         local closest = nil
         local shortest = math.huge
         local mousePos = inputService:GetMouseLocation()
@@ -501,7 +518,7 @@ run(function()
 
         mod.Raycast = function(...)
             local args = {...}
-            if not enabled then
+            if not enabled or not gameReady then
                 return originalRaycast(...)
             end
             if math.random(100) > hitChance then
@@ -509,7 +526,7 @@ run(function()
             end
 
             local target = getClosestPlayerToMouse()
-            if target and target.part then
+            if target and target.part and target.part.Parent then
                 args[3] = target.pos
             end
             return originalRaycast(table.unpack(args))
@@ -526,6 +543,25 @@ run(function()
         UtilityModule = nil
     end
 
+    task.spawn(function()
+        repeat
+            task.wait(0.5)
+        until isGameActive() and lplr.Character and lplr.Character:FindFirstChild("HumanoidRootPart")
+        local viewModelsFound = false
+        for _ = 1, 30 do
+            task.wait(0.5)
+            local firstPerson = workspace:FindFirstChild("ViewModels")
+            if firstPerson then
+                firstPerson = firstPerson:FindFirstChild("FirstPerson")
+                if firstPerson and #firstPerson:GetChildren() > 0 then
+                    viewModelsFound = true
+                    break
+                end
+            end
+        end
+        gameReady = true
+    end)
+
     local SilentAimV2 = vape.Categories.Combat:CreateModule({
         Name = 'Silent Aim V2',
         Function = function(callback)
@@ -537,7 +573,7 @@ run(function()
                 removeHook()
             end
         end,
-        Tooltip = 'New 4 u <3'
+        Tooltip = 'built for u <3'
     })
 
     SilentAimV2:CreateDropdown({Name='Aim Part', List={'Head','Body','Random'}, Default='Head', Function=function(v) aimPart=v end, Tooltip='Part to redirect onto'})
