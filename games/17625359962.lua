@@ -1016,11 +1016,11 @@ run(function()
 end)
                                                                                                                         
 run(function()
-    local Players = game:GetService("Players")
-    local localPlayer = Players.LocalPlayer
-    local HttpService = game:GetService("HttpService")
+    local players = game:GetService("Players")
+    local me = players.LocalPlayer
+    local http = game:GetService("HttpService")
 
-    local ALL_PARTS = {
+    local bodyParts = {
         "Head", "Torso",
         "UpperTorso", "LowerTorso",
         "Left Arm", "Right Arm", "Left Leg", "Right Leg",
@@ -1029,234 +1029,191 @@ run(function()
         "LeftHand", "RightHand", "LeftFoot", "RightFoot"
     }
 
-    local MATERIALS = {
+    local materials = {
         "Plastic", "Wood", "Brick", "Concrete", "CorrodedMetal", "DiamondPlate",
         "Foil", "Grass", "Ice", "Marble", "Metal", "Neon", "Pebble", "Sand",
         "Slate", "SmoothPlastic", "WoodPlanks", "ForceField"
     }
 
-    local configPath = "newvape/assets/self_visuals.json"
-    local originalProperties = {}
-    local selectedMaterial = "Plastic"
-    local selectedColor = Color3.new(1, 1, 1)
-    local selectedTransparency = 0
+    local cfgPath = "newvape/assets/self_visuals.json"
+    local orig = {}
+    local selMat = "Plastic"
+    local selCol = Color3.new(1, 1, 1)
+    local selTrans = 0
 
     local function ensureFolders()
         if not isfolder("newvape") then makefolder("newvape") end
         if not isfolder("newvape/assets") then makefolder("newvape/assets") end
     end
 
-    local function colorToTable(c)
+    local function col2tbl(c)
         return {r = c.R, g = c.G, b = c.B}
     end
 
-    local function tableToColor(t)
+    local function tbl2col(t)
         if type(t) == "table" and t.r and t.g and t.b then
             return Color3.new(t.r, t.g, t.b)
         end
-        return Color3.new(1, 1, 1)
+        return Color3.new(1,1,1)
     end
 
-    local function saveConfig()
+    local function save()
         ensureFolders()
         local data = {
-            material = selectedMaterial,
-            color = colorToTable(selectedColor),
-            transparency = selectedTransparency
+            material = selMat,
+            color = col2tbl(selCol),
+            transparency = selTrans
         }
-        pcall(function() writefile(configPath, HttpService:JSONEncode(data)) end)
+        pcall(function() writefile(cfgPath, http:JSONEncode(data)) end)
     end
 
-    local function loadConfig()
+    local function load()
         ensureFolders()
-        if not isfile(configPath) then return end
-        local ok, jsonData = pcall(function() return readfile(configPath) end)
+        if not isfile(cfgPath) then return end
+        local ok, raw = pcall(function() return readfile(cfgPath) end)
         if not ok then return end
-        local data = HttpService:JSONDecode(jsonData)
+        local data = http:JSONDecode(raw)
         if data then
-            if data.material then selectedMaterial = data.material end
-            if data.color then selectedColor = tableToColor(data.color) end
-            if data.transparency then selectedTransparency = data.transparency end
+            if data.material then selMat = data.material end
+            if data.color then selCol = tbl2col(data.color) end
+            if data.transparency then selTrans = data.transparency end
         end
     end
 
-    local function cacheOriginalProperties()
-        local char = localPlayer.Character
+    local function cacheOrig()
+        local char = me.Character
         if not char then return end
-        for _, partName in ipairs(ALL_PARTS) do
-            local part = char:FindFirstChild(partName)
-            if part and part:IsA("BasePart") then
-                originalProperties[partName] = {
-                    material = part.Material,
-                    color = part.Color,
-                    transparency = part.Transparency
+        for _, pname in ipairs(bodyParts) do
+            local p = char:FindFirstChild(pname)
+            if p and p:IsA("BasePart") then
+                orig[pname] = {
+                    material = p.Material,
+                    color = p.Color,
+                    transparency = p.Transparency
                 }
             end
         end
     end
 
-    local function applyPart(partName, material, color, transparency)
-        local part = localPlayer.Character and localPlayer.Character:FindFirstChild(partName)
+    local function applyPart(pname)
+        local part = me.Character and me.Character:FindFirstChild(pname)
         if not part or not part:IsA("BasePart") then return end
-        part.Material = Enum.Material[material] or Enum.Material.Plastic
-        part.Color = color
-        part.Transparency = transparency or 0
+        part.Material = Enum.Material[selMat] or Enum.Material.Plastic
+        part.Color = selCol
+        part.Transparency = selTrans
     end
 
-    local function restorePart(partName)
-        local part = localPlayer.Character and localPlayer.Character:FindFirstChild(partName)
+    local function restorePart(pname)
+        local part = me.Character and me.Character:FindFirstChild(pname)
         if not part or not part:IsA("BasePart") then return end
-        local orig = originalProperties[partName]
-        if orig then
-            part.Material = orig.material
-            part.Color = orig.color
-            part.Transparency = orig.transparency
+        local o = orig[pname]
+        if o then
+            part.Material = o.material
+            part.Color = o.color
+            part.Transparency = o.transparency
         else
             part.Material = Enum.Material.Plastic
-            part.Color = Color3.new(1, 1, 1)
+            part.Color = Color3.new(1,1,1)
             part.Transparency = 0
         end
     end
 
     local function applyAll()
-        for _, partName in ipairs(ALL_PARTS) do
-            applyPart(partName, selectedMaterial, selectedColor, selectedTransparency)
+        for _, pname in ipairs(bodyParts) do
+            applyPart(pname)
         end
     end
 
     local function restoreAll()
-        local char = localPlayer.Character
+        local char = me.Character
         if not char then return end
-        for _, partName in ipairs(ALL_PARTS) do
-            restorePart(partName)
+        for _, pname in ipairs(bodyParts) do
+            restorePart(pname)
         end
     end
 
-    local function applyToPart(part, material, color, transparency)
+    local function applyArm(part)
         if not part or not part:IsA("BasePart") then return end
-        part.Material = Enum.Material[material] or part.Material
-        part.Color = color
-        part.Transparency = transparency or 0
+        local n = part.Name
+        if n ~= "LeftArm" and n ~= "RightArm" then return end
+        part.Material = Enum.Material[selMat] or part.Material
+        part.Color = selCol
+        part.Transparency = selTrans
     end
 
-    local function colorViewModel(model)
+    local function colorArmsInModel(model)
         if not model or not model:IsA("Model") then return end
-        for _, part in ipairs(model:GetDescendants()) do
-            applyToPart(part, selectedMaterial, selectedColor, selectedTransparency)
+        for _, p in ipairs(model:GetDescendants()) do
+            applyArm(p)
         end
     end
 
-    local function applyToPart(part, material, color, transparency)
-        if not part or not part:IsA("BasePart") then return end
-        part.Material = Enum.Material[material] or part.Material
-        part.Color = color
-        part.Transparency = transparency or 0
-    end
+    local function processFirstPerson()
+        local firstPerson = workspace:FindFirstChild("ViewModels")
+        if not firstPerson then return end
+        firstPerson = firstPerson:FindFirstChild("FirstPerson")
+        if not firstPerson then return end
 
-    local function colorViewModel(model)
-        if not model or not model:IsA("Model") then return end
-        for _, part in ipairs(model:GetDescendants()) do
-            applyToPart(part, selectedMaterial, selectedColor, selectedTransparency)
-        end
-    end
-
-    local function hookWorkspaceViewModels()
-        local myName = localPlayer.Name
-
-        local function scanFirstPerson()
-            local firstPerson = workspace:FindFirstChild("ViewModels")
-            if not firstPerson then return end
-            firstPerson = firstPerson:FindFirstChild("FirstPerson")
-            if not firstPerson then return end
-
-            for _, model in ipairs(firstPerson:GetChildren()) do
-                if model:IsA("Model") then
-                    colorViewModel(model)
-                end
+        local myName = me.Name
+        for _, model in ipairs(firstPerson:GetChildren()) do
+            if model:IsA("Model") and model.Name:sub(1, #myName) == myName then
+                colorArmsInModel(model)
             end
-
-            firstPerson.ChildAdded:Connect(function(model)
-                if model:IsA("Model") then
-                    task.wait(0.1)
-                    colorViewModel(model)
-                end
-            end)
         end
+    end
 
-        workspace.ChildAdded:Connect(function(child)
-            if child:IsA("Model") and child.Name:sub(1, #myName) == myName and child.Name:find(" - ") then
-                task.wait(0.15)
-                colorViewModel(child)
+    local function hookViewModels()
+        task.spawn(function()
+            while true do
+                task.wait(1)
+                processFirstPerson()
             end
         end)
 
-        scanFirstPerson()
+        processFirstPerson()
     end
 
-    local function hookStorageViewModels()
-        local assets = replicatedStorageService:FindFirstChild("Assets")
-        if not assets then return end
-        local temp = assets:FindFirstChild("Temp")
-        if not temp then return end
-        local folder = temp:FindFirstChild("ViewModels")
-        if not folder then return end
-
-        for _, model in ipairs(folder:GetChildren()) do
-            if model:IsA("Model") then
-                task.wait(0.1)
-                colorViewModel(model)
-            end
-        end
-
-        folder.ChildAdded:Connect(function(model)
-            if model:IsA("Model") then
-                task.wait(0.1)
-                colorViewModel(model)
-            end
-        end)
-    end
-                                                                                                                                
-    localPlayer.CharacterAdded:Connect(function(char)
+    me.CharacterAdded:Connect(function(char)
         task.wait(0.2)
-        originalProperties = {}
-        cacheOriginalProperties()
+        orig = {}
+        cacheOrig()
         applyAll()
     end)
 
-    if localPlayer.Character then
-        cacheOriginalProperties()
+    if me.Character then
+        cacheOrig()
     end
 
     local SelfVisuals = vape.Categories.Render:CreateModule({
         Name = "Self Visuals",
-        Function = function(enabled)
-            if enabled then
-                cacheOriginalProperties()
+        Function = function(on)
+            if on then
+                cacheOrig()
                 applyAll()
             else
                 restoreAll()
             end
         end,
-        Tooltip = "Custom materials & colors on your character and viewmodel"
+        Tooltip = "Custom materials & colors on body & viewmodel arms"
     })
 
     SelfVisuals:CreateDropdown({
         Name = "Material",
-        List = MATERIALS,
+        List = materials,
         Default = "Plastic",
-        Function = function(val)
-            selectedMaterial = val
+        Function = function(v)
+            selMat = v
             applyAll()
-            saveConfig()
+            save()
         end
     })
 
     SelfVisuals:CreateColorSlider({
         Name = "Color",
         Function = function(h, s, v)
-            selectedColor = Color3.fromHSV(h, s, v)
+            selCol = Color3.fromHSV(h, s, v)
             applyAll()
-            saveConfig()
+            save()
         end
     })
 
@@ -1264,19 +1221,17 @@ run(function()
         Name = "Transparency",
         Min = 0, Max = 1, Default = 0, Decimal = 100,
         Function = function(v)
-            selectedTransparency = v
+            selTrans = v
             applyAll()
-            saveConfig()
+            save()
         end
     })
 
-    loadConfig()
-    if localPlayer.Character then
+    load()
+    if me.Character then
         applyAll()
     end
-
-    task.spawn(hookStorageViewModels)
-    task.spawn(hookWorkspaceViewModels)
+    hookViewModels()
 
     vape:Clean(function()
         restoreAll()
