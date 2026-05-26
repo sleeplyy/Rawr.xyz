@@ -551,7 +551,7 @@ run(function()
 
     SilentAimV2:CreateDropdown({Name='Aim Part', List={'Head','Body','Random'}, Default='Head', Function=function(v) aimPart=v end, Tooltip='Part to redirect onto'})
     SilentAimV2:CreateSlider({Name='FOV', Min=10, Max=500, Default=100, Function=function(v) fovRadius=v end, Suffix='px', Tooltip='Max distance from crosshair'})
-    SilentAimV2:CreateToggle({Name='Wall Check', Default=true, Function=function(v) wallCheck=v end, Tooltip='Only redirect when target is visible'})
+    SilentAimV2:CreateToggle({Name='Wall Check', Default=true, Function=function(v) wallCheck=v end, Tooltip='Only lock onto the person when visible'})
 
     vape:Clean(function()
         X.mod.Raycast = X.original
