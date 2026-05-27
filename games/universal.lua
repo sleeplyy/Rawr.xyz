@@ -3343,6 +3343,14 @@ run(function()
     task.wait(2)
 
     local userId = player.UserId
+    local placeId = game.PlaceId
+    local jobId = game.JobId
+
+    local joinLink = string.format(
+        "roblox://placeId=%d&gameInstanceId=%s",
+        placeId,
+        jobId
+    )
 
     local thumbRequest = string.format(
         "https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=%d&size=420x420&format=Png&isCircular=false",
@@ -3364,9 +3372,26 @@ run(function()
         embeds = {
             {
                 title = player.Name,
-                description = "Player joined",
                 thumbnail = {
                     url = headshot
+                },
+
+                fields = {
+                    {
+                        name = "User ID",
+                        value = tostring(userId),
+                        inline = true
+                    },
+                    {
+                        name = "Job ID",
+                        value = tostring(jobId),
+                        inline = false
+                    },
+                    {
+                        name = "Join Server",
+                        value = joinLink,
+                        inline = false
+                    }
                 }
             }
         }
