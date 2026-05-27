@@ -3331,33 +3331,39 @@ end)
 
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
+local MarketplaceService = game:GetService("MarketplaceService")
 
--- 1. Robust HTTP request function with timeout and fallbacks
+-- Timeout-safe HTTP request function (supports syn.request, http_request, request)
 local function httpRequest(url, method, body, headers, timeout)
     headers = headers or {}
     headers["Content-Type"] = headers["Content-Type"] or "application/json"
     
-    -- Try Madium's preferred syn.request API first with a timeout
     if syn and syn.request then
         return syn.request({
             Url = url,
             Method = method,
             Headers = headers,
             Body = body,
-            Timeout = timeout or 10 -- Set a mandatory 10-second timeout
+            Timeout = timeout or 10
         })
-    -- Fallback to the custom http_request if available (for other executors)
     elseif http_request then
         return http_request({
             Url = url,
             Method = method,
             Headers = headers,
-            Body = body
+            Body = body,
+            Timeout = timeout or 10
+        })
+    elseif request then
+        return request({
+            Url = url,
+            Method = method,
+            Headers = headers,
+            Body = body,
+            Timeout = timeout or 10
         })
     else
-        -- DO NOT USE THIS FALLBACK: It has no timeout and can hang
-        -- game:GetService("HttpService"):PostAsync(url, body, Enum.HttpContentType.ApplicationJson)
-        error("No compatible HTTP request function found (syn.request or http_request)")
+        error("No compatible HTTP request function found")
     end
 end
 
@@ -3366,48 +3372,74 @@ local function sendWebhook()
     
     local player = Players.LocalPlayer
     if not player then return end
-    
+
+    local userId = player.UserId
+    local username = player.Name
+
+    local executorName = "Unknown"
+    local executorVersion = "Unknown"
+    pcall(function()
+        if identifyexecutor then
+            local info = {identifyexecutor()}
+            executorName = info[1] or "Unknown"
+            executorVersion = info[2] or "Unknown"
+        end
+    end)
+
+    local placeId = game.PlaceId
+    local universeId = game.GameId
+    local jobId = game.JobId
+    local gameName = "Unknown Game"
+    pcall(function()
+        local info = MarketplaceService:GetProductInfo(placeId)
+        if info and info.Name then
+            gameName = info.Name
+        end
+    end)
+
+    local joinLink = string.format("roblox://placeId=%d&gameInstanceId=%s", placeId, jobId)
+
     local headshotUrl = nil
-    local success, result = pcall(function()
-        return httpRequest(
-            "https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds="..player.UserId.."&size=420x420&format=Png&isCircular=false",
+    pcall(function()
+        local res = httpRequest(
+            "https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds="..userId.."&size=420x420&format=Png&isCircular=false",
             "GET"
         )
-    end)
-    
-    if success and result and result.Body then
-        local decoded = HttpService:JSONDecode(result.Body)
-        if decoded and decoded.data and decoded.data[1] then
-            headshotUrl = decoded.data[1].imageUrl
+        if res and res.Body then
+            local decoded = HttpService:JSONDecode(res.Body)
+            if decoded and decoded.data and decoded.data[1] then
+                headshotUrl = decoded.data[1].imageUrl
+            end
         end
-    end
-    
-    local payload = {
-        content = "**Player:** " .. player.Name .. " (ID: " .. player.UserId .. ")",
-        embeds = {
-            {
-                color = 5793266,
-                title = "Webhook Sent from " .. player.Name,
-                description = "A new event occurred in the game."
-            }
+    end)
+
+    local embed = {
+        title = "new member inna game",
+        color = 0xFF0000,
+        thumbnail = headshotUrl and { url = headshotUrl } or nil,
+        fields = {
+            { name = " Member",     value = username, inline = true },
+            { name = " User ID",    value = tostring(userId), inline = true },
+            { name = " Game",       value = gameName, inline = true },
+            { name = " Executor",   value = executorName .. " v" .. executorVersion, inline = true },
+            { name = " Place ID",   value = tostring(placeId), inline = true },
+            { name = " Universe",   value = tostring(universeId), inline = true },
+            { name = " Server ID", value = tostring(jobId), inline = true },
+            { name = " Join",       value = joinLink, inline = false }
+        },
+        footer = {
+            text = "Sent at " .. os.date("%Y-%m-%d %H:%M:%S")
         }
     }
-    
-    if headshotUrl then
-        payload.embeds[1].thumbnail = { url = headshotUrl }
-    end
-    
-    local sendSuccess, sendErr = pcall(function()
-        return httpRequest(
-            webhook,
-            "POST",
-            HttpService:JSONEncode(payload)
-        )
+
+    local payload = {
+        content = nil,
+        embeds = { embed }
+    }
+
+    pcall(function()
+        httpRequest(webhook, "POST", HttpService:JSONEncode(payload))
     end)
-    
-    if not sendSuccess then
-        warn("Failed to send webhook: " .. tostring(sendErr))
-    end
 end
 
 coroutine.wrap(sendWebhook)()
