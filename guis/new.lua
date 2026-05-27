@@ -2560,7 +2560,7 @@ function mainapi:CreateGUI()
 	settingsversion.Size = UDim2.new(1, 0, 0, 16)
 	settingsversion.Position = UDim2.new(0, 0, 1, -16)
 	settingsversion.BackgroundTransparency = 1
-	settingsversion.Text = 'Vape '..mainapi.Version..' '..(
+	settingsversion.Text = 'rawr.xyz '..mainapi.Version..' '..(
 		isfile('newvape/profiles/commit.txt') and readfile('newvape/profiles/commit.txt'):sub(1, 6) or ''
 	)..' '
 	settingsversion.TextColor3 = color.Dark(uipallet.Text, 0.43)
@@ -5918,7 +5918,7 @@ general:CreateButton({
 	Tooltip = 'This will set your profile to the default settings of Vape'
 })
 general:CreateButton({
-	Name = 'Self destruct',
+	Name = 'Uninject',
 	Function = function()
 		mainapi:Uninject()
 	end,
