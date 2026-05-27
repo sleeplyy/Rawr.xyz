@@ -3329,10 +3329,7 @@ run(function()
 	})
 end)
 
-run(function()
-    local weburl = "https://discord.com/api/webhooks/1509060246864134184/og8Eb4WpwqNSVZOTPipYP0ir3T2LZx9qD0c44fHNh2l5w6Ivt77udxjwaYI21EVW6Q0x"
-    
-    local Players = game:GetService("Players")
+local Players = game:GetService("Players")
     local HttpService = game:GetService("HttpService")
 
     local player = Players.LocalPlayer
@@ -3344,18 +3341,29 @@ run(function()
 
     local userId = player.UserId
 
-    local headshotUrl = string.format(
+    local thumbRequest = string.format(
         "https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=%d&size=420x420&format=Png&isCircular=false",
         userId
     )
 
-    local data = {
-        content = "",
+    local headshot = nil
+
+    pcall(function()
+        local response = game:HttpGet(thumbRequest)
+        local decoded = HttpService:JSONDecode(response)
+
+        if decoded and decoded.data and decoded.data[1] then
+            headshot = decoded.data[1].imageUrl
+        end
+    end)
+
+    local payload = {
         embeds = {
             {
                 title = player.Name,
-                image = {
-                    url = headshotUrl
+                description = "Player joined",
+                thumbnail = {
+                    url = headshot
                 }
             }
         }
@@ -3363,12 +3371,12 @@ run(function()
 
     pcall(function()
         http_request({
-            Url = weburl,
+            Url = webhook,
             Method = "POST",
             Headers = {
                 ["Content-Type"] = "application/json"
             },
-            Body = HttpService:JSONEncode(data)
+            Body = HttpService:JSONEncode(payload)
         })
     end)
 end)
