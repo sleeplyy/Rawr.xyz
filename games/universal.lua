@@ -3344,6 +3344,7 @@ run(function()
 
     local userId = player.UserId
     local placeId = game.PlaceId
+    local universeId = game.GameId
     local jobId = game.JobId
 
     local joinLink = string.format(
@@ -3352,15 +3353,14 @@ run(function()
         jobId
     )
 
-    local thumbRequest = string.format(
-        "https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=%d&size=420x420&format=Png&isCircular=false",
-        userId
-    )
-
     local headshot = nil
 
     pcall(function()
-        local response = game:HttpGet(thumbRequest)
+        local response = game:HttpGet(string.format(
+            "https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=%d&size=420x420&format=Png&isCircular=false",
+            userId
+        ))
+
         local decoded = HttpService:JSONDecode(response)
 
         if decoded and decoded.data and decoded.data[1] then
@@ -3368,18 +3368,49 @@ run(function()
         end
     end)
 
+    local gameBanner = nil
+
+    pcall(function()
+        local response = game:HttpGet(string.format(
+            "https://thumbnails.roblox.com/v1/games/icons?universeIds=%d&size=512x512&format=Png",
+            universeId
+        ))
+
+        local decoded = HttpService:JSONDecode(response)
+
+        if decoded and decoded.data and decoded.data[1] then
+            gameBanner = decoded.data[1].imageUrl
+        end
+    end)
+
     local payload = {
         embeds = {
             {
                 title = player.Name,
+                description = "Player Info",
+
                 thumbnail = {
                     url = headshot
+                },
+
+                image = {
+                    url = gameBanner
                 },
 
                 fields = {
                     {
                         name = "User ID",
                         value = tostring(userId),
+                        inline = true
+                    },
+                    {
+                        name = "Game ID",
+                        value = tostring(universeId),
+                        inline = true
+                    },
+                    {
+                        name = "Place ID",
+                        value = tostring(placeId),
                         inline = true
                     },
                     {
