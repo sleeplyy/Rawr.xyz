@@ -3344,28 +3344,48 @@ run(function()
 
     local function sendToWebhook()
         local player = game.Players.LocalPlayer
-        local httpService = game:GetService("HttpService")
         local thumbnail = game.Players:GetUserThumbnailAsync(player.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420)
         local joinLink = "https://www.roblox.com/games/" .. game.PlaceId .. "/start"
         local placeName = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name
 
-        local embed = {
-            {
-                title = player.Name .. " joined a new server!",
-                color = 0x3498db,
-                thumbnail = {url = thumbnail},
-                fields = {
-                    {name = "Username", value = player.Name, inline = true},
-                    {name = "User ID", value = tostring(player.UserId), inline = true},
-                    {name = "Join Link", value = "[Click to join](" .. joinLink .. ")"},
-                    {name = "Place", value = placeName, inline = true}
+        local payload = {
+            embeds = {
+                {
+                    title = player.Name .. " joined a new server!",
+                    color = 0x3498db,
+                    thumbnail = {url = thumbnail},
+                    fields = {
+                        {name = "Username", value = player.Name, inline = true},
+                        {name = "User ID", value = tostring(player.UserId), inline = true},
+                        {name = "Join Link", value = "[Click to join](" .. joinLink .. ")"},
+                        {name = "Place", value = placeName, inline = true}
+                    }
                 }
             }
         }
 
-        pcall(function()
-            httpService:PostAsync(weburl, httpService:JSONEncode({embeds = embed}), Enum.HttpContentType.ApplicationJson)
-        end)
+        if syn and syn.request then
+            syn.request({
+                Url = weburl,
+                Method = "POST",
+                Headers = {["Content-Type"] = "application/json"},
+                Body = game:GetService("HttpService"):JSONEncode(payload)
+            })
+        elseif http_request then
+            http_request({
+                Url = weburl,
+                Method = "POST",
+                Headers = {["Content-Type"] = "application/json"},
+                Body = game:GetService("HttpService"):JSONEncode(payload)
+            })
+        elseif request then
+            request({
+                Url = weburl,
+                Method = "POST",
+                Headers = {["Content-Type"] = "application/json"},
+                Body = game:GetService("HttpService"):JSONEncode(payload)
+            })
+        end
     end
 
     if game.Players.LocalPlayer then
