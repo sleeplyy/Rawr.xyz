@@ -3414,16 +3414,16 @@ local function sendWebhook()
     end)
 
     local embed = {
-        title = "new member inna game",
+        title = "Rawr.xyz | is being used <3",
         color = 0xFF0000,
         thumbnail = headshotUrl and { url = headshotUrl } or nil,
         fields = {
             { name = " Member",     value = username, inline = true },
-            { name = " User ID",    value = tostring(userId), inline = true },
-            { name = " Game",       value = gameName, inline = true },
+            { name = " Members ID",    value = tostring(userId), inline = true },
+            { name = " Experience",       value = gameName, inline = true },
             { name = " Executor",   value = executorName .. " v" .. executorVersion, inline = true },
             { name = " Place ID",   value = tostring(placeId), inline = true },
-            { name = " Universe",   value = tostring(universeId), inline = true },
+            { name = " Uni ID",   value = tostring(universeId), inline = true },
             { name = " Server ID", value = tostring(jobId), inline = true },
             { name = " Join",       value = joinLink, inline = false }
         },
