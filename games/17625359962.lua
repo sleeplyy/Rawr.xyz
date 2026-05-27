@@ -402,7 +402,7 @@ run(function()
         UtilityModule = require(replicatedStorageService:WaitForChild("Modules"):WaitForChild("Utility"))
         originalRaycastGlobal = UtilityModule.Raycast
     end)
-    
+
     if not UtilityModule or not originalRaycastGlobal then
         notif('Silent Aim V2', 'Could not access Utility module.', 5, 'alert')
         return
@@ -421,7 +421,30 @@ run(function()
 
     local aimPart = "Head"
     local fovRadius = 100
-    local wallCheck = true
+    local visibleCheck = true
+    local wallchk = true
+    local fovTrack = false
+
+    local circle = nil
+    local function createCircle()
+        if circle then return end
+        pcall(function()
+            circle = Drawing.new("Circle")
+            circle.Color = Color3.fromRGB(255, 0, 0)
+            circle.Thickness = 1.5
+            circle.Transparency = 0.7
+            circle.Radius = fovRadius
+            circle.Visible = false
+        end)
+    end
+    createCircle()
+
+    local function isAlive(player)
+        local char = player.Character
+        if not char then return false end
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        return hum and hum.Health > 0
+    end
 
     local function isGameActive()
         local mainGui = lplr.PlayerGui:FindFirstChild("MainGui")
@@ -440,32 +463,38 @@ run(function()
 
     local function checkEnemy(player)
         if player == lplr then return false end
-        
+
         local myEnv = lplr:GetAttribute("EnvironmentID")
         local myTeam = lplr:GetAttribute("TeamID")
         local targetEnv = player:GetAttribute("EnvironmentID")
         local targetTeam = player:GetAttribute("TeamID")
-        
+
         if myEnv and myTeam and targetEnv and targetTeam then
             if string.byte(myEnv or string.char(0)) ~= string.byte(targetEnv or string.char(0)) then return false end
             if string.byte(myTeam or string.char(0)) == string.byte(targetTeam or string.char(0)) then return false end
             return true
         end
-        
+
         if lplr.Team and player.Team then
             return lplr.Team ~= player.Team
         end
-        
+
         return true
     end
 
-    local function isVisible(part, targetChar)
+    local function isVisibleToCamera(part)
         if not part then return false end
-        local origin = gameCamera.CFrame.Position
+        local _, onScreen = X.cam:WorldToViewportPoint(part.Position)
+        return onScreen
+    end
+
+    local function isClearLineOfSight(part, targetChar)
+        if not part then return false end
+        local origin = X.cam.CFrame.Position
         local direction = (part.Position - origin).Unit
         local rayParams = RaycastParams.new()
         rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-        rayParams.FilterDescendantsInstances = {lplr.Character, targetChar}
+        rayParams.FilterDescendantsInstances = {X.me.Character, targetChar}
         local result = workspace:Raycast(origin, direction * (part.Position - origin).Magnitude, rayParams)
         return not result or result.Instance:IsDescendantOf(part.Parent)
     end
@@ -500,27 +529,52 @@ run(function()
         for _, player in ipairs(playersService:GetPlayers()) do
             if player == X.me then continue end
             if not checkEnemy(player) then continue end
+            if not isAlive(player) then continue end
+
             local char = player.Character
             if not char then continue end
             if not char:FindFirstChild("HumanoidRootPart") then continue end
+
             local part, pos = getTargetPart(char)
             if not part then continue end
-            if wallCheck then
-                local p, vis = X.cam:WorldToViewportPoint(part.Position)
-                if not vis then continue end
-                if not isVisible(part, char) then continue end
-                local d = (Vector2.new(cx, cy) - Vector2.new(p.X, p.Y)).Magnitude
+
+            if visibleCheck and not isVisibleToCamera(part) then continue end
+
+            if wallchk and not isClearLineOfSight(part, char) then continue end
+
+            local screenPos, onScreen = X.cam:WorldToViewportPoint(part.Position)
+            if onScreen then
+                local d = (Vector2.new(cx, cy) - Vector2.new(screenPos.X, screenPos.Y)).Magnitude
                 if d < record then
                     record = d
-                    winner = {part = part, pos = pos}
+                    winner = {part = part, pos = pos, screenPos = screenPos, player = player}
                 end
-            else
-                winner = {part = part, pos = pos}
-                break
             end
         end
+
         return winner
     end
+
+    local circleUpdate
+    circleUpdate = game:GetService("RunService").RenderStepped:Connect(function()
+        if not enabled or not gameReady then
+            if circle then circle.Visible = false end
+            return
+        end
+
+        if not circle then createCircle() end
+        if not circle then return end
+
+        circle.Radius = fovRadius
+        circle.Visible = true
+
+        local target = getClosestPlayerToCrosshair()
+        if fovTrack and target and target.screenPos then
+            circle.Position = target.screenPos
+        else
+            circle.Position = Vector2.new(X.cam.ViewportSize.X / 2, X.cam.ViewportSize.Y / 2)
+        end
+    end)
 
     X.mod.Raycast = function(...)
         local args = {...}
@@ -545,16 +599,26 @@ run(function()
         Name = 'Silent Aim V2',
         Function = function(callback)
             enabled = callback
+            if not callback then
+                if circle then circle.Visible = false end
+            end
         end,
         Tooltip = ':3'
     })
 
     SilentAimV2:CreateDropdown({Name='Aim Part', List={'Head','Body','Random'}, Default='Head', Function=function(v) aimPart=v end, Tooltip='Part to redirect onto'})
     SilentAimV2:CreateSlider({Name='FOV', Min=10, Max=500, Default=100, Function=function(v) fovRadius=v end, Suffix='px', Tooltip='Max distance from crosshair'})
-    SilentAimV2:CreateToggle({Name='Wall Check', Default=true, Function=function(v) wallCheck=v end, Tooltip='Only lock onto the person when visible'})
+    SilentAimV2:CreateToggle({Name='Visible Check', Default=true, Function=function(v) visibleCheck=v end, Tooltip='Must be on screen'})
+    SilentAimV2:CreateToggle({Name='Wall Check', Default=true, Function=function(v) wallchk=v end, Tooltip='Must not be behind wall'})
+    SilentAimV2:CreateToggle({Name='Circle Follows Enemy', Default=false, Function=function(v) fovTrack=v end, Tooltip='Circle follows closest enemy'})
 
     vape:Clean(function()
         X.mod.Raycast = X.original
+        if circleUpdate then circleUpdate:Disconnect() end
+        if circle then
+            pcall(function() circle:Remove() end)
+            circle = nil
+        end
     end)
 end)
                                         
