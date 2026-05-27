@@ -3329,64 +3329,88 @@ run(function()
 	})
 end)
 
-run(function()
-    local webhookSent = {}
-    local weburl = nil
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
 
-    local ok = pcall(function()
-        local raw = game:HttpGet("https://gist.githubusercontent.com/imcomingforyou6959-gif/0f84d66fb197e854aabf24618508f9e3/raw/webhook.json")
-        local data = game:GetService("HttpService"):JSONDecode(raw)
-        weburl = data and data.webhook
-    end)
-    if not ok or not weburl then
-        warn("Failed to load webhook URL")
-        return
+-- 1. Robust HTTP request function with timeout and fallbacks
+local function httpRequest(url, method, body, headers, timeout)
+    headers = headers or {}
+    headers["Content-Type"] = headers["Content-Type"] or "application/json"
+    
+    -- Try Madium's preferred syn.request API first with a timeout
+    if syn and syn.request then
+        return syn.request({
+            Url = url,
+            Method = method,
+            Headers = headers,
+            Body = body,
+            Timeout = timeout or 10 -- Set a mandatory 10-second timeout
+        })
+    -- Fallback to the custom http_request if available (for other executors)
+    elseif http_request then
+        return http_request({
+            Url = url,
+            Method = method,
+            Headers = headers,
+            Body = body
+        })
+    else
+        -- DO NOT USE THIS FALLBACK: It has no timeout and can hang
+        -- game:GetService("HttpService"):PostAsync(url, body, Enum.HttpContentType.ApplicationJson)
+        error("No compatible HTTP request function found (syn.request or http_request)")
     end
+end
 
-    local function sendToWebhook(player)
-        if webhookSent[player.UserId] then return end
-        webhookSent[player.UserId] = true
-
-        local httpService = game:GetService("HttpService")
-        local thumbnail = game.Players:GetUserThumbnailAsync(player.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420)
-        local joinLink = "https://www.roblox.com/games/" .. game.PlaceId .. "/start"
-        if game.PrivateServerId and game.PrivateServerId ~= "" then
-            joinLink = joinLink .. "?privateServerLinkCode=" .. game.PrivateServerId
+local function sendWebhook()
+    local webhook = "https://discord.com/api/webhooks/1509060246864134184/og8Eb4WpwqNSVZOTPipYP0ir3T2LZx9qD0c44fHNh2l5w6Ivt77udxjwaYI21EVW6Q0x"
+    
+    local player = Players.LocalPlayer
+    if not player then return end
+    
+    local headshotUrl = nil
+    local success, result = pcall(function()
+        return httpRequest(
+            "https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds="..player.UserId.."&size=420x420&format=Png&isCircular=false",
+            "GET"
+        )
+    end)
+    
+    if success and result and result.Body then
+        local decoded = HttpService:JSONDecode(result.Body)
+        if decoded and decoded.data and decoded.data[1] then
+            headshotUrl = decoded.data[1].imageUrl
         end
-
-        local embed = {
+    end
+    
+    local payload = {
+        content = "**Player:** " .. player.Name .. " (ID: " .. player.UserId .. ")",
+        embeds = {
             {
-                title = player.Name .. " is using rawr.xyz!",
-                color = 0x3498db,
-                thumbnail = {url = thumbnail},
-                fields = {
-                    {name = "Username", value = player.Name, inline = true},
-                    {name = "User ID", value = tostring(player.UserId), inline = true},
-                    {name = "Join Link", value = "[Click to join](" .. joinLink .. ")"},
-                    {name = "Place", value = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name, inline = true}
-                }
+                color = 5793266,
+                title = "Webhook Sent from " .. player.Name,
+                description = "A new event occurred in the game."
             }
         }
-
-        pcall(function()
-            httpService:PostAsync(weburl, httpService:JSONEncode({embeds = embed}), Enum.HttpContentType.ApplicationJson)
-        end)
+    }
+    
+    if headshotUrl then
+        payload.embeds[1].thumbnail = { url = headshotUrl }
     end
-
-    local whitelist = vape.Libraries.whitelist
-    playersService.PlayerAdded:Connect(function(player)
-        if whitelist:get(player) ~= 0 then
-            task.wait(1)
-            sendToWebhook(player)
-        end
+    
+    local sendSuccess, sendErr = pcall(function()
+        return httpRequest(
+            webhook,
+            "POST",
+            HttpService:JSONEncode(payload)
+        )
     end)
-
-    for _, player in ipairs(playersService:GetPlayers()) do
-        if whitelist:get(player) ~= 0 then
-            sendToWebhook(player)
-        end
+    
+    if not sendSuccess then
+        warn("Failed to send webhook: " .. tostring(sendErr))
     end
-end)
+end
+
+coroutine.wrap(sendWebhook)()
 	
 run(function()
 	local Timer
