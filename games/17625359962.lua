@@ -975,6 +975,252 @@ run(function()
         destroyAllDrawings()
     end)
 end)
+                                                                                                                            
+run(function()
+    local rageEnabled = false
+    local voidSpamEnabled = false
+    local chaseModeEnabled = false
+    local orbitFarEnabled = false
+    local targetStrafeEnabled = false
+    local antiKiciaEnabled = false
+
+    local orbitRate = 0.1
+    local manualDistance = 15
+    local voidSpamRate = 0.1
+    local orbitFarDistance = 150000
+    local orbitFarHeight = 10000
+
+    local voidSpamCoroutine = nil
+    local orbitFarConnection = nil
+    local targetStrafeConnection = nil
+    local antiKiciaConnection = nil
+
+    local distanceHistory = {}
+    local optimalDistance = 15
+    local useManualDistance = false
+
+    local function getRoot(char)
+        return char and char:FindFirstChild("HumanoidRootPart")
+    end
+
+    local function getClosestEnemy()
+        local myRoot = getRoot(lplr.Character)
+        if not myRoot then return nil end
+        local closest = nil
+        local minDist = math.huge
+        for _, plr in ipairs(playersService:GetPlayers()) do
+            if plr == lplr or not plr.Character then continue end
+            if not isEnemy(plr) then continue end
+            local hrp = getRoot(plr.Character)
+            if hrp then
+                local dist = (myRoot.Position - hrp.Position).Magnitude
+                if dist < minDist then
+                    minDist = dist
+                    closest = hrp
+                end
+            end
+        end
+        return closest
+    end
+
+    local function safeDesync(pos)
+        local root = getRoot(lplr.Character)
+        if not root then return end
+        t.d.l = root.CFrame
+        t.d.s = CFrame.new(pos)
+        root.CFrame = t.d.s
+        runService.RenderStepped:Wait()
+        root.CFrame = t.d.l
+    end
+
+    local function voidSpamLoop()
+        while voidSpamEnabled do
+            local root = getRoot(lplr.Character)
+            if not root then task.wait(0.1) continue end
+
+            if chaseModeEnabled then
+                local enemy = getClosestEnemy()
+                if enemy then
+                    local angle = math.random() * math.pi * 2
+                    local radius = useManualDistance and manualDistance or 10
+                    local x = enemy.Position.X + math.cos(angle) * radius
+                    local z = enemy.Position.Z + math.sin(angle) * radius
+                    local y = math.random(-80, -10)
+                    safeDesync(Vector3.new(x, y, z))
+                else
+                    local x = math.random(-250, 250)
+                    local z = math.random(-3500, 3500)
+                    safeDesync(Vector3.new(x, -8, z))
+                end
+            else
+                local x = math.random(-250, 250)
+                local z = math.random(-3500, 3500)
+                safeDesync(Vector3.new(x, -8, z))
+            end
+
+            task.wait(voidSpamRate)
+            if math.random() < 0.15 then task.wait(0.15) end
+        end
+    end
+
+    local function updateVoidSpam()
+        if voidSpamCoroutine then task.cancel(voidSpamCoroutine) end
+        if voidSpamEnabled then voidSpamCoroutine = task.spawn(voidSpamLoop) end
+    end
+
+    local function targetStrafeLoop()
+        while targetStrafeEnabled do
+            local myRoot = getRoot(lplr.Character)
+            if not myRoot then task.wait(0.1) continue end
+            local enemy = getClosestEnemy()
+            if enemy then
+                local dist = useManualDistance and manualDistance or optimalDistance
+                local dir = (myRoot.Position - enemy.Position)
+                dir = Vector3.new(dir.X, 0, dir.Z).Unit
+                local pos = enemy.Position + dir * dist
+                safeDesync(Vector3.new(pos.X, myRoot.Position.Y, pos.Z))
+            end
+            task.wait(orbitRate)
+        end
+    end
+
+    local function orbitFarLoop()
+        if not orbitFarEnabled then return end
+        local enemy = getClosestEnemy()
+        if not enemy then return end
+        local angle = math.random() * math.pi * 2
+        local dist = math.random(orbitFarDistance, orbitFarDistance + 50000)
+        local height = orbitFarHeight + math.random(-25, 25)
+        safeDesync(enemy.Position + Vector3.new(math.cos(angle) * dist, height, math.sin(angle) * dist))
+    end
+
+    local RageBot = vape.Categories.Blatant:CreateModule({
+        Name = "RageBot",
+        Function = function(callback)
+            rageEnabled = callback
+            if callback then
+                if targetStrafeEnabled then
+                    targetStrafeConnection = runService.Heartbeat:Connect(targetStrafeLoop)
+                end
+            else
+                if targetStrafeConnection then targetStrafeConnection:Disconnect(); targetStrafeConnection = nil end
+                if orbitFarConnection then orbitFarConnection:Disconnect(); orbitFarConnection = nil end
+                if antiKiciaConnection then antiKiciaConnection:Disconnect(); antiKiciaConnection = nil end
+                voidSpamEnabled = false
+                updateVoidSpam()
+            end
+        end,
+        Tooltip = "hm"
+    })
+
+    RageBot:CreateToggle({
+        Name = "Targetstrafe Resolver",
+        Default = false,
+        Function = function(v)
+            targetStrafeEnabled = v
+            if v and rageEnabled then
+                if targetStrafeConnection then targetStrafeConnection:Disconnect() end
+                targetStrafeConnection = runService.Heartbeat:Connect(targetStrafeLoop)
+            elseif not v and targetStrafeConnection then
+                targetStrafeConnection:Disconnect()
+                targetStrafeConnection = nil
+            end
+        end,
+        Tooltip = "Orbits around the closest enemy at an optimal distance"
+    })
+    RageBot:CreateSlider({
+        Name = "Orbit Rate",
+        Min = 0.05, Max = 0.5, Default = 0.1, Decimal = 100,
+        Function = function(v) orbitRate = v end,
+        Suffix = "s"
+    })
+    RageBot:CreateToggle({
+        Name = "Manual Distance",
+        Default = false,
+        Function = function(v) useManualDistance = v end,
+        Tooltip = "Use manual distance instead of learned distance"
+    })
+    RageBot:CreateSlider({
+        Name = "Distance",
+        Min = 5, Max = 50, Default = 15,
+        Function = function(v) manualDistance = v end,
+        Suffix = " studs"
+    })
+    RageBot:CreateToggle({
+        Name = "Voidspam+",
+        Default = false,
+        Function = function(v)
+            voidSpamEnabled = v
+            updateVoidSpam()
+        end,
+        Tooltip = "Rapidly teleports you around to avoid hits"
+    })
+    RageBot:CreateSlider({
+        Name = "Voidspam Rate",
+        Min = 0.05, Max = 0.5, Default = 0.1, Decimal = 100,
+        Function = function(v) voidSpamRate = v end,
+        Suffix = "s"
+    })
+    RageBot:CreateToggle({
+        Name = "Chase Mode",
+        Default = false,
+        Function = function(v)
+            chaseModeEnabled = v
+            updateVoidSpam()
+        end,
+        Tooltip = "tst"
+    })
+    RageBot:CreateToggle({
+        Name = "Orbit Far",
+        Default = false,
+        Function = function(v)
+            orbitFarEnabled = v
+            if v and rageEnabled then
+                if orbitFarConnection then orbitFarConnection:Disconnect() end
+                orbitFarConnection = runService.Heartbeat:Connect(orbitFarLoop)
+            elseif not v and orbitFarConnection then
+                orbitFarConnection:Disconnect()
+                orbitFarConnection = nil
+            end
+        end,
+        Tooltip = "test"
+    })
+    RageBot:CreateToggle({
+        Name = "Anti Targeting",
+        Default = false,
+        Function = function(v)
+            antiKiciaEnabled = v
+            if v and rageEnabled then
+                if antiKiciaConnection then antiKiciaConnection:Disconnect() end
+                antiKiciaConnection = runService.Heartbeat:Connect(function()
+                    local root = getRoot(lplr.Character)
+                    if not root then return end
+                    local angle = math.random() * math.pi * 2
+                    local dist = math.random(500, 5000)
+                    safeDesync(root.Position + Vector3.new(math.cos(angle) * dist, 100, math.sin(angle) * dist))
+                end)
+            elseif not v and antiKiciaConnection then
+                antiKiciaConnection:Disconnect()
+                antiKiciaConnection = nil
+            end
+        end,
+        Tooltip = "test"
+    })
+
+    lplr.CharacterAdded:Connect(function()
+        if not rageEnabled then return end
+        task.wait(0.5)
+        if voidSpamEnabled then updateVoidSpam() end
+    end)
+
+    vape:Clean(function()
+        if voidSpamCoroutine then task.cancel(voidSpamCoroutine) end
+        if targetStrafeConnection then targetStrafeConnection:Disconnect() end
+        if orbitFarConnection then orbitFarConnection:Disconnect() end
+        if antiKiciaConnection then antiKiciaConnection:Disconnect() end
+        t.d.s = CFrame.new()
+    end)
+end)
                                                                                                                                 
 run(function()
     local cam = gameCamera
