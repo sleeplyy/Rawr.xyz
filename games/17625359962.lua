@@ -1121,9 +1121,9 @@ run(function()
     local sounds = {
         ["windy winter"] = "rbxassetid://6046340391",
         ["light rain"] = "rbxassetid://18862087062",
-        ["thunderstorm"] = "rbxassetid://4305545740",
-        ["night"] = "rbxassetid://179507208",
-        ["day"] = "rbxassetid://6189453706"
+        ["thunderstorm"] = "rbxassetid://102331984100037",
+        ["night"] = "rbxassetid://9112798079",
+        ["day"] = "rbxassetid://9112789988"
     }
 
     local sound = nil
@@ -1193,7 +1193,7 @@ run(function()
                 end
             end
         end,
-        Tooltip = "Select ambient sound"
+        Tooltip = "Select ambient sound (supports custom files in newvape/assets)"
     })
 
     BackgroundNoise:CreateSlider({
@@ -1213,7 +1213,7 @@ run(function()
     vape:Clean(function()
         destroySound()
     end)
-end)                                                                                                                                            
+end)                                                                                                               
 
 run(function()
     local assetSounds = {
