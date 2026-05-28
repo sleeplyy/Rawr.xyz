@@ -180,7 +180,9 @@ for _, v in {
     'SilentAim', 'Reach', 'AntiFall', 'AntiRagdoll', 'Blink',
     'Disabler', 'SafeWalk', 'MurderMystery', 'TriggerBot',
     'ChatSpammer', 'Arrest Highlight', 'HitNotifications',
-    'Bullet Tracers', 'Head Pitch Spinbot (Client)', 'AutoArrest'
+    'Bullet Tracers', 'Head Pitch Spinbot (Client)', 'AutoArrest',
+    'Anti Riot', 'Anti Taze', 'C4 ESP',
+    'AutoReset', 'AutoHeal'
 } do vape:Remove(v) end
 
 local t = {
@@ -1983,62 +1985,51 @@ run(function()
 end)
                                                                                                                                             
 run(function()
-    local AntiTaze
-    local oldFunction = nil
-    local hookTarget = nil
-
-    local function hookTased()
-        local gunRemotes = game:GetService("ReplicatedStorage"):FindFirstChild("GunRemotes")
-        if not gunRemotes then return end
-        local tasedEvent = gunRemotes:FindFirstChild("PlayerTased")
-        if not tasedEvent then return end
-
-        for _, conn in ipairs(getconnections(tasedEvent.OnClientEvent)) do
-            if conn.Function and not conn.Function:FindFirstChild("AntiTazeHooked") then
-                hookTarget = conn
-                oldFunction = conn.Function
-
-                local newFunction = function(...)
-                    local char = lplr.Character
-                    lplr:SetAttribute('BackpackEnabled', false)
-                    if entitylib.isAlive then
-                        entitylib.character.Humanoid:UnequipTools()
-                    end
-
-                    task.wait(3.5)
-                    if lplr.Character == char then
-                        lplr:SetAttribute('BackpackEnabled', true)
-                    end
-
-                    return oldFunction(...)
-                end
-
-                newFunction.AntiTazeHooked = true
-                conn.Function = newFunction
-                return
-            end
-        end
-    end
-
-    AntiTaze = vape.Categories.Blatant:CreateModule({
-        Name = 'Anti Taze',
-        Function = function(callback)
-            if callback then
-                hookTased()
-                AntiTaze:Clean(entitylib.Events.LocalAdded:Connect(function()
-                    task.wait(0.5)
-                    hookTased()
-                end))
-            else
-                if hookTarget and oldFunction then
-                    hookTarget.Function = oldFunction
-                end
-                hookTarget = nil
-                oldFunction = nil
-            end
-        end,
-        Tooltip = 'Prevent you from getting tazed'
-    })
+	local AntiTaze
+	local old, connection
+	
+	local function EntityAdded(ent)
+		connection = getconnections(replicatedStorage.GunRemotes.PlayerTased.OnClientEvent)[1]
+		if not (connection and connection.Function) then
+			repeat
+				connection = getconnections(replicatedStorage.GunRemotes.PlayerTased.OnClientEvent)[1]
+				task.wait()
+			until connection and connection.Function or not AntiTaze.Enabled
+		end
+	
+		if connection and AntiTaze.Enabled then
+			old = hookfunction(connection.Function, function()
+				local char = lplr.Character
+				lplr:SetAttribute('BackpackEnabled', false)
+				if entitylib.isAlive then
+					entitylib.character.Humanoid:UnequipTools()
+				end
+	
+				task.wait(3.5)
+				if lplr.Character == char then
+					lplr:SetAttribute('BackpackEnabled', true)
+				end
+			end)
+		end
+	end
+	
+	AntiTaze = vape.Categories.Blatant:CreateModule({
+		Name = 'Anti Taze',
+		Function = function(callback)
+			if callback then
+				AntiTaze:Clean(entitylib.Events.LocalAdded:Connect(EntityAdded))
+				if entitylib.isAlive then
+					task.spawn(EntityAdded, entitylib.character)
+				end
+			else
+				if old and connection.Function then
+					hookfunction(connection.Function, old)
+					old = nil
+				end
+			end
+		end,
+		Tooltip = 'Prevent you from getting tazed'
+	})
 end)
                                                                                                                                                 
 run(function()
