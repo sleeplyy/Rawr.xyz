@@ -1988,15 +1988,24 @@ run(function()
     local connection = nil
     local hookActive = false
 
+    local function getTasedConnections()
+        local gunRemotes = game:GetService("ReplicatedStorage"):FindFirstChild("GunRemotes")
+        if not gunRemotes then return nil end
+        local tasedEvent = gunRemotes:FindFirstChild("PlayerTased")
+        if not tasedEvent then return nil end
+        return getconnections(tasedEvent.OnClientEvent)
+    end
+
     local function EntityAdded(ent)
         if hookActive then return end
 
-        local conns = getconnections(replicatedStorage.GunRemotes.PlayerTased.OnClientEvent)
+        local conns = getTasedConnections()
         if not conns or #conns == 0 then
             repeat
                 task.wait()
-                conns = getconnections(replicatedStorage.GunRemotes.PlayerTased.OnClientEvent)
-            until (conns and #conns > 0) or not AntiTaze.Enabled
+                if not AntiTaze.Enabled then return end
+                conns = getTasedConnections()
+            until conns and #conns > 0
         end
         if not AntiTaze.Enabled then return end
 
@@ -2140,66 +2149,90 @@ run(function()
 		end
 	end
 	
-	C4ESP = vape.Categories.Render:CreateModule({
-		Name = 'C4 ESP',
-		Function = function(callback)
-			if callback then
-				C4ESP:Clean(collectionService:GetInstanceAddedSignal('C4'):Connect(Added))
-				C4ESP:Clean(collectionService:GetInstanceRemovedSignal('C4'):Connect(Removed))
-	
-				for _, obj in collectionService:GetTagged('C4') do
-					task.spawn(Added, obj)
-				end
-			else
-				for _, v in Reference do
-					v:Destroy()
-				end
-				table.clear(Reference)
-			end
-		end,
-		Tooltip = 'Display all C4\'s placed'
-	})
-	FillColor = C4ESP:CreateColorSlider({
-		Name = 'Color',
-		Function = function(hue, sat, val)
-			for _, v in Reference do
-				v.FillColor = Color3.fromHSV(hue, sat, val)
-			end
-		end
-	})
-	OutlineColor = C4ESP:CreateColorSlider({
-		Name = 'Outline Color',
-		DefaultSat = 0,
-		Function = function(hue, sat, val)
-			for _, v in Reference do
-				v.OutlineColor = Color3.fromHSV(hue, sat, val)
-			end
-		end
-	})
-	FillTransparency = C4ESP:CreateSlider({
-		Name = 'Transparency',
-		Min = 0,
-		Max = 1,
-		Default = 0.5,
-		Function = function(val)
-			for _, v in Reference do
-				v.FillTransparency = val
-			end
-		end,
-		Decimal = 10
-	})
-	OutlineTransparency = C4ESP:CreateSlider({
-		Name = 'Outline Transparency',
-		Min = 0,
-		Max = 1,
-		Default = 0.5,
-		Function = function(val)
-			for _, v in Reference do
-				v.OutlineTransparency = val
-			end
-		end,
-		Decimal = 10
-	})
+run(function()
+    local collectionService = game:GetService("CollectionService")
+    local Reference = {}
+
+    local function Added(obj)
+        if Reference[obj] then return end
+        local highlight = Instance.new("Highlight")
+        highlight.FillColor = Color3.fromHSV(FillColor and FillColor.Hue or 0, FillColor and FillColor.Sat or 1, FillColor and FillColor.Value or 1)
+        highlight.OutlineColor = Color3.fromHSV(OutlineColor and OutlineColor.Hue or 0, 0, 1)
+        highlight.FillTransparency = FillTransparency and FillTransparency.Value or 0.5
+        highlight.OutlineTransparency = OutlineTransparency and OutlineTransparency.Value or 0.5
+        highlight.Adornee = obj
+        highlight.Parent = obj
+        Reference[obj] = highlight
+    end
+
+    local function Removed(obj)
+        if Reference[obj] then
+            Reference[obj]:Destroy()
+            Reference[obj] = nil
+        end
+    end
+
+    local C4ESP = vape.Categories.Render:CreateModule({
+        Name = 'C4 ESP',
+        Function = function(callback)
+            if callback then
+                C4ESP:Clean(collectionService:GetInstanceAddedSignal('C4'):Connect(Added))
+                C4ESP:Clean(collectionService:GetInstanceRemovedSignal('C4'):Connect(Removed))
+
+                for _, obj in collectionService:GetTagged('C4') do
+                    task.spawn(Added, obj)
+                end
+            else
+                for obj, highlight in pairs(Reference) do
+                    highlight:Destroy()
+                end
+                table.clear(Reference)
+            end
+        end,
+        Tooltip = 'Display all C4\'s placed'
+    })
+
+    local FillColor = C4ESP:CreateColorSlider({
+        Name = 'Color',
+        Function = function(hue, sat, val)
+            for _, v in pairs(Reference) do
+                v.FillColor = Color3.fromHSV(hue, sat, val)
+            end
+        end
+    })
+    local OutlineColor = C4ESP:CreateColorSlider({
+        Name = 'Outline Color',
+        DefaultSat = 0,
+        Function = function(hue, sat, val)
+            for _, v in pairs(Reference) do
+                v.OutlineColor = Color3.fromHSV(hue, sat, val)
+            end
+        end
+    })
+    local FillTransparency = C4ESP:CreateSlider({
+        Name = 'Transparency',
+        Min = 0,
+        Max = 1,
+        Default = 0.5,
+        Function = function(val)
+            for _, v in pairs(Reference) do
+                v.FillTransparency = val
+            end
+        end,
+        Decimal = 10
+    })
+    local OutlineTransparency = C4ESP:CreateSlider({
+        Name = 'Outline Transparency',
+        Min = 0,
+        Max = 1,
+        Default = 0.5,
+        Function = function(val)
+            for _, v in pairs(Reference) do
+                v.OutlineTransparency = val
+            end
+        end,
+        Decimal = 10
+    })
 end)
                                                                                                                                                                             
 run(function()
