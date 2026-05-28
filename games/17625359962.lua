@@ -234,7 +234,7 @@ run(function()
     local isLeftMouseDown, isRightMouseDown = false, false
     local autoClickConnection = nil
     local cameraLockConnection = nil
-    local silentAimEnabled = false
+    local silenton = false
     local lockChance = 100
     local clickInterval = 0.10
     local aimPartSA = "Head"
@@ -272,11 +272,11 @@ run(function()
             autoClickConnection:Disconnect()
             autoClickConnection = nil
         end
-        if not silentAimEnabled then return end
+        if not silenton then return end
         if not (isLeftMouseDown or isRightMouseDown) then return end
 
         autoClickConnection = runService.Heartbeat:Connect(function()
-            if not (isLeftMouseDown or isRightMouseDown) or not silentAimEnabled then
+            if not (isLeftMouseDown or isRightMouseDown) or not silenton then
                 if autoClickConnection then
                     autoClickConnection:Disconnect()
                     autoClickConnection = nil
@@ -325,7 +325,7 @@ run(function()
     local SilentAim = vape.Categories.Combat:CreateModule({
         Name = 'Silent Aim',
         Function = function(callback)
-            silentAimEnabled = callback
+            silenton = callback
             if CircleObject then CircleObject.Visible = callback end
             if callback then
                 cameraLockConnection = runService.Heartbeat:Connect(function()
@@ -379,7 +379,7 @@ run(function()
             CircleObject.Radius = fovRadiusSA
             CircleObject.NumSides = 100
             CircleObject.Transparency = 1-(CircleTransparency and CircleTransparency.Value or 0.5)
-            CircleObject.Visible = silentAimEnabled
+            CircleObject.Visible = silenton
         else
             pcall(function() CircleObject:Remove() end); CircleObject = nil
         end
@@ -414,14 +414,19 @@ run(function()
     local runService = game:GetService("RunService")
 
     local enabled = false
-    local rightClicked = not RightClick or not RightClick.Enabled or inputService:IsMouseButtonPressed(1)
     local gameReady = false
 
-    local Targets, Part, FOV, Speed, RightClick, ShowTarget, EnemyOnlyToggle
-    local circleColor, circleTransparency, circleFilled, circleVisible = {Hue=0, Saturation=1, Value=1}, 0.5, false, false
-    local fovTrack = false
+    local aimPartName = "Head"
+    local fovRadius = 100
     local CircleObject = nil
-    local smoothPos = Vector2.new(cam.ViewportSize.X/2, cam.ViewportSize.Y/2)
+    local circleColor = {Hue=0, Saturation=1, Value=1}
+    local circleTransparency = 0.5
+    local circleFilled = false
+    local showCircle = false
+
+    local cachedTarget = nil
+    local lastTargetUpdate = 0
+    local TARGET_UPDATE_INTERVAL = 0.1
 
     local function isGameActive()
         local mainGui = me.PlayerGui:FindFirstChild("MainGui")
@@ -438,8 +443,7 @@ run(function()
         return false
     end
 
-    local function checkEnemy(player)
-        if not EnemyOnlyToggle or not EnemyOnlyToggle.Enabled then return true end
+    local function isValidTarget(player)
         if player == me then return false end
         local myEnv = me:GetAttribute("EnvironmentID")
         local myTeam = me:GetAttribute("TeamID")
@@ -447,8 +451,8 @@ run(function()
         local targetTeam = player:GetAttribute("TeamID")
 
         if myEnv and myTeam and targetEnv and targetTeam then
-            if string.byte(myEnv or string.char(0)) ~= string.byte(targetEnv or string.char(0)) then return false end
-            if string.byte(myTeam or string.char(0)) == string.byte(targetTeam or string.char(0)) then return false end
+            if string.byte(myEnv or "") ~= string.byte(targetEnv or "") then return false end
+            if string.byte(myTeam or "") == string.byte(targetTeam or "") then return false end
             return true
         end
 
@@ -458,23 +462,23 @@ run(function()
         return true
     end
 
-    local function getTarget()
-        if not gameReady then return nil end
-        if RightClick and RightClick.Enabled and not rightClicked then return nil end
+    local function updateTarget()
+        local now = tick()
+        if now - lastTargetUpdate < TARGET_UPDATE_INTERVAL then return end
+        lastTargetUpdate = now
 
-        local ent = entitylib.EntityMouse({
-            Range = FOV.Value,
-            Part = Part.Value,
-            Players = Targets.Players.Enabled,
-            NPCs = Targets.NPCs.Enabled,
-            Wallcheck = Targets.Walls.Enabled,
+        cachedTarget = entitylib.EntityMouse({
+            Range = fovRadius,
+            Part = aimPartName,
+            Players = true,
+            NPCs = false,
+            Wallcheck = false,
             Origin = cam.CFrame.Position
         })
 
-        if ent and ent.Player and not checkEnemy(ent.Player) then
-            ent = nil
+        if cachedTarget and cachedTarget.Player and not isValidTarget(cachedTarget.Player) then
+            cachedTarget = nil
         end
-        return ent
     end
 
     X = {}
@@ -485,70 +489,26 @@ run(function()
         if not enabled or not gameReady then
             return X.original(...)
         end
-        local ent = getTarget()
-        if ent and ent[Part.Value] then
-            args[3] = ent[Part.Value].Position
+
+        updateTarget()
+        if cachedTarget and cachedTarget[aimPartName] then
+            args[3] = cachedTarget[aimPartName].Position
         end
         return X.original(table.unpack(args))
     end
 
-    local circleUpdate
-    circleUpdate = runService.RenderStepped:Connect(function(dt)
+    local circleUpdateConn
+    circleUpdateConn = runService.RenderStepped:Connect(function()
         if not CircleObject then return end
-        CircleObject.Visible = enabled and circleVisible
+        CircleObject.Visible = enabled and showCircle
+        if not (enabled and showCircle) then return end
 
-        if not enabled or not circleVisible then return end
-
-        CircleObject.Radius = FOV.Value
+        CircleObject.Radius = fovRadius
         CircleObject.Color = Color3.fromHSV(circleColor.Hue, circleColor.Saturation, circleColor.Value)
         CircleObject.Transparency = 1 - circleTransparency
         CircleObject.Filled = circleFilled
-
-        local goalPos
-        local ent = getTarget()
-        if fovTrack and ent and ent[Part.Value] then
-            local pos, onScreen = cam:WorldToViewportPoint(ent[Part.Value].Position)
-            if onScreen then
-                goalPos = Vector2.new(pos.X, pos.Y)
-            else
-                goalPos = inputService:GetMouseLocation()
-            end
-        else
-            goalPos = inputService:GetMouseLocation()
-        end
-
-        smoothPos = smoothPos:Lerp(goalPos, math.min(dt * 8, 1))
-        CircleObject.Position = smoothPos
+        CircleObject.Position = inputService:GetMouseLocation()
     end)
-
-    local rightDown = false
-    if RightClick and RightClick.Enabled then
-        local inputConn
-        inputConn = inputService.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton2 then
-                rightClicked = true
-            end
-        end)
-        vape:Clean(function() inputConn:Disconnect() end)
-        local inputEndConn
-        inputEndConn = inputService.InputEnded:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton2 then
-                rightClicked = false
-            end
-        end)
-        vape:Clean(function() inputEndConn:Disconnect() end)
-    end
-
-    local targetInfoConn
-    if ShowTarget and ShowTarget.Enabled then
-        targetInfoConn = runService.RenderStepped:Connect(function()
-            if not enabled then return end
-            local ent = getTarget()
-            if ent and ent.Player then
-            end
-        end)
-        vape:Clean(function() if targetInfoConn then targetInfoConn:Disconnect() end end)
-    end
 
     task.spawn(function()
         repeat task.wait(0.5) until isGameActive() and me.Character and me.Character:FindFirstChild("HumanoidRootPart")
@@ -563,70 +523,52 @@ run(function()
                 CircleObject.Visible = false
             end
         end,
-        Tooltip = 'love for u'
+        Tooltip = 'Silently redirects bullets to chosen body part'
     })
 
-    Targets = SilentAimV2:CreateTargets({Players = true})
-    Part = SilentAimV2:CreateDropdown({
-        Name = 'Part',
-        List = {'RootPart', 'Head'}
+    SilentAimV2:CreateDropdown({
+        Name = 'Hit Part',
+        List = {'Head', 'RootPart', 'HumanoidRootPart', 'UpperTorso', 'LowerTorso'},
+        Default = 'Head',
+        Function = function(v)
+            aimPartName = v
+            cachedTarget = nil
+        end,
+        Tooltip = 'Body part the bullet will hit'
     })
-    FOV = SilentAimV2:CreateSlider({
+
+    SilentAimV2:CreateSlider({
         Name = 'FOV',
-        Min = 0,
+        Min = 10,
         Max = 1000,
         Default = 100,
-        Function = function(val)
-            if CircleObject then
-                CircleObject.Radius = val
-            end
-        end
-    })
-    Speed = SilentAimV2:CreateSlider({
-        Name = 'Speed',
-        Min = 0,
-        Max = 200,
-        Default = 15,
-        Tooltip = 'Circle tracking'
-    })
-    RightClick = SilentAimV2:CreateToggle({
-        Name = 'Require right click',
-        Function = function()
-            if SilentAimV2.Enabled then
-                SilentAimV2:Toggle()
-                SilentAimV2:Toggle()
-            end
-        end
-    })
-    ShowTarget = SilentAimV2:CreateToggle({
-        Name = 'Show target info'
-    })
-    EnemyOnlyToggle = SilentAimV2:CreateToggle({
-        Name = 'Team Check',
-        Default = true,
-        Tooltip = '<3'
+        Function = function(v)
+            fovRadius = v
+            if CircleObject then CircleObject.Radius = v end
+        end,
+        Suffix = 'px'
     })
 
     SilentAimV2:CreateToggle({
         Name = 'Range Circle',
         Function = function(c)
-            circleVisible = c
+            showCircle = c
             if c then
-                CircleObject = Drawing.new('Circle')
+                if not CircleObject then
+                    CircleObject = Drawing.new('Circle')
+                    CircleObject.NumSides = 100
+                    CircleObject.Visible = enabled
+                end
                 CircleObject.Filled = circleFilled
                 CircleObject.Color = Color3.fromHSV(circleColor.Hue, circleColor.Saturation, circleColor.Value)
-                CircleObject.Position = inputService:GetMouseLocation()
-                CircleObject.Radius = FOV.Value
-                CircleObject.NumSides = 100
                 CircleObject.Transparency = 1 - circleTransparency
-                CircleObject.Visible = enabled
+                CircleObject.Radius = fovRadius
+                CircleObject.Position = inputService:GetMouseLocation()
             else
-                pcall(function()
-                    if CircleObject then
-                        CircleObject:Remove()
-                        CircleObject = nil
-                    end
-                end)
+                if CircleObject then
+                    pcall(function() CircleObject:Remove() end)
+                    CircleObject = nil
+                end
             end
             if CircleColor then CircleColor.Object.Visible = c end
             if CircleTransparency then CircleTransparency.Object.Visible = c end
@@ -635,10 +577,10 @@ run(function()
     })
     CircleColor = SilentAimV2:CreateColorSlider({
         Name = 'Circle Color',
-        Function = function(h, s, v)
+        Function = function(h,s,v)
             circleColor = {Hue=h, Saturation=s, Value=v}
             if CircleObject then
-                CircleObject.Color = Color3.fromHSV(h, s, v)
+                CircleObject.Color = Color3.fromHSV(h,s,v)
             end
         end,
         Darker = true,
@@ -646,10 +588,7 @@ run(function()
     })
     CircleTransparency = SilentAimV2:CreateSlider({
         Name = 'Transparency',
-        Min = 0,
-        Max = 1,
-        Decimal = 10,
-        Default = 0.5,
+        Min = 0, Max = 1, Decimal = 10, Default = 0.5,
         Function = function(v)
             circleTransparency = v
             if CircleObject then
@@ -663,23 +602,15 @@ run(function()
         Name = 'Circle Filled',
         Function = function(c)
             circleFilled = c
-            if CircleObject then
-                CircleObject.Filled = c
-            end
+            if CircleObject then CircleObject.Filled = c end
         end,
         Darker = true,
         Visible = false
     })
-    SilentAimV2:CreateToggle({
-        Name = 'Fov Track',
-        Default = false,
-        Function = function(v) fovTrack = v end,
-        Tooltip = 'Circle follows closest enemy'
-    })
 
     vape:Clean(function()
         X.mod.Raycast = X.original
-        if circleUpdate then circleUpdate:Disconnect() end
+        if circleUpdateConn then circleUpdateConn:Disconnect() end
         if CircleObject then
             pcall(function() CircleObject:Remove() end)
             CircleObject = nil
