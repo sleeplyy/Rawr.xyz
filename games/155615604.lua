@@ -2276,6 +2276,7 @@ end)
                                                                                                                                                                             
 run(function()
     local AutoHeal
+    local HealthThreshold
     local healItems = {
         Breakfast = true,
         Lunch = true,
@@ -2293,7 +2294,12 @@ run(function()
                     end
 
                     local humanoid = entitylib.character.Humanoid
-                    if humanoid.Health > 85 then
+                    local currentHealth = humanoid.Health
+                    local maxHealth = humanoid.MaxHealth
+                    local healthPercent = (currentHealth / maxHealth) * 100
+                    local threshold = HealthThreshold and HealthThreshold.Value or 85
+
+                    if healthPercent > threshold then
                         task.wait(0.5)
                         continue
                     end
@@ -2320,31 +2326,50 @@ run(function()
                         task.wait(0.5)
                         continue
                     end
-																																																			
-                    local equipped = char:FindFirstChildOfClass('Tool')
 
+                    local equipped = char:FindFirstChildOfClass('Tool')
                     if equipped then
                         equipped.Parent = backpack
                     end
                     healTool.Parent = char
 
-                    healTool:SetAttribute('Quantity', math.max((healTool:GetAttribute('Quantity') or 1) - 1, 0))
-                    healTool:SetAttribute('Client_LastConsumedAt', os.clock())
-                    replicatedStorage.Remotes.EatFood:FireServer()
+                    repeat
+                        if mouse1press then mouse1press() end
+                        task.wait(0.05)
+                        if mouse1release then mouse1release() end
 
-                    task.wait(0.1)
+                        task.wait(1)
 
-                    healTool.Parent = backpack
+                        currentHealth = humanoid.Health
+
+                        if not healTool.Parent or (healTool:GetAttribute('Quantity') or 0) <= 0 then
+                            break
+                        end
+                    until currentHealth >= maxHealth or not entitylib.isAlive
+
+                    if healTool.Parent == char then
+                        healTool.Parent = backpack
+                    end
                     if equipped and equipped.Parent == backpack then
                         equipped.Parent = char
                     end
 
-                    notif('AutoHeal', 'Ate ' .. healTool.Name .. ' | Qty: ' .. healTool:GetAttribute('Quantity'), 2)
+                    notif('AutoHeal', 'Finished eating ' .. healTool.Name, 2)
                     task.wait(0.5)
                 until not AutoHeal.Enabled
             end
         end,
         Tooltip = 'Automatically eat food when health is low.'
+    })
+
+    HealthThreshold = AutoHeal:CreateSlider({
+        Name = 'Health Threshold',
+        Min = 1,
+        Max = 99,
+        Default = 85,
+        Suffix = '%',
+        Function = function() end,
+        Tooltip = 'Start eating when health falls below this %'
     })
 end)
                                                                                                                                                                                 
