@@ -3830,4 +3830,4 @@ run(function()
 end)
 
 entitylib.start()
-print("Rawr.xyz V4.5.6")
+print("Welcome, V4.5.7")
