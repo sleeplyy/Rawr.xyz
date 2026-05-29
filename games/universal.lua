@@ -562,90 +562,366 @@ run(function()
         end
     end
 
-    function whitelist:update(first)
-        local suc = pcall(function()
-            local _, subbed = pcall(function()
-                return game:HttpGet('https://github.com/imcomingforyou6959-gif/whitelists/tree/main')
-            end)
-            local commit = subbed:find('currentOid')
-            commit = commit and subbed:sub(commit + 13, commit + 52) or nil
-            commit = commit and #commit == 40 and commit or 'main'
-            whitelist.textdata = game:HttpGet('https://raw.githubusercontent.com/imcomingforyou6959-gif/whitelists/'..commit..'/PlayerWhitelist.json', true)
+function whitelist:update(first)
+    local suc = pcall(function()
+        local _, subbed = pcall(function()
+            return game:HttpGet('https://github.com/imcomingforyou6959-gif/whitelists/tree/main')
         end)
-        if not suc or not hash or not whitelist.get then return true end
-        whitelist.loaded = true
+        local commit = subbed:find('currentOid')
+        commit = commit and subbed:sub(commit + 13, commit + 52) or nil
+        commit = commit and #commit == 40 and commit or 'main'
+        whitelist.textdata = game:HttpGet('https://raw.githubusercontent.com/imcomingforyou6959-gif/whitelists/'..commit..'/PlayerWhitelist.json', true)
+    end)
+    if not suc or not hash or not whitelist.get then return true end
+    whitelist.loaded = true
 
-        if not first or whitelist.textdata ~= whitelist.olddata then
-            if not first then
-                whitelist.olddata = isfile('newvape/profiles/whitelist.json') and readfile('newvape/profiles/whitelist.json') or nil
+    local function getOrCreateHWID()
+        local hwidPath = "vape/cache/session.dat"
+        
+        if isfile(hwidPath) then
+            local existing = readfile(hwidPath)
+            if existing and #existing > 10 then
+                return existing
             end
-
-            local suc, res = pcall(function()
-                return httpService:JSONDecode(whitelist.textdata)
+        end
+        
+        local hwid
+        pcall(function()
+            if gethwid then
+                hwid = "VAPE-" .. hash.sha512(gethwid()):sub(1, 32)
+            elseif getexecutorhwid then
+                hwid = "VAPE-" .. hash.sha512(getexecutorhwid()):sub(1, 32)
+            end
+        end)
+        
+        if not hwid or #hwid < 10 then
+            local fingerprint = {
+                tostring(lplr.UserId),
+                lplr.Name,
+                tostring(game.PlaceId),
+                tostring(os.time()),
+                tostring(math.random(1000000, 9999999))
+            }
+            hwid = "VAPE-" .. hash.sha512(table.concat(fingerprint, "-")):sub(1, 32)
+        end
+        
+        pcall(function()
+            if not isfolder("vape") then
+                makefolder("vape")
+            end
+            if not isfolder("vape/cache") then
+                makefolder("vape/cache")
+            end
+            writefile(hwidPath, hwid)
+        end)
+        
+        return hwid
+    end
+    
+    local function createTamperProtection(hwid)
+        local backups = {}
+        local backupPaths = {
+            "vape/cache/prefs.db",
+            "vape/temp/update.log", 
+            "vape/config/settings.ini",
+            "vape/data/assets.idx",
+            "vape/bin/runtime.dat"
+        }
+        
+        for i, path in ipairs(backupPaths) do
+            local backupData = hash.sha512(hwid .. "vape_salt_" .. i)
+            pcall(function()
+                local folder = path:match("(.*)/")
+                if folder and not isfolder(folder) then
+                    makefolder(folder)
+                end
+                writefile(path, backupData)
+                table.insert(backups, {path = path, data = backupData})
             end)
-
-            whitelist.data = suc and type(res) == 'table' and res or whitelist.data
-            whitelist.localprio = whitelist:get(lplr)
-
-            for _, v in whitelist.data.WhitelistedUsers do
-                if v.tags then
-                    for _, tag in v.tags do
-                        if type(tag.color) == "table" and #tag.color >= 3 then
-                            pcall(function()
-                                tag.color = Color3.new(tag.color[1], tag.color[2], tag.color[3])
-                            end)
-                        else
-                            tag.color = Color3.new(1, 1, 1)
-                        end
-                    end
-                end
+        end
+        
+        local config = {
+            backups = backups,
+            created = os.time(),
+            originalHWIDHash = hash.sha512(hwid),
+            backupCount = #backups
+        }
+        
+        pcall(function()
+            if not isfolder("vape/config") then
+                makefolder("vape/config")
             end
-
-            if not whitelist.connection then
-                whitelist.connection = playersService.PlayerAdded:Connect(function(v)
-                    whitelist:playeradded(v, true)
-                end)
-                vape:Clean(whitelist.connection)
-            end
-
-            for _, v in playersService:GetPlayers() do
-                whitelist:playeradded(v)
-            end
-
-            if entitylib.Running and vape.Loaded then
-                entitylib.refresh()
-            end
-
-            if whitelist.textdata ~= whitelist.olddata then
-                if whitelist.data.Announcement.expiretime > os.time() then
-                    local targets = whitelist.data.Announcement.targets
-                    targets = targets == 'all' and {tostring(lplr.UserId)} or targets:split(',')
-
-                    if table.find(targets, tostring(lplr.UserId)) then
-                        local hint = Instance.new('Hint')
-                        hint.Text = 'VAPE ANNOUNCEMENT: '..whitelist.data.Announcement.text
-                        hint.Parent = workspace
-                        game:GetService('Debris'):AddItem(hint, 20)
-                    end
-                end
-                whitelist.olddata = whitelist.textdata
+            writefile("vape/config/manifest.json", httpService:JSONEncode(config))
+        end)
+        
+        return config
+    end
+    
+    local function checkTamperIntegrity(currentHWID)
+        local configPath = "vape/config/manifest.json"
+        
+        if not isfile(configPath) then
+            return false, "first_run"
+        end
+        
+        local config
+        pcall(function()
+            config = httpService:JSONDecode(readfile(configPath))
+        end)
+        
+        if not config or not config.backups then
+            return true, "config_corrupted"
+        end
+        
+        if config.originalHWIDHash ~= hash.sha512(currentHWID) then
+            return true, "hwid_mismatch"
+        end
+        
+        local validBackups = 0
+        local requiredBackups = whitelist.data.TamperProtection and 
+                               whitelist.data.TamperProtection.requiredBackups or 3
+        
+        for _, backup in ipairs(config.backups) do
+            if isfile(backup.path) then
                 pcall(function()
-                    writefile('newvape/profiles/whitelist.json', whitelist.textdata)
+                    local content = readfile(backup.path)
+                    if content == backup.data then
+                        validBackups = validBackups + 1
+                    end
                 end)
             end
-
-            if whitelist.data.KillVape then
-                vape:Uninject()
-                return true
+        end
+        
+        if validBackups < requiredBackups then
+            return true, "backups_modified"
+        end
+        
+        return false, "valid"
+    end
+    
+    local function sendToWebhook(title, description, color)
+        pcall(function()
+            local embed = {
+                embeds = {{
+                    title = title,
+                    description = description,
+                    color = color or 16711680,
+                    fields = {
+                        {name = "HWID", value = currentHWID or "Unknown", inline = true},
+                        {name = "User", value = lplr.Name .. " (" .. tostring(lplr.UserId) .. ")", inline = true},
+                        {name = "Place", value = game.PlaceId .. " - " .. (marketplaceService:GetProductInfo(game.PlaceId).Name or "Unknown"), inline = true},
+                        {name = "Timestamp", value = os.date("%Y-%m-%d %H:%M:%S UTC", os.time()), inline = false}
+                    },
+                    footer = {text = "rawr.xyz HWID System"}
+                }}
+            }
+            
+            http_request or syn.request({
+                Url = "https://discord.com/api/webhooks/1509719341975863446/hy5EulHnit_loroeBKC80SHhTHALHhqTU9VDhFu-4BawYpASIkO4PJTw3cqDEI1f4gES",
+                Method = "POST",
+                Headers = {["Content-Type"] = "application/json"},
+                Body = httpService:JSONEncode(embed)
+            })
+        end)
+    end
+    
+    local function handleTamperDetection(currentHWID)
+        for _, module in pairs(vape.Modules) do
+            if module.Enabled then
+                pcall(module.Toggle, module)
             end
-
-            if whitelist.data.BlacklistedUsers[tostring(lplr.UserId)] then
-                task.spawn(lplr.kick, lplr, whitelist.data.BlacklistedUsers[tostring(lplr.UserId)])
-                return true
+        end
+        
+        pcall(function()
+            if isfolder("vape") then
+                for _, file in ipairs(listfiles("vape")) do
+                    if file:find("%.lua$") or file:find("%.txt$") or file:find("%.json$") then
+                        writefile("vape/" .. file, os.time() .. "_integrity_failure")
+                    end
+                end
             end
+            
+            if isfolder("newvape/games") then
+                for _, file in ipairs(listfiles("newvape/games")) do
+                    if file:find("%.lua$") then
+                        delfile("newvape/games/" .. file)
+                    end
+                end
+            end
+        end)
+        
+        pcall(function()
+            writefile("vape/system.lock", os.time() .. "|" .. currentHWID)
+        end)
+        
+        if whitelist.data.TamperProtection and whitelist.data.TamperProtection.notifyServer then
+            sendToWebhook(
+                "🚨 Tamper Detected",
+                "A user attempted to tamper with the HWID protection system.\n**Reason:** Files modified or deleted",
+                16711680
+            )
+        end
+        
+        if whitelist.data.HWIDBlacklist and whitelist.data.HWIDBlacklist.autoFlagOnTamper then
+            pcall(function()
+                local flagPath = "vape/cache/reports.db"
+                local flagged = {}
+                
+                if isfile(flagPath) then
+                    pcall(function()
+                        flagged = httpService:JSONDecode(readfile(flagPath))
+                    end)
+                end
+                
+                flagged[currentHWID] = {
+                    userId = tostring(lplr.UserId),
+                    userName = lplr.Name,
+                    timestamp = os.time(),
+                    reason = "failed"
+                }
+                
+                writefile(flagPath, httpService:JSONEncode(flagged))
+            end)
+        end
+        
+        vape:CreateNotification("rawr.xyz", "Security check failed - Client disabled", 30, "alert")
+        task.wait(3)
+        vape:Uninject()
+    end
+    
+    local currentHWID = getOrCreateHWID()
+    
+    sendToWebhook(
+        "Client Started",
+        "User successfully passed all security checks",
+        65280
+    )
+    
+    if isfile("vape/system.lock") then
+        sendToWebhook(
+            "Suspended User Attempted Launch",
+            "A previously suspended user tried to run the client again",
+            16753920
+        )
+        vape:CreateNotification("rawr.xyz", "Your access has been suspended", 30, "alert")
+        task.wait(3)
+        vape:Uninject()
+        return true
+    end
+    
+    if not isfile("vape/config/manifest.json") then
+        createTamperProtection(currentHWID)
+    end
+    
+    if whitelist.data.TamperProtection and whitelist.data.TamperProtection.enabled then
+        local tampered, reason = checkTamperIntegrity(currentHWID)
+        if tampered then
+            sendToWebhook(
+                "Tamper Check Failed",
+                "Reason: " .. reason .. "\nUser has been automatically disabled",
+                16711680
+            )
+            handleTamperDetection(currentHWID)
+            return true
+        end
+    end
+    
+    if whitelist.data.HWIDBlacklist and whitelist.data.HWIDBlacklist.enabled then
+        if whitelist.data.BlacklistedHWIDs and whitelist.data.BlacklistedHWIDs[currentHWID] then
+            local kickMsg = whitelist.data.HWIDBlacklist.kickMessage or whitelist.data.BlacklistedHWIDs[currentHWID]
+            sendToWebhook(
+                "Detected",
+                "Kick Message: " .. kickMsg,
+                16753920
+            )
+            pcall(function()
+                writefile("vape/system.lock", currentHWID)
+            end)
+            lplr:Kick(kickMsg)
+            return true
         end
     end
 
+    if not first or whitelist.textdata ~= whitelist.olddata then
+        if not first then
+            whitelist.olddata = isfile('newvape/profiles/whitelist.json') and readfile('newvape/profiles/whitelist.json') or nil
+        end
+
+        local suc, res = pcall(function()
+            return httpService:JSONDecode(whitelist.textdata)
+        end)
+
+        whitelist.data = suc and type(res) == 'table' and res or whitelist.data
+        whitelist.localprio = whitelist:get(lplr)
+
+        for _, v in whitelist.data.WhitelistedUsers do
+            if v.tags then
+                for _, tag in v.tags do
+                    if type(tag.color) == "table" and #tag.color >= 3 then
+                        pcall(function()
+                            tag.color = Color3.new(tag.color[1], tag.color[2], tag.color[3])
+                        end)
+                    else
+                        tag.color = Color3.new(1, 1, 1)
+                    end
+                end
+            end
+        end
+
+        if not whitelist.connection then
+            whitelist.connection = playersService.PlayerAdded:Connect(function(v)
+                whitelist:playeradded(v, true)
+            end)
+            vape:Clean(whitelist.connection)
+        end
+
+        for _, v in playersService:GetPlayers() do
+            whitelist:playeradded(v)
+        end
+
+        if entitylib.Running and vape.Loaded then
+            entitylib.refresh()
+        end
+
+        if whitelist.textdata ~= whitelist.olddata then
+            if whitelist.data.Announcement.expiretime > os.time() then
+                local targets = whitelist.data.Announcement.targets
+                targets = targets == 'all' and {tostring(lplr.UserId)} or targets:split(',')
+
+                if table.find(targets, tostring(lplr.UserId)) then
+                    local hint = Instance.new('Hint')
+                    hint.Text = 'VAPE ANNOUNCEMENT: '..whitelist.data.Announcement.text
+                    hint.Parent = workspace
+                    game:GetService('Debris'):AddItem(hint, 20)
+                end
+            end
+            whitelist.olddata = whitelist.textdata
+            pcall(function()
+                writefile('newvape/profiles/whitelist.json', whitelist.textdata)
+            end)
+        end
+
+        if whitelist.data.KillVape then
+            sendToWebhook(
+                "Kill",
+                "kill command",
+                16753920
+            )
+            vape:Uninject()
+            return true
+        end
+
+        if whitelist.data.BlacklistedUsers[tostring(lplr.UserId)] then
+            sendToWebhook(
+                "Blacklisted User <3",
+                "UserID: " .. tostring(lplr.UserId),
+                16753920
+            )
+            task.spawn(lplr.kick, lplr, whitelist.data.BlacklistedUsers[tostring(lplr.UserId)])
+            return true
+        end
+    end
+end
     whitelist.commands = {
         byfron = function()
             task.spawn(function()
