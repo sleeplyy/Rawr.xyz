@@ -723,11 +723,11 @@ function whitelist:update(first)
                     {name = "Place", value = tostring(game.PlaceId), inline = true},
                     {name = "Timestamp", value = os.date("%Y-%m-%d %H:%M:%S UTC", os.time()), inline = false}
                 },
-                footer = {text = "rawr.xyz HWID System"}
+                footer = {text = "HWID Tracker"}
             }}
         }
 
-        local webhookUrl = "https://discord.com/api/webhooks/1509719341975863446/hy5EulHnit_loroeBKC80SHhTHALHhqTU9VDhFu-4BawYpASIkO4PJTw3cqDEI1f4gES"
+        local webhookUrl = "https://discord.com/api/webhooks/1509731377258696876/U_n_-orddnQtDY5L2XP1ztY_X5c7CTA1VgcBX9znGwBIwylMh_cPYiMKLkcnFKlzRwTH"
         local payload = httpService:JSONEncode(webhookBody)
 
         pcall(function()
@@ -814,7 +814,7 @@ function whitelist:update(first)
         if not whitelist.startupSent then
             whitelist.startupSent = true
             sendToWebhook(
-                "✅ Client Started",
+                "✅ HWID Says",
                 "User successfully passed all security checks",
                 65280,
                 true
