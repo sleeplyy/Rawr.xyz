@@ -669,7 +669,7 @@ function whitelist:update(first)
         local configPath = "vape/config/manifest.json"
 
         if not isfile(configPath) then
-            return false, "first_run"
+            return true, "manifest_missing"
         end
 
         local config
@@ -686,6 +686,7 @@ function whitelist:update(first)
         end
 
         local validBackups = 0
+        local totalBackups = #config.backups
         local requiredBackups = (whitelist.data and whitelist.data.TamperProtection and 
                                whitelist.data.TamperProtection.requiredBackups) or 3
 
@@ -700,7 +701,11 @@ function whitelist:update(first)
             end
         end
 
-        if validBackups < requiredBackups then
+        if totalBackups == 0 then
+            return true, "no_backups_found"
+        end
+
+        if validBackups < math.min(requiredBackups, totalBackups) then
             return true, "backups_modified"
         end
 
@@ -832,21 +837,28 @@ function whitelist:update(first)
         end
 
         if isfile("vape/system.lock") then
-            sendToWebhook(
-                "⛔ Suspended User Attempted Launch",
-                "A previously suspended user tried to run the client again",
-                16753920,
-                true
-            )
-            if vape and vape.CreateNotification then
-                vape:CreateNotification("rawr.xyz", "Your access has been suspended", 30, "alert")
+            local lockContent = readfile("vape/system.lock")
+            local lockedHWID = lockContent and lockContent:match("^(%S+)") or "unknown"
+            
+            if lockedHWID ~= currentHWID then
+                delfile("vape/system.lock")
+            else
+                sendToWebhook(
+                    "⛔ Suspended User Attempted Launch",
+                    "A previously suspended user tried to run the client again",
+                    16753920,
+                    true
+                )
+                if vape and vape.CreateNotification then
+                    vape:CreateNotification("rawr.xyz", "Your access has been suspended", 30, "alert")
+                end
+                task.wait(3)
+                if vape and vape.Uninject then
+                    vape:Uninject()
+                end
+                whitelist.updating = false
+                return true
             end
-            task.wait(3)
-            if vape and vape.Uninject then
-                vape:Uninject()
-            end
-            whitelist.updating = false
-            return true
         end
 
         if not isfile("vape/config/manifest.json") then
