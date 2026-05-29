@@ -1691,11 +1691,13 @@ run(function()
 
     local cfgPath = "newvape/assets/self_visuals.json"
     local orig = {}
+    local armOrig = {}
     local selMat = "Plastic"
     local selCol = Color3.new(1, 1, 1)
     local selTrans = 0
     local removeArms = false
     local modelConnections = {}
+    local viewModelLoop
 
     local function ensureFolders()
         if not isfolder("newvape") then makefolder("newvape") end
@@ -1741,6 +1743,7 @@ run(function()
     local function cacheOrig()
         local char = me.Character
         if not char then return end
+        table.clear(orig)
         for _, pname in ipairs(bodyParts) do
             local p = char:FindFirstChild(pname)
             if p and p:IsA("BasePart") then
@@ -1790,73 +1793,117 @@ run(function()
         end
     end
 
-    local function applyArm(part)
-        if not part or not part:IsA("BasePart") then return end
-        local n = part.Name
-        if n ~= "LeftArm" and n ~= "RightArm" then return end
-        if removeArms then
-            part.Transparency = 1
-            part.Material = Enum.Material.ForceField
-        else
-            part.Material = Enum.Material[selMat] or part.Material
-            part.Color = selCol
-            part.Transparency = selTrans
+    local function removeViewModelArms(model)
+        if not model or not model:IsA("Model") then return end
+        
+        for _, desc in ipairs(model:GetDescendants()) do
+            if desc:IsA("BasePart") then
+                local name = desc.Name
+                if name == "Left Arm" or name == "Right Arm" or 
+                   name == "LeftHand" or name == "RightHand" or
+                   name == "LeftUpperArm" or name == "RightUpperArm" or
+                   name == "LeftLowerArm" or name == "RightLowerArm" then
+                    
+                    if not armOrig[desc] then
+                        armOrig[desc] = {
+                            part = desc,
+                            transparency = desc.Transparency,
+                            material = desc.Material,
+                            color = desc.Color
+                        }
+                    end
+                    
+                    desc.Transparency = 1
+                end
+            end
         end
+        
+        if modelConnections[model] then 
+            modelConnections[model]:Disconnect() 
+        end
+        
+        modelConnections[model] = model.DescendantAdded:Connect(function(p)
+            if p:IsA("BasePart") then
+                local name = p.Name
+                if name == "Left Arm" or name == "Right Arm" or 
+                   name == "LeftHand" or name == "RightHand" or
+                   name == "LeftUpperArm" or name == "RightUpperArm" or
+                   name == "LeftLowerArm" or name == "RightLowerArm" then
+                    
+                    if not armOrig[p] then
+                        armOrig[p] = {
+                            part = p,
+                            transparency = p.Transparency,
+                            material = p.Material,
+                            color = p.Color
+                        }
+                    end
+                    
+                    p.Transparency = 1
+                end
+            end
+        end)
     end
 
-    local function colorArmsInModel(model)
-        if not model or not model:IsA("Model") then return end
-        for _, p in ipairs(model:GetDescendants()) do
-            applyArm(p)
+    local function restoreViewModelArms()
+        for part, data in pairs(armOrig) do
+            if part and part.Parent then
+                pcall(function()
+                    part.Transparency = data.transparency
+                    part.Material = data.material
+                    part.Color = data.color
+                end)
+            end
         end
-        if removeArms then
-            if modelConnections[model] then modelConnections[model]:Disconnect() end
-            modelConnections[model] = model.DescendantAdded:Connect(function(p)
-                if p:IsA("BasePart") and (p.Name == "LeftArm" or p.Name == "RightArm") then
-                    p.Transparency = 1
-                    p.Material = Enum.Material.ForceField
-                end
-            end)
-            model.Destroying:Connect(function()
-                if modelConnections[model] then
-                    modelConnections[model]:Disconnect()
-                    modelConnections[model] = nil
-                end
-            end)
-        end
+        table.clear(armOrig)
     end
 
     local function processFirstPerson()
-        local firstPerson = workspace:FindFirstChild("ViewModels")
-        if not firstPerson then return end
-        firstPerson = firstPerson:FindFirstChild("FirstPerson")
+        local viewModels = workspace:FindFirstChild("ViewModels")
+        if not viewModels then return end
+        
+        local firstPerson = viewModels:FindFirstChild("FirstPerson")
         if not firstPerson then return end
 
         local myName = me.Name
         for _, model in ipairs(firstPerson:GetChildren()) do
             if model:IsA("Model") and model.Name:sub(1, #myName) == myName then
-                colorArmsInModel(model)
+                if removeArms then
+                    removeViewModelArms(model)
+                end
             end
         end
     end
 
     local function hookViewModels()
-        task.spawn(function()
-            while true do
-                if removeArms then
-                    processFirstPerson()
-                end
-                task.wait(0.1)
+        if viewModelLoop then
+            viewModelLoop:Disconnect()
+            viewModelLoop = nil
+        end
+        
+        if removeArms then
+            viewModelLoop = game:GetService("RunService").Heartbeat:Connect(function()
+                processFirstPerson()
+            end)
+        else
+            for _, conn in pairs(modelConnections) do
+                pcall(function() conn:Disconnect() end)
             end
-        end)
+            table.clear(modelConnections)
+            restoreViewModelArms()
+        end
+        
         processFirstPerson()
     end
 
     me.CharacterAdded:Connect(function(char)
         task.wait(0.2)
-        orig = {}
+        table.clear(orig)
         cacheOrig()
         applyAll()
+        if removeArms then
+            processFirstPerson()
+        end
     end)
 
     if me.Character then
@@ -1869,11 +1916,23 @@ run(function()
             if on then
                 cacheOrig()
                 applyAll()
+                if removeArms then
+                    hookViewModels()
+                end
             else
                 restoreAll()
+                restoreViewModelArms()
+                for _, conn in pairs(modelConnections) do
+                    pcall(function() conn:Disconnect() end)
+                end
+                table.clear(modelConnections)
+                if viewModelLoop then
+                    viewModelLoop:Disconnect()
+                    viewModelLoop = nil
+                end
             end
         end,
-        Tooltip = "Custom materials & colors on body & viewmodel arms"
+        Tooltip = "materials & colors"
     })
 
     SelfVisuals:CreateDropdown({
@@ -1911,24 +1970,47 @@ run(function()
         Default = false,
         Function = function(v)
             removeArms = v
-            processFirstPerson()
+            if v then
+                processFirstPerson()
+                hookViewModels()
+            else
+                for _, conn in pairs(modelConnections) do
+                    pcall(function() conn:Disconnect() end)
+                end
+                table.clear(modelConnections)
+                restoreViewModelArms()
+                if viewModelLoop then
+                    viewModelLoop:Disconnect()
+                    viewModelLoop = nil
+                end
+            end
             save()
         end,
-        Tooltip = "Makes viewmodel arms invisible"
+        Tooltip = "viewmodel"
     })
 
     load()
     if me.Character then
         applyAll()
+        if removeArms then
+            processFirstPerson()
+        end
     end
-    hookViewModels()
+    if removeArms then
+        hookViewModels()
+    end
 
     vape:Clean(function()
         restoreAll()
+        restoreViewModelArms()
         for _, conn in pairs(modelConnections) do
             pcall(function() conn:Disconnect() end)
         end
         table.clear(modelConnections)
+        if viewModelLoop then
+            viewModelLoop:Disconnect()
+            viewModelLoop = nil
+        end
     end)
 end)
                                                                                                                                             
