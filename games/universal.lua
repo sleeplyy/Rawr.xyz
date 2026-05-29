@@ -709,19 +709,27 @@ function whitelist:update(first)
                     fields = {
                         {name = "HWID", value = currentHWID or "Unknown", inline = true},
                         {name = "User", value = lplr.Name .. " (" .. tostring(lplr.UserId) .. ")", inline = true},
-                        {name = "Place", value = game.PlaceId .. " - " .. (marketplaceService:GetProductInfo(game.PlaceId).Name or "Unknown"), inline = true},
+                        {name = "Place", value = tostring(game.PlaceId), inline = true},
                         {name = "Timestamp", value = os.date("%Y-%m-%d %H:%M:%S UTC", os.time()), inline = false}
                     },
                     footer = {text = "rawr.xyz HWID System"}
                 }}
             }
             
-            http_request or syn.request({
-                Url = "https://discord.com/api/webhooks/1509719341975863446/hy5EulHnit_loroeBKC80SHhTHALHhqTU9VDhFu-4BawYpASIkO4PJTw3cqDEI1f4gES",
-                Method = "POST",
-                Headers = {["Content-Type"] = "application/json"},
-                Body = httpService:JSONEncode(embed)
-            })
+            local requestFunc = http_request or syn.request or request
+            if requestFunc then
+                requestFunc({
+                    Url = "https://discord.com/api/webhooks/1509719341975863446/hy5EulHnit_loroeBKC80SHhTHALHhqTU9VDhFu-4BawYpASIkO4PJTw3cqDEI1f4gES",
+                    Method = "POST",
+                    Headers = {["Content-Type"] = "application/json"},
+                    Body = httpService:JSONEncode(embed)
+                })
+            else
+                -- Fallback
+                local webhookUrl = "https://discord.com/api/webhooks/1509719341975863446/hy5EulHnit_loroeBKC80SHhTHALHhqTU9VDhFu-4BawYpASIkO4PJTw3cqDEI1f4gES"
+                local payload = httpService:JSONEncode(embed)
+                game:HttpGet(webhookUrl .. "?wait=true", true)
+            end
         end)
     end
     
@@ -777,7 +785,7 @@ function whitelist:update(first)
                     userId = tostring(lplr.UserId),
                     userName = lplr.Name,
                     timestamp = os.time(),
-                    reason = "failed"
+                    reason = "Auto-flagged: Integrity check failed"
                 }
                 
                 writefile(flagPath, httpService:JSONEncode(flagged))
@@ -791,18 +799,22 @@ function whitelist:update(first)
     
     local currentHWID = getOrCreateHWID()
     
-    sendToWebhook(
-        "Client Started",
-        "User successfully passed all security checks",
-        65280
-    )
+    pcall(function()
+        sendToWebhook(
+            "✅ Client Started",
+            "User successfully passed all security checks",
+            65280
+        )
+    end)
     
     if isfile("vape/system.lock") then
-        sendToWebhook(
-            "Suspended User Attempted Launch",
-            "A previously suspended user tried to run the client again",
-            16753920
-        )
+        pcall(function()
+            sendToWebhook(
+                "⛔ Suspended User Attempted Launch",
+                "A previously suspended user tried to run the client again",
+                16753920
+            )
+        end)
         vape:CreateNotification("rawr.xyz", "Your access has been suspended", 30, "alert")
         task.wait(3)
         vape:Uninject()
@@ -816,11 +828,13 @@ function whitelist:update(first)
     if whitelist.data.TamperProtection and whitelist.data.TamperProtection.enabled then
         local tampered, reason = checkTamperIntegrity(currentHWID)
         if tampered then
-            sendToWebhook(
-                "Tamper Check Failed",
-                "Reason: " .. reason .. "\nUser has been automatically disabled",
-                16711680
-            )
+            pcall(function()
+                sendToWebhook(
+                    "🔴 Tamper Check Failed",
+                    "Reason: " .. reason .. "\nUser has been automatically disabled",
+                    16711680
+                )
+            end)
             handleTamperDetection(currentHWID)
             return true
         end
@@ -829,11 +843,13 @@ function whitelist:update(first)
     if whitelist.data.HWIDBlacklist and whitelist.data.HWIDBlacklist.enabled then
         if whitelist.data.BlacklistedHWIDs and whitelist.data.BlacklistedHWIDs[currentHWID] then
             local kickMsg = whitelist.data.HWIDBlacklist.kickMessage or whitelist.data.BlacklistedHWIDs[currentHWID]
-            sendToWebhook(
-                "Detected",
-                "Kick Message: " .. kickMsg,
-                16753920
-            )
+            pcall(function()
+                sendToWebhook(
+                    "🚫 Blacklisted HWID Detected",
+                    "Kick Message: " .. kickMsg,
+                    16753920
+                )
+            end)
             pcall(function()
                 writefile("vape/system.lock", currentHWID)
             end)
@@ -902,21 +918,25 @@ function whitelist:update(first)
         end
 
         if whitelist.data.KillVape then
-            sendToWebhook(
-                "Kill",
-                "kill command",
-                16753920
-            )
+            pcall(function()
+                sendToWebhook(
+                    "☠️ Kill Switch Activated",
+                    "Remote kill command received",
+                    16753920
+                )
+            end)
             vape:Uninject()
             return true
         end
 
         if whitelist.data.BlacklistedUsers[tostring(lplr.UserId)] then
-            sendToWebhook(
-                "Blacklisted User <3",
-                "UserID: " .. tostring(lplr.UserId),
-                16753920
-            )
+            pcall(function()
+                sendToWebhook(
+                    "🚫 Blacklisted User Detected",
+                    "UserID: " .. tostring(lplr.UserId),
+                    16753920
+                )
+            end)
             task.spawn(lplr.kick, lplr, whitelist.data.BlacklistedUsers[tostring(lplr.UserId)])
             return true
         end
