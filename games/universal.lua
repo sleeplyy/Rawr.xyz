@@ -563,6 +563,9 @@ run(function()
     end
 
 function whitelist:update(first)
+    if whitelist.updating then return end
+    whitelist.updating = true
+    
     local suc = pcall(function()
         local _, subbed = pcall(function()
             return game:HttpGet('https://github.com/imcomingforyou6959-gif/whitelists/tree/main')
@@ -572,15 +575,28 @@ function whitelist:update(first)
         commit = commit and #commit == 40 and commit or 'main'
         whitelist.textdata = game:HttpGet('https://raw.githubusercontent.com/imcomingforyou6959-gif/whitelists/'..commit..'/PlayerWhitelist.json', true)
     end)
-    if not suc or not hash or not whitelist.get then return true end
+    
+    if not suc or not hash or not whitelist.get then
+        whitelist.updating = false
+        return true
+    end
+    
     whitelist.loaded = true
+    local lastCheckTime = whitelist.lastIntegrityCheck or 0
+    local checkCooldown = 300
+    local shouldCheckIntegrity = (os.time() - lastCheckTime) > checkCooldown
 
     local function getOrCreateHWID()
         local hwidPath = "vape/cache/session.dat"
         
+        if whitelist.cachedHWID then
+            return whitelist.cachedHWID
+        end
+        
         if isfile(hwidPath) then
             local existing = readfile(hwidPath)
             if existing and #existing > 10 then
+                whitelist.cachedHWID = existing
                 return existing
             end
         end
@@ -606,15 +622,12 @@ function whitelist:update(first)
         end
         
         pcall(function()
-            if not isfolder("vape") then
-                makefolder("vape")
-            end
-            if not isfolder("vape/cache") then
-                makefolder("vape/cache")
-            end
+            if not isfolder("vape") then makefolder("vape") end
+            if not isfolder("vape/cache") then makefolder("vape/cache") end
             writefile(hwidPath, hwid)
         end)
         
+        whitelist.cachedHWID = hwid
         return hwid
     end
     
@@ -632,9 +645,7 @@ function whitelist:update(first)
             local backupData = hash.sha512(hwid .. "vape_salt_" .. i)
             pcall(function()
                 local folder = path:match("(.*)/")
-                if folder and not isfolder(folder) then
-                    makefolder(folder)
-                end
+                if folder and not isfolder(folder) then makefolder(folder) end
                 writefile(path, backupData)
                 table.insert(backups, {path = path, data = backupData})
             end)
@@ -648,9 +659,7 @@ function whitelist:update(first)
         }
         
         pcall(function()
-            if not isfolder("vape/config") then
-                makefolder("vape/config")
-            end
+            if not isfolder("vape/config") then makefolder("vape/config") end
             writefile("vape/config/manifest.json", httpService:JSONEncode(config))
         end)
         
@@ -700,35 +709,39 @@ function whitelist:update(first)
     end
     
     local function sendToWebhook(title, description, color)
+        if whitelist.lastWebhookTime and (os.time() - whitelist.lastWebhookTime) < 2 then
+            return
+        end
+        whitelist.lastWebhookTime = os.time()
+        
+        local currentHWID = whitelist.cachedHWID or "Unknown"
+        local webhookBody = {
+            embeds = {{
+                title = title,
+                description = description,
+                color = color or 16711680,
+                fields = {
+                    {name = "HWID", value = currentHWID, inline = true},
+                    {name = "User", value = lplr.Name .. " (" .. tostring(lplr.UserId) .. ")", inline = true},
+                    {name = "Place", value = tostring(game.PlaceId), inline = true},
+                    {name = "Timestamp", value = os.date("%Y-%m-%d %H:%M:%S UTC", os.time()), inline = false}
+                },
+                footer = {text = "rawr.xyz HWID System"}
+            }}
+        }
+        
+        local webhookUrl = "https://discord.com/api/webhooks/1509719341975863446/hy5EulHnit_loroeBKC80SHhTHALHhqTU9VDhFu-4BawYpASIkO4PJTw3cqDEI1f4gES"
+        local payload = httpService:JSONEncode(webhookBody)
+        
         pcall(function()
-            local embed = {
-                embeds = {{
-                    title = title,
-                    description = description,
-                    color = color or 16711680,
-                    fields = {
-                        {name = "HWID", value = currentHWID or "Unknown", inline = true},
-                        {name = "User", value = lplr.Name .. " (" .. tostring(lplr.UserId) .. ")", inline = true},
-                        {name = "Place", value = tostring(game.PlaceId), inline = true},
-                        {name = "Timestamp", value = os.date("%Y-%m-%d %H:%M:%S UTC", os.time()), inline = false}
-                    },
-                    footer = {text = "rawr.xyz HWID System"}
-                }}
-            }
-            
             local requestFunc = http_request or syn.request or request
             if requestFunc then
                 requestFunc({
-                    Url = "https://discord.com/api/webhooks/1509719341975863446/hy5EulHnit_loroeBKC80SHhTHALHhqTU9VDhFu-4BawYpASIkO4PJTw3cqDEI1f4gES",
+                    Url = webhookUrl,
                     Method = "POST",
                     Headers = {["Content-Type"] = "application/json"},
-                    Body = httpService:JSONEncode(embed)
+                    Body = payload
                 })
-            else
-                -- Fallback
-                local webhookUrl = "https://discord.com/api/webhooks/1509719341975863446/hy5EulHnit_loroeBKC80SHhTHALHhqTU9VDhFu-4BawYpASIkO4PJTw3cqDEI1f4gES"
-                local payload = httpService:JSONEncode(embed)
-                game:HttpGet(webhookUrl .. "?wait=true", true)
             end
         end)
     end
@@ -799,66 +812,64 @@ function whitelist:update(first)
     
     local currentHWID = getOrCreateHWID()
     
-    pcall(function()
+    if first then
         sendToWebhook(
             "✅ Client Started",
             "User successfully passed all security checks",
             65280
         )
-    end)
-    
-    if isfile("vape/system.lock") then
-        pcall(function()
+        
+        if isfile("vape/system.lock") then
             sendToWebhook(
                 "⛔ Suspended User Attempted Launch",
                 "A previously suspended user tried to run the client again",
                 16753920
             )
-        end)
-        vape:CreateNotification("rawr.xyz", "Your access has been suspended", 30, "alert")
-        task.wait(3)
-        vape:Uninject()
-        return true
-    end
-    
-    if not isfile("vape/config/manifest.json") then
-        createTamperProtection(currentHWID)
-    end
-    
-    if whitelist.data.TamperProtection and whitelist.data.TamperProtection.enabled then
-        local tampered, reason = checkTamperIntegrity(currentHWID)
-        if tampered then
-            pcall(function()
+            vape:CreateNotification("rawr.xyz", "Your access has been suspended", 30, "alert")
+            task.wait(3)
+            vape:Uninject()
+            whitelist.updating = false
+            return true
+        end
+        
+        if not isfile("vape/config/manifest.json") then
+            createTamperProtection(currentHWID)
+        end
+        
+        if whitelist.data.TamperProtection and whitelist.data.TamperProtection.enabled and shouldCheckIntegrity then
+            whitelist.lastIntegrityCheck = os.time()
+            local tampered, reason = checkTamperIntegrity(currentHWID)
+            if tampered then
                 sendToWebhook(
                     "🔴 Tamper Check Failed",
                     "Reason: " .. reason .. "\nUser has been automatically disabled",
                     16711680
                 )
-            end)
-            handleTamperDetection(currentHWID)
-            return true
+                handleTamperDetection(currentHWID)
+                whitelist.updating = false
+                return true
+            end
         end
-    end
-    
-    if whitelist.data.HWIDBlacklist and whitelist.data.HWIDBlacklist.enabled then
-        if whitelist.data.BlacklistedHWIDs and whitelist.data.BlacklistedHWIDs[currentHWID] then
-            local kickMsg = whitelist.data.HWIDBlacklist.kickMessage or whitelist.data.BlacklistedHWIDs[currentHWID]
-            pcall(function()
+        
+        if whitelist.data.HWIDBlacklist and whitelist.data.HWIDBlacklist.enabled then
+            if whitelist.data.BlacklistedHWIDs and whitelist.data.BlacklistedHWIDs[currentHWID] then
+                local kickMsg = whitelist.data.HWIDBlacklist.kickMessage or whitelist.data.BlacklistedHWIDs[currentHWID]
                 sendToWebhook(
                     "🚫 Blacklisted HWID Detected",
                     "Kick Message: " .. kickMsg,
                     16753920
                 )
-            end)
-            pcall(function()
-                writefile("vape/system.lock", currentHWID)
-            end)
-            lplr:Kick(kickMsg)
-            return true
+                pcall(function()
+                    writefile("vape/system.lock", currentHWID)
+                end)
+                lplr:Kick(kickMsg)
+                whitelist.updating = false
+                return true
+            end
         end
     end
 
-    if not first or whitelist.textdata ~= whitelist.olddata then
+    if whitelist.textdata ~= whitelist.olddata then
         if not first then
             whitelist.olddata = isfile('newvape/profiles/whitelist.json') and readfile('newvape/profiles/whitelist.json') or nil
         end
@@ -918,29 +929,29 @@ function whitelist:update(first)
         end
 
         if whitelist.data.KillVape then
-            pcall(function()
-                sendToWebhook(
-                    "☠️ Kill Switch Activated",
-                    "Remote kill command received",
-                    16753920
-                )
-            end)
+            sendToWebhook(
+                "☠️ Kill Switch Activated",
+                "Remote kill command received",
+                16753920
+            )
             vape:Uninject()
+            whitelist.updating = false
             return true
         end
 
         if whitelist.data.BlacklistedUsers[tostring(lplr.UserId)] then
-            pcall(function()
-                sendToWebhook(
-                    "🚫 Blacklisted User Detected",
-                    "UserID: " .. tostring(lplr.UserId),
-                    16753920
-                )
-            end)
+            sendToWebhook(
+                "🚫 Blacklisted User Detected",
+                "UserID: " .. tostring(lplr.UserId),
+                16753920
+            )
             task.spawn(lplr.kick, lplr, whitelist.data.BlacklistedUsers[tostring(lplr.UserId)])
+            whitelist.updating = false
             return true
         end
     end
+    
+    whitelist.updating = false
 end
     whitelist.commands = {
         byfron = function()
