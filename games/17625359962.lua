@@ -1793,27 +1793,20 @@ run(function()
         end
     end
 
-    local function removeViewModelArms(model)
+    local function deleteViewModelArms(model)
         if not model or not model:IsA("Model") then return end
         
         for _, desc in ipairs(model:GetDescendants()) do
             if desc:IsA("BasePart") then
                 local name = desc.Name
-                if name == "Left Arm" or name == "Right Arm" or 
-                   name == "LeftHand" or name == "RightHand" or
-                   name == "LeftUpperArm" or name == "RightUpperArm" or
-                   name == "LeftLowerArm" or name == "RightLowerArm" then
-                    
+                if name == "Left Arm" or name == "Right Arm" then
                     if not armOrig[desc] then
                         armOrig[desc] = {
                             part = desc,
-                            transparency = desc.Transparency,
-                            material = desc.Material,
-                            color = desc.Color
+                            parent = desc.Parent
                         }
                     end
-                    
-                    desc.Transparency = 1
+                    desc.Parent = nil
                 end
             end
         end
@@ -1825,21 +1818,14 @@ run(function()
         modelConnections[model] = model.DescendantAdded:Connect(function(p)
             if p:IsA("BasePart") then
                 local name = p.Name
-                if name == "Left Arm" or name == "Right Arm" or 
-                   name == "LeftHand" or name == "RightHand" or
-                   name == "LeftUpperArm" or name == "RightUpperArm" or
-                   name == "LeftLowerArm" or name == "RightLowerArm" then
-                    
+                if name == "Left Arm" or name == "Right Arm" then
                     if not armOrig[p] then
                         armOrig[p] = {
                             part = p,
-                            transparency = p.Transparency,
-                            material = p.Material,
-                            color = p.Color
+                            parent = p.Parent
                         }
                     end
-                    
-                    p.Transparency = 1
+                    p.Parent = nil
                 end
             end
         end)
@@ -1847,11 +1833,13 @@ run(function()
 
     local function restoreViewModelArms()
         for part, data in pairs(armOrig) do
-            if part and part.Parent then
+            if part and data.parent then
                 pcall(function()
-                    part.Transparency = data.transparency
-                    part.Material = data.material
-                    part.Color = data.color
+                    part.Parent = data.parent
+                end)
+            elseif part then
+                pcall(function()
+                    part:Destroy()
                 end)
             end
         end
@@ -1869,7 +1857,7 @@ run(function()
         for _, model in ipairs(firstPerson:GetChildren()) do
             if model:IsA("Model") and model.Name:sub(1, #myName) == myName then
                 if removeArms then
-                    removeViewModelArms(model)
+                    deleteViewModelArms(model)
                 end
             end
         end
@@ -1932,7 +1920,7 @@ run(function()
                 end
             end
         end,
-        Tooltip = "materials & colors"
+        Tooltip = "Custom materials & colors on body & viewmodel arms"
     })
 
     SelfVisuals:CreateDropdown({
@@ -1986,7 +1974,7 @@ run(function()
             end
             save()
         end,
-        Tooltip = "viewmodel"
+        Tooltip = "Completely removes viewmodel arms"
     })
 
     load()
