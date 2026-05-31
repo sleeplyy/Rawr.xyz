@@ -348,9 +348,17 @@ run(function()
 
     task.spawn(function()
         while running do
-            task.wait(60)
+            task.wait(30)
             if not running then break end
             loadTeamMembers()
+            for _, player in ipairs(playersService:GetPlayers()) do
+                local info = isTeamMember(player)
+                if info then
+                    if player.Character then
+                        attachNametag(player.Character, info.role)
+                    end
+                end
+            end
         end
     end)
 
@@ -374,6 +382,14 @@ run(function()
         if not char then return end
         local head = char:FindFirstChild("Head") or char:WaitForChild("Head", 5)
         if not head then return end
+
+        for i, b in ipairs(activeBillboards) do
+            if b.Adornee == head then
+                pcall(function() b:Destroy() end)
+                table.remove(activeBillboards, i)
+                break
+            end
+        end
 
         local billboard = Instance.new("BillboardGui")
         billboard.Adornee = head
