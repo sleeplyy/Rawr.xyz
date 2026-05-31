@@ -7050,4 +7050,49 @@ mainapi:Clean(inputService.InputEnded:Connect(function(inputObj)
 	end
 end))
 
+do
+    local mainPane = mainapi.Categories.Main:CreateSettingsPane({Name = 'GUI'})
+    mainPane:CreateToggle({
+        Name = "Watermark",
+        Default = true,
+        Function = function(callback)
+            shared.vape_watermark = callback
+            if callback then
+                if not shared.vape_watermark_gui then
+                    local sg = Instance.new("ScreenGui")
+                    sg.Name = "VapeWatermark"
+                    sg.ResetOnSpawn = false
+                    sg.IgnoreGuiInset = true
+                    sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+                    sg.Parent = coreGui
+
+                    local label = Instance.new("TextLabel")
+                    label.Name = "Watermark"
+                    label.AnchorPoint = Vector2.new(0, 0)
+                    label.Position = UDim2.new(0, 10, 0, 10)
+                    label.Size = UDim2.new(0, 300, 0, 20)
+                    label.BackgroundTransparency = 1
+                    label.Text = "Rawr.xyz | " .. game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name
+                    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+                    label.TextStrokeTransparency = 0.5
+                    label.TextStrokeColor3 = Color3.new(0, 0, 0)
+                    label.TextSize = 14
+                    label.Font = Enum.Font.GothamBold
+                    label.TextXAlignment = Enum.TextXAlignment.Left
+                    label.Parent = sg
+
+                    shared.vape_watermark_gui = sg
+                else
+                    shared.vape_watermark_gui.Enabled = true
+                end
+            else
+                if shared.vape_watermark_gui then
+                    shared.vape_watermark_gui.Enabled = false
+                end
+            end
+        end,
+        Tooltip = "Shows 'Rawr.xyz | Game Name' in the top-left corner"
+    })
+end
+
 return mainapi
