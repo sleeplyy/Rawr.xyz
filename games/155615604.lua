@@ -1927,6 +1927,8 @@ run(function()
     local AutoArrest
     local ArrestRange
     local ArrestMode
+    local lastCooldownNotif = 0
+    local COOLDOWN_NOTIF_INTERVAL = 3
 
     local function disconnectPlayerConnections(plr)
         if Players[plr] then
@@ -1942,28 +1944,42 @@ run(function()
     end
 
     local function Arrest(player, char)
-        if not player or not char then return end
-        if not entitylib or not entitylib.isAlive then return end
-        if not char:FindFirstChild("HumanoidRootPart") then return end
+        if not player or not char then return false end
+        if not entitylib or not entitylib.isAlive then return false end
+        if not char:FindFirstChild("HumanoidRootPart") then return false end
         local humanoid = char:FindFirstChildOfClass("Humanoid")
-        if humanoid and humanoid.Health <= 0 then return end
+        if humanoid and humanoid.Health <= 0 then return false end
 
+        local success = false
         safeCall('Arrest', function()
             ArrestPlayer:InvokeServer(player, 1)
             InteractWithItem:InvokeServer(char.Head)
+            success = true
         end)
         
-        Cooldown = tick() + 7
-        notif('Rawr.xyz', 'Successfully arrested ' .. player.Name, 3, 'success')
+        if success then
+            Cooldown = tick() + 7
+            notif('AutoArrest', 'Successfully arrested ' .. player.Name, 3, 'success')
+        end
+        return success
     end
 
-    local function canArrest(v, char)
-        if not v or not v.Team then return false end
-        if v.Team == criminalsTeam then return true end
-        if v.Team == inmatesTeam then
+    local function canArrest(player, char)
+        if not player or not player.Team or not char then return false end
+        if char:GetAttribute("Arrested") then return false end
+        if player.Team == criminalsTeam then return true end
+        if player.Team == inmatesTeam then
             return char:GetAttribute("Hostile") or char:GetAttribute("Trespassing")
         end
         return false
+    end
+
+    local function isInRange(char)
+        if not entitylib or not entitylib.isAlive then return false end
+        local root = char:FindFirstChild("HumanoidRootPart")
+        if not root then return false end
+        local dist = (entitylib.character.RootPart.Position - root.Position).Magnitude
+        return dist <= (ArrestRange and ArrestRange.Value or 100)
     end
 
     local function reEquipHandcuffs()
@@ -1981,11 +1997,53 @@ run(function()
         end
     end
 
-    local function showCooldownNotif()
-        if Cooldown > tick() then
-            local remaining = math.ceil(Cooldown - tick())
-            notif('AutoArrest', 'Cooldown: ' .. remaining .. 's remaining', 5, 'warning')
+    local function tryArrest(player, char)
+        if not entitylib or not entitylib.isAlive then return end
+        if lplr.Team ~= guardsTeam then return end
+        
+        if tick() < Cooldown then
+            local now = tick()
+            if now - lastCooldownNotif >= COOLDOWN_NOTIF_INTERVAL then
+                lastCooldownNotif = now
+                notif('AutoArrest', 'Cooldown: ' .. math.ceil(Cooldown - now) .. 's remaining', 2, 'warning')
+            end
+            return
         end
+
+        if not canArrest(player, char) then return end
+        if not isInRange(char) then return end
+
+        local mode = ArrestMode and ArrestMode.Value or "Tased"
+        if mode == "Tased" and char:GetAttribute("Tased") ~= true then return end
+
+        reEquipHandcuffs()
+        
+        local Handcuffs = char:FindFirstChild("Handcuffs") or (lplr.Backpack and lplr.Backpack:FindFirstChild("Handcuffs"))
+        if not Handcuffs then return end
+        
+        Handcuffs.Parent = char
+        local start = tick()
+        local timeout = 5
+        
+        repeat
+            if not entitylib or not entitylib.isAlive then break end
+            if not char or not char:FindFirstChild("HumanoidRootPart") then break end
+            if not char:FindFirstChildOfClass("Humanoid") or char:FindFirstChildOfClass("Humanoid").Health <= 0 then break end
+            if not player or not player.Parent or not player.Character then break end
+            if char:GetAttribute("Arrested") then break end
+            if tick() - start > timeout then break end
+
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            if hrp then t.d.s = hrp.CFrame end
+            Arrest(player, char)
+            task.wait(0.1)
+        until not char or char:GetAttribute("Arrested") or not entitylib.isAlive
+
+        t.d.s = CFrame.new()
+        Handcuffs.Parent = lplr.Backpack
+        
+        task.wait(0.5)
+        reEquipHandcuffs()
     end
 
     local function Auto(v)
@@ -2001,7 +2059,6 @@ run(function()
             if humanoid then
                 Players[v].localDeath = humanoid.Died:Connect(function()
                     t.d.s = CFrame.new()
-                    if arrestTimeouts[v] then arrestTimeouts[v] = nil end
                 end)
             end
         end
@@ -2012,71 +2069,14 @@ run(function()
 
             if mode == "Tased" then
                 Players[v].TasedConnection = char:GetAttributeChangedSignal("Tased"):Connect(function()
-                    if tick() < Cooldown then
-                        showCooldownNotif()
-                        return
-                    end
-                    if not entitylib or not entitylib.isAlive then return end
-                    if lplr.Team ~= guardsTeam then return end
-                    if char:GetAttribute("Tased") ~= true then return end
-                    if not canArrest(v, char) then return end
-
-                    local root = char:FindFirstChild("HumanoidRootPart")
-                    if not root then return end
-                    local dist = (entitylib.character.RootPart.Position - root.Position).Magnitude
-                    if dist > (ArrestRange and ArrestRange.Value or 100) then return end
-
-                    reEquipHandcuffs()
-                    
-                    local Handcuffs = char:FindFirstChild("Handcuffs") or (lplr.Backpack and lplr.Backpack:FindFirstChild("Handcuffs"))
-                    if Handcuffs then
-                        Handcuffs.Parent = char
-                        local start = tick()
-                        local timeout = 5
-                        arrestTimeouts[v] = tick() + timeout
-                        
-                        repeat
-                            if not entitylib or not entitylib.isAlive then break end
-                            if not char or not char:FindFirstChild("HumanoidRootPart") then break end
-                            if not char:FindFirstChildOfClass("Humanoid") or char:FindFirstChildOfClass("Humanoid").Health <= 0 then break end
-                            if not v or not v.Parent or not v.Character then break end
-                            if char:GetAttribute("Arrested") then break end
-                            if tick() - start > timeout then break end
-
-                            local hrp = char:FindFirstChild("HumanoidRootPart")
-                            if hrp then t.d.s = hrp.CFrame end
-                            Arrest(v, char)
-                            task.wait(0.1)
-                        until not char or char:GetAttribute("Arrested") or not entitylib.isAlive
-
-                        t.d.s = CFrame.new()
-                        Handcuffs.Parent = lplr.Backpack
-                        arrestTimeouts[v] = nil
-                        
-                        task.wait(0.5)
-                        reEquipHandcuffs()
+                    if char:GetAttribute("Tased") == true then
+                        tryArrest(v, char)
                     end
                 end)
             else
                 Players[v].normalArrest = task.spawn(function()
                     while AutoArrest and AutoArrest.Enabled and entitylib.isAlive do
-                        if tick() < Cooldown then
-                            showCooldownNotif()
-                            task.wait(0.5)
-                            continue
-                        end
-                        if lplr.Team ~= guardsTeam then task.wait(0.5) continue end
-                        if not canArrest(v, char) then task.wait(0.5) continue end
-
-                        local root = char:FindFirstChild("HumanoidRootPart")
-                        if not root then task.wait(0.1) continue end
-                        local dist = (entitylib.character.RootPart.Position - root.Position).Magnitude
-                        if dist > (ArrestRange and ArrestRange.Value or 100) then task.wait(0.1) continue end
-
-                        if char:GetAttribute("Arrested") then task.wait(0.5) continue end
-
-                        reEquipHandcuffs()
-                        Arrest(v, char)
+                        tryArrest(v, char)
                         task.wait(0.5)
                     end
                 end)
