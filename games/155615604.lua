@@ -1919,231 +1919,115 @@ run(function()
 end)
                                                                                                                                                                     
 run(function()
-    local ArrestPlayer = remotes:WaitForChild("ArrestPlayer")
-    local InteractWithItem = remotes:WaitForChild("InteractWithItem")
-    local Cooldown = 0
-    local Players = {}
-    local arrestTimeouts = {}
-    local AutoArrest
-    local ArrestRange
-    local ArrestMode
-    local lastCooldownNotif = 0
-    local COOLDOWN_NOTIF_INTERVAL = 3
-
-    local function disconnectPlayerConnections(plr)
-        if Players[plr] then
-            for _, conn in pairs(Players[plr]) do
-                pcall(function() conn:Disconnect() end)
-            end
-            Players[plr] = nil
-        end
-        if arrestTimeouts[plr] then
-            arrestTimeouts[plr] = nil
-        end
-        t.d.s = CFrame.new()
-    end
-
-    local function Arrest(player, char)
-        if not player or not char then return false end
-        if not entitylib or not entitylib.isAlive then return false end
-        if not char:FindFirstChild("HumanoidRootPart") then return false end
-        local humanoid = char:FindFirstChildOfClass("Humanoid")
-        if humanoid and humanoid.Health <= 0 then return false end
-
-        local success = false
-        safeCall('Arrest', function()
-            ArrestPlayer:InvokeServer(player, 1)
-            InteractWithItem:InvokeServer(char.Head)
-            success = true
-        end)
-        
-        if success then
-            Cooldown = tick() + 7
-            notif('AutoArrest', 'Successfully arrested ' .. player.Name, 3, 'success')
-        end
-        return success
-    end
-
-    local function canArrest(player, char)
-        if not player or not player.Team or not char then return false end
-        if char:GetAttribute("Arrested") then return false end
-        if player.Team == criminalsTeam then return true end
-        if player.Team == inmatesTeam then
-            return char:GetAttribute("Hostile") or char:GetAttribute("Trespassing")
-        end
-        return false
-    end
-
-    local function isInRange(char)
-        if not entitylib or not entitylib.isAlive then return false end
-        local root = char:FindFirstChild("HumanoidRootPart")
-        if not root then return false end
-        local dist = (entitylib.character.RootPart.Position - root.Position).Magnitude
-        return dist <= (ArrestRange and ArrestRange.Value or 100)
-    end
-
-    local function reEquipHandcuffs()
-        local backpack = lplr:FindFirstChildOfClass("Backpack")
-        if not backpack then return end
-        local handcuffs = backpack:FindFirstChild("Handcuffs")
-        local char = lplr.Character
-        if handcuffs and char then
-            local equipped = char:FindFirstChildOfClass("Tool")
-            if equipped and equipped.Name == "Handcuffs" then
-                equipped.Parent = backpack
-            end
-            task.wait(0.1)
-            handcuffs.Parent = char
-        end
-    end
-
-    local function tryArrest(player, char)
-        if not entitylib or not entitylib.isAlive then return end
-        if lplr.Team ~= guardsTeam then return end
-        
-        if tick() < Cooldown then
-            local now = tick()
-            if now - lastCooldownNotif >= COOLDOWN_NOTIF_INTERVAL then
-                lastCooldownNotif = now
-                notif('AutoArrest', 'Cooldown: ' .. math.ceil(Cooldown - now) .. 's remaining', 2, 'warning')
-            end
-            return
-        end
-
-        if not canArrest(player, char) then return end
-        if not isInRange(char) then return end
-
-        local mode = ArrestMode and ArrestMode.Value or "Tased"
-        if mode == "Tased" and char:GetAttribute("Tased") ~= true then return end
-
-        reEquipHandcuffs()
-        
-        local Handcuffs = char:FindFirstChild("Handcuffs") or (lplr.Backpack and lplr.Backpack:FindFirstChild("Handcuffs"))
-        if not Handcuffs then return end
-        
-        Handcuffs.Parent = char
-        local start = tick()
-        local timeout = 5
-        
-        repeat
-            if not entitylib or not entitylib.isAlive then break end
-            if not char or not char:FindFirstChild("HumanoidRootPart") then break end
-            if not char:FindFirstChildOfClass("Humanoid") or char:FindFirstChildOfClass("Humanoid").Health <= 0 then break end
-            if not player or not player.Parent or not player.Character then break end
-            if char:GetAttribute("Arrested") then break end
-            if tick() - start > timeout then break end
-
-            local hrp = char:FindFirstChild("HumanoidRootPart")
-            if hrp then t.d.s = hrp.CFrame end
-            Arrest(player, char)
-            task.wait(0.1)
-        until not char or char:GetAttribute("Arrested") or not entitylib.isAlive
-
-        t.d.s = CFrame.new()
-        Handcuffs.Parent = lplr.Backpack
-        
-        task.wait(0.5)
-        reEquipHandcuffs()
-    end
-
-    local function Auto(v)
-        if not AutoArrest or not AutoArrest.Enabled then return end
-        if not entitylib or not entitylib.isAlive then return end
-
-        disconnectPlayerConnections(v)
-        Players[v] = {}
-
-        local localChar = lplr.Character
-        if localChar then
-            local humanoid = localChar:FindFirstChildOfClass("Humanoid")
-            if humanoid then
-                Players[v].localDeath = humanoid.Died:Connect(function()
-                    t.d.s = CFrame.new()
-                end)
-            end
-        end
-
-        local function Listener(char)
-            if not char then return end
-            local mode = ArrestMode and ArrestMode.Value or "Tased"
-
-            if mode == "Tased" then
-                Players[v].TasedConnection = char:GetAttributeChangedSignal("Tased"):Connect(function()
-                    if char:GetAttribute("Tased") == true then
-                        tryArrest(v, char)
-                    end
-                end)
-            else
-                Players[v].normalArrest = task.spawn(function()
-                    while AutoArrest and AutoArrest.Enabled and entitylib.isAlive do
-                        tryArrest(v, char)
-                        task.wait(0.5)
-                    end
-                end)
-            end
-
-            char.Destroying:Connect(function()
-                t.d.s = CFrame.new()
-                disconnectPlayerConnections(v)
-            end)
-
-            local targetHumanoid = char:FindFirstChildOfClass("Humanoid")
-            if targetHumanoid then
-                Players[v].targetDeath = targetHumanoid.Died:Connect(function()
-                    t.d.s = CFrame.new()
-                end)
-            end
-        end
-
-        if v and v.Character then Listener(v.Character) end
-
-        Players[v].leaveConnection = entitylib.Events.EntityRemoved:Connect(function(plr)
-            if plr.Player == v then disconnectPlayerConnections(v) end
-        end)
-    end
-
-    AutoArrest = vape.Categories.Blatant:CreateModule({
-        Name = "AutoArrest",
-        Function = function(callback)
-            if callback then
-                local function setup(plr)
-                    AutoArrest:Clean(plr.CharacterAdded:Connect(function() Auto(plr) end))
-                    if plr.Character then Auto(plr) end
-                end
-                for _, plr in pairs(entitylib.List) do setup(plr.Player) end
-                AutoArrest:Clean(entitylib.Events.EntityAdded:Connect(function(plr) setup(plr.Player) end))
-            else
-                for plr, conns in pairs(Players) do
-                    for _, conn in pairs(conns) do pcall(function() conn:Disconnect() end) end
-                    Players[plr] = nil
-                end
-                arrestTimeouts = {}
-                t.d.s = CFrame.new()
-            end
-        end
-    })
-
-    ArrestMode = AutoArrest:CreateDropdown({
-        Name = "Mode",
-        List = {"Tased", "Normal"},
-        Default = "Tased",
-        Function = function() end,
-        Tooltip = "Tased - Only arrest tased players\nNormal - Arrest any criminal/inmate"
-    })
-    ArrestRange = AutoArrest:CreateSlider({
-        Name = "Arrest Range",
-        Min = 1, Max = 1000, Default = 100,
-        Suffix = function(val) return val == 1 and 'stud' or 'studs' end
-    })
-
-    vape:Clean(function()
-        for plr, conns in pairs(Players) do
-            for _, conn in pairs(conns) do pcall(function() conn:Disconnect() end) end
-            Players[plr] = nil
-        end
-        arrestTimeouts = {}
-        t.d.s = CFrame.new()
-    end)
+	local AutoArrest
+	local Range
+	local HandCheck
+	local CooldownBar
+	local cooldown = os.clock()
+	local cdholder, cdframe, cdlabel
+	
+	AutoArrest = vape.Categories.Blatant:CreateModule({
+		Name = 'AutoArrest',
+		Function = function(callback)
+			if callback then
+				repeat
+					local check = cooldown < os.clock()
+					if HandCheck.Enabled then
+						local tool = entitylib.isAlive and lplr.Character:FindFirstChildWhichIsA('Tool')
+						check = check and tool and tool.Name == 'Handcuffs'
+					end
+	
+					if check then
+						local entities = entitylib.AllPosition({
+							Range = Range.Value,
+							Players = true,
+							Part = 'RootPart',
+							TargetCheck = true
+						})
+	
+						for _, ent in entities do
+							if not ent.Character:GetAttribute('Arrested') then
+								if ent.Player.Team == teams.Inmates and ent.Character:GetAttribute('Hostile') and not ent.Character:GetAttribute('Tased') then
+									continue
+								end
+	
+								if replicatedStorage.Remotes.ArrestPlayer:InvokeServer(ent.Player, 1) then
+									cooldown = os.clock() + 7
+									vapeEvents.Arrested:Fire()
+									notif('AutoArrest', 'Arrested '..(ent.Player.Name), 7)
+								end
+	
+								break
+							end
+						end
+					end
+	
+					if cdholder then
+						cdholder.Visible = cooldown > os.clock()
+	
+						if cdholder.Visible then
+							local diff = (cooldown - os.clock())
+							cdframe.Size = UDim2.new(math.clamp(diff / 7, 0, 1), -2, 1, -2)
+							cdlabel.Text = (math.round(diff * 10) / 10)..'s'
+						end
+					end
+	
+					task.wait(0.05)
+				until not AutoArrest.Enabled
+			end
+		end,
+		Tooltip = 'Automatically uses handcuffs on nearby entities'
+	})
+	Range = AutoArrest:CreateSlider({
+		Name = 'Range',
+		Min = 1,
+		Max = 8,
+		Default = 8,
+		Suffix = function(val)
+			return val == 1 and 'stud' or 'studs'
+		end
+	})
+	HandCheck = AutoArrest:CreateToggle({
+		Name = 'Hand Check',
+		Tooltip = 'Only arrest if you have handcuffs equipped.'
+	})
+	CooldownBar = AutoArrest:CreateToggle({
+		Name = 'Cooldown Bar',
+		Function = function(callback)
+			if callback then
+				cdholder = Instance.new('Frame')
+				cdholder.BorderSizePixel = 0
+				cdholder.BackgroundTransparency = 0.7
+				cdholder.AnchorPoint = Vector2.new(0.5, 0)
+				cdholder.BackgroundColor3 = Color3.new(1, 1, 1)
+				cdholder.Size = UDim2.new(0.1, 0, 0, 5)
+				cdholder.Position = UDim2.fromScale(0.5, 0.55)
+				cdholder.Parent = vape.gui
+				cdframe = Instance.new('Frame')
+				cdframe.BorderSizePixel = 0
+				cdframe.BackgroundTransparency = 0.3
+				cdframe.BackgroundColor3 = Color3.new(1, 1, 1)
+				cdframe.Size = UDim2.new(1, -2, 1, -2)
+				cdframe.Position = UDim2.fromOffset(1, 1)
+				cdframe.Parent = cdholder
+				cdlabel = Instance.new('TextLabel')
+				cdlabel.Size = UDim2.new(1, 0, 0, 14)
+				cdlabel.Position = UDim2.fromOffset(0, 10)
+				cdlabel.BackgroundTransparency = 1
+				cdlabel.TextColor3 = Color3.new(1, 1, 1)
+				cdlabel.TextScaled = true
+				cdlabel.TextStrokeTransparency = 0
+				cdlabel.Font = Enum.Font.Arial
+				cdlabel.Parent = cdholder
+			else
+				if cdframe then
+					cdframe:Destroy()
+					cdframe = nil
+				end
+			end
+		end,
+		Tooltip = 'Show the cooldown for arresting'
+	})
 end)
                                                                                                                                         
 run(function()
