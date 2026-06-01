@@ -3542,7 +3542,7 @@ run(function()
     local AntiAim
     local Mode
     local Direction
-    local Manual
+    local ManualToggle
     local renderConn
     local lastAngle = 0
     local lockedAngle = nil
@@ -3563,9 +3563,8 @@ run(function()
 
     local function applyInverse()
         if not entitylib.isAlive then return end
-        local humanoid = entitylib.character.Humanoid
         local root = entitylib.character.RootPart
-        local moveDir = humanoid.MoveDirection
+        local moveDir = entitylib.character.Humanoid.MoveDirection
         if moveDir.Magnitude < 0.1 then return end
 
         local lookCF = CFrame.lookAt(root.Position, root.Position - moveDir)
@@ -3576,25 +3575,23 @@ run(function()
 
     local function applyBackwards()
         if not entitylib.isAlive then return end
-        local humanoid = entitylib.character.Humanoid
         local root = entitylib.character.RootPart
-        local moveDir = humanoid.MoveDirection
+        local moveDir = entitylib.character.Humanoid.MoveDirection
         if moveDir.Magnitude < 0.1 then return end
 
-        local lookCF = CFrame.lookAt(root.Position, root.Position + moveDir)
-        local _, yaw, _ = lookCF:ToOrientation()
-        lastAngle = yaw
-        root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, yaw, 0)
+        local camForward = gameCamera.CFrame.LookVector * Vector3.new(1, 0, 1)
+        local angle = math.atan2(-camForward.X, -camForward.Z)
+        lastAngle = angle
+        root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, angle, 0)
     end
 
     local function applySideways()
         if not entitylib.isAlive then return end
-        local humanoid = entitylib.character.Humanoid
         local root = entitylib.character.RootPart
-        local moveDir = humanoid.MoveDirection
+        local moveDir = entitylib.character.Humanoid.MoveDirection
         if moveDir.Magnitude < 0.1 then return end
 
-        if Manual and Manual.Enabled and lockedAngle then
+        if ManualToggle and ManualToggle.Enabled and lockedAngle then
             lastAngle = lockedAngle
         else
             lastAngle = getAngleOffset()
@@ -3621,7 +3618,7 @@ run(function()
             if gameProcessed then return end
             if not AntiAim.Enabled then return end
             if Mode.Value ~= "Sideways" then return end
-            if not Manual or not Manual.Enabled then return end
+            if not ManualToggle or not ManualToggle.Enabled then return end
 
             if input.KeyCode == Enum.KeyCode.Up then
                 lockedAngle = math.atan2(gameCamera.CFrame.LookVector.X, gameCamera.CFrame.LookVector.Z) + math.rad(90)
@@ -3663,7 +3660,7 @@ run(function()
                 lockedAngle = nil
             end
         end,
-        Tooltip = 'self'
+        Tooltip = 'hmmm'
     })
 
     Mode = AntiAim:CreateDropdown({
@@ -3674,8 +3671,8 @@ run(function()
             if Direction then
                 Direction.Object.Visible = (val == "Sideways")
             end
-            if Manual then
-                Manual.Object.Visible = (val == "Sideways")
+            if ManualToggle then
+                ManualToggle.Object.Visible = (val == "Sideways")
             end
             if val ~= "Sideways" then
                 lockedAngle = nil
@@ -3691,7 +3688,7 @@ run(function()
         Function = function() end
     })
 
-    Manual = AntiAim:CreateToggle({
+    ManualToggle = AntiAim:CreateToggle({
         Name = 'Manual',
         Default = false,
         Visible = false,
