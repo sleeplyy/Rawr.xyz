@@ -1362,14 +1362,9 @@ run(function()
     local sky = game:GetService("Lighting")
     local skyboxes = {
         ["default"] = {
-            SkyboxBk = sky.SkyboxBk,
-            SkyboxDn = sky.SkyboxDn,
-            SkyboxFt = sky.SkyboxFt,
-            SkyboxLf = sky.SkyboxLf,
-            SkyboxRt = sky.SkyboxRt,
-            SkyboxUp = sky.SkyboxUp,
-            SunTextureId = sky.SunTextureId,
-            MoonTextureId = sky.MoonTextureId
+            SkyboxBk = sky.SkyboxBk, SkyboxDn = sky.SkyboxDn, SkyboxFt = sky.SkyboxFt,
+            SkyboxLf = sky.SkyboxLf, SkyboxRt = sky.SkyboxRt, SkyboxUp = sky.SkyboxUp,
+            SunTextureId = sky.SunTextureId, MoonTextureId = sky.MoonTextureId
         },
         ["stormy"] = {
             SkyboxUp = "http://www.roblox.com/asset/?id=18703232671",
@@ -1378,127 +1373,67 @@ run(function()
             SkyboxDn = "http://www.roblox.com/asset/?id=18703243349",
             SkyboxFt = "http://www.roblox.com/asset/?id=18703240532",
             SkyboxRt = "http://www.roblox.com/asset/?id=18703235430",
-            SunTextureId = sky.SunTextureId,
-            MoonTextureId = sky.MoonTextureId
+            SunTextureId = sky.SunTextureId, MoonTextureId = sky.MoonTextureId
         },
         ["blue space"] = {
-            SkyboxLf = "rbxassetid://15536114370",
-            SkyboxUp = "rbxassetid://15536117282",
-            SkyboxRt = "rbxassetid://15536118762",
-            SkyboxFt = "rbxassetid://15536116141",
-            SkyboxDn = "rbxassetid://15536112543",
-            SkyboxBk = "rbxassetid://15536110634",
-            SunTextureId = sky.SunTextureId,
-            MoonTextureId = sky.MoonTextureId
+            SkyboxLf = "rbxassetid://15536114370", SkyboxUp = "rbxassetid://15536117282",
+            SkyboxRt = "rbxassetid://15536118762", SkyboxFt = "rbxassetid://15536116141",
+            SkyboxDn = "rbxassetid://15536112543", SkyboxBk = "rbxassetid://15536110634",
+            SunTextureId = sky.SunTextureId, MoonTextureId = sky.MoonTextureId
         },
         ["pink"] = {
-            SkyboxUp = "rbxassetid://12216108877",
-            SkyboxLf = "rbxassetid://12216110170",
-            SkyboxRt = "rbxassetid://12216110471",
-            SkyboxFt = "rbxassetid://12216109489",
-            SkyboxBk = "rbxassetid://12216109205",
-            SkyboxDn = "rbxassetid://12216109875",
-            SunTextureId = sky.SunTextureId,
-            MoonTextureId = sky.MoonTextureId
+            SkyboxUp = "rbxassetid://12216108877", SkyboxLf = "rbxassetid://12216110170",
+            SkyboxRt = "rbxassetid://12216110471", SkyboxFt = "rbxassetid://12216109489",
+            SkyboxBk = "rbxassetid://12216109205", SkyboxDn = "rbxassetid://12216109875",
+            SunTextureId = sky.SunTextureId, MoonTextureId = sky.MoonTextureId
         },
         ["black storm"] = {
-            SkyboxLf = "rbxassetid://15502507918",
-            SkyboxUp = "rbxassetid://15502511911",
-            SkyboxRt = "rbxassetid://15502509398",
-            SkyboxFt = "rbxassetid://15502510289",
-            SkyboxDn = "rbxassetid://15502508460",
-            SkyboxBk = "rbxassetid://15502511288",
-            SunTextureId = sky.SunTextureId,
-            MoonTextureId = sky.MoonTextureId
+            SkyboxLf = "rbxassetid://15502507918", SkyboxUp = "rbxassetid://15502511911",
+            SkyboxRt = "rbxassetid://15502509398", SkyboxFt = "rbxassetid://15502510289",
+            SkyboxDn = "rbxassetid://15502508460", SkyboxBk = "rbxassetid://15502511288",
+            SunTextureId = sky.SunTextureId, MoonTextureId = sky.MoonTextureId
         },
         ["realistic"] = {
-            SkyboxUp = "rbxassetid://653719321",
-            SkyboxDn = "rbxassetid://653718790",
-            SkyboxLf = "rbxassetid://653719190",
-            SkyboxFt = "rbxassetid://653719067",
-            SkyboxRt = "rbxassetid://653718931",
-            SkyboxBk = "rbxassetid://653719502",
-            SunTextureId = sky.SunTextureId,
-            MoonTextureId = sky.MoonTextureId
+            SkyboxUp = "rbxassetid://653719321", SkyboxDn = "rbxassetid://653718790",
+            SkyboxLf = "rbxassetid://653719190", SkyboxFt = "rbxassetid://653719067",
+            SkyboxRt = "rbxassetid://653718931", SkyboxBk = "rbxassetid://653719502",
+            SunTextureId = sky.SunTextureId, MoonTextureId = sky.MoonTextureId
         }
     }
 
     local enabled = false
-    local currentSkybox = "black storm"
-    local defaultSkybox = {}
+    local current = "black storm"
+    local def = {}
+    for _, f in ipairs({"SkyboxBk","SkyboxDn","SkyboxFt","SkyboxLf","SkyboxRt","SkyboxUp"}) do def[f]=sky[f] end
+    def.SunTextureId, def.MoonTextureId = sky.SunTextureId, sky.MoonTextureId
 
-    for _, face in ipairs({"SkyboxBk", "SkyboxDn", "SkyboxFt", "SkyboxLf", "SkyboxRt", "SkyboxUp"}) do
-        defaultSkybox[face] = sky[face]
-    end
-    defaultSkybox.SunTextureId = sky.SunTextureId
-    defaultSkybox.MoonTextureId = sky.MoonTextureId
-
-    local function applySkybox(name)
-        local ids = skyboxes[name]
-        if not ids then return end
-        pcall(function() sky.SkyboxBk = ids.SkyboxBk end)
-        pcall(function() sky.SkyboxDn = ids.SkyboxDn end)
-        pcall(function() sky.SkyboxFt = ids.SkyboxFt end)
-        pcall(function() sky.SkyboxLf = ids.SkyboxLf end)
-        pcall(function() sky.SkyboxRt = ids.SkyboxRt end)
-        pcall(function() sky.SkyboxUp = ids.SkyboxUp end)
-        pcall(function() sky.SunTextureId = ids.SunTextureId end)
-        pcall(function() sky.MoonTextureId = ids.MoonTextureId end)
+    local function apply(n)
+        local s = skyboxes[n]; if not s then return end
+        pcall(function() sky.SkyboxBk=s.SkyboxBk; sky.SkyboxDn=s.SkyboxDn; sky.SkyboxFt=s.SkyboxFt
+            sky.SkyboxLf=s.SkyboxLf; sky.SkyboxRt=s.SkyboxRt; sky.SkyboxUp=s.SkyboxUp
+            sky.SunTextureId=s.SunTextureId; sky.MoonTextureId=s.MoonTextureId end)
     end
 
-    local function restoreDefault()
-        pcall(function() sky.SkyboxBk = defaultSkybox.SkyboxBk end)
-        pcall(function() sky.SkyboxDn = defaultSkybox.SkyboxDn end)
-        pcall(function() sky.SkyboxFt = defaultSkybox.SkyboxFt end)
-        pcall(function() sky.SkyboxLf = defaultSkybox.SkyboxLf end)
-        pcall(function() sky.SkyboxRt = defaultSkybox.SkyboxRt end)
-        pcall(function() sky.SkyboxUp = defaultSkybox.SkyboxUp end)
-        pcall(function() sky.SunTextureId = defaultSkybox.SunTextureId end)
-        pcall(function() sky.MoonTextureId = defaultSkybox.MoonTextureId end)
+    local function restore()
+        pcall(function() sky.SkyboxBk=def.SkyboxBk; sky.SkyboxDn=def.SkyboxDn; sky.SkyboxFt=def.SkyboxFt
+            sky.SkyboxLf=def.SkyboxLf; sky.SkyboxRt=def.SkyboxRt; sky.SkyboxUp=def.SkyboxUp
+            sky.SunTextureId=def.SunTextureId; sky.MoonTextureId=def.MoonTextureId end)
     end
 
-    local WorldChanger = vape.Categories.Utility:CreateModule({
-        Name = "World Changer",
-        Function = function(callback)
-            enabled = callback
-            if callback then
-                applySkybox(currentSkybox)
-            else
-                restoreDefault()
-            end
-        end,
+    local wc = vape.Categories.World:CreateModule({
+        Name = "Skybox",
+        Function = function(cb) enabled=cb; if cb then apply(current) else restore() end end,
         Tooltip = "Change the skybox"
     })
 
-    local skyboxNames = {"black storm", "blue space", "realistic", "stormy", "pink"}
-    WorldChanger:CreateDropdown({
-        Name = "Skybox",
-        List = skyboxNames,
+    wc:CreateDropdown({
+        Name = "Preset",
+        List = {"black storm","blue space","realistic","stormy","pink"},
         Default = "black storm",
-        Function = function(val)
-            currentSkybox = val
-            if enabled then
-                applySkybox(val)
-            end
-        end,
-        Tooltip = "Select a skybox"
+        Function = function(v) current=v; if enabled then apply(v) end end
     })
 
-    vape:Clean(function()
-        restoreDefault()
-    end)
-end)
-
-run(function()
-    local Lighting = game:GetService("Lighting")
-    local origFogEnd, origFogStart = Lighting.FogEnd, Lighting.FogStart
-    vape.Categories.World:CreateModule({
-        Name = "No Fog",
-        Function = function(callback)
-            if callback then Lighting.FogEnd = 100000; Lighting.FogStart = 100000
-            else Lighting.FogEnd = origFogEnd; Lighting.FogStart = origFogStart end
-        end
-    })
+    vape:Clean(function() restore() end)
 end)
 
 run(function()
