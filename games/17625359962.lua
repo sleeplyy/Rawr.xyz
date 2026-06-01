@@ -2104,6 +2104,146 @@ run(function()
         lastNotifTime = {}
     end)
 end)
+                                                                                                                                                                                                                                                
+run(function()
+    local rs = cloneref(game:GetService("ReplicatedStorage"))
+    local players = cloneref(game:GetService("Players"))
+    local workspace = cloneref(game:GetService("Workspace"))
+    local runservice = cloneref(game:GetService("RunService"))
+    local lplr = players.LocalPlayer
+    local util = require(rs.Modules.Utility)
+    local ray_params = RaycastParams.new()
+
+    local offsets = {
+        Vector3.new(0, 12, 0),
+        Vector3.new(0, 16, 0),
+        Vector3.new(0, 20, 0),
+        Vector3.new(0, 24, 0),
+        Vector3.new(0, 28, 0),
+        Vector3.new(0, 32, 0),
+        Vector3.new(0, 36, 0),
+        Vector3.new(0, 40, 0)
+    }
+
+    local manipulation = {}
+    local wallbangEnabled = true
+
+    function manipulation.get_closest()
+        if not lplr.Character or not lplr.Character:FindFirstChild("HumanoidRootPart") then
+            return nil, nil
+        end
+
+        local target, char, dist = nil, nil, math.huge
+        local myRoot = lplr.Character.HumanoidRootPart
+
+        for _, v in next, players:GetPlayers() do
+            if v == lplr then continue end
+
+            local myEnv = lplr:GetAttribute("EnvironmentID")
+            local myTeam = lplr:GetAttribute("TeamID")
+            local targetEnv = v:GetAttribute("EnvironmentID")
+            local targetTeam = v:GetAttribute("TeamID")
+
+            if myEnv and myTeam and targetEnv and targetTeam then
+                if string.byte(myEnv or "") == string.byte(targetEnv or "") and string.byte(myTeam or "") == string.byte(targetTeam or "") then
+                    continue
+                end
+            end
+
+            if not v.Character or not v.Character:FindFirstChild("Head") then continue end
+            local hum = v.Character:FindFirstChildOfClass("Humanoid")
+            if not hum or hum.Health <= 0 then continue end
+
+            local mag = (myRoot.Position - v.Character.Head.Position).Magnitude
+            if mag < dist then
+                dist = mag
+                target = v.Character.Head
+                char = v.Character
+            end
+        end
+
+        return target, char
+    end
+
+    function manipulation.calculate_point(origin, target_pos, target_char)
+        local ignoreList = {lplr.Character}
+        if target_char then
+            table.insert(ignoreList, target_char)
+        end
+        ray_params.FilterDescendantsInstances = ignoreList
+        ray_params.FilterType = Enum.RaycastFilterType.Exclude
+
+        if not workspace:Raycast(origin, target_pos - origin, ray_params) then
+            return origin, nil
+        end
+
+        if not wallbangEnabled then
+            return nil, nil
+        end
+
+        for _, offset in next, offsets do
+            local scan_pos = origin + offset
+            if not workspace:Raycast(scan_pos, target_pos - scan_pos, ray_params) then
+                return scan_pos, offset.Y
+            end
+        end
+
+        return nil, nil
+    end
+
+    runservice.Heartbeat:Connect(function()
+        pcall(function()
+            if not lplr.Character then return end
+            local root = lplr.Character:FindFirstChild("HumanoidRootPart")
+            if not root then return end
+
+            local item = nil
+            pcall(function()
+                local fighter = require(lplr.PlayerScripts.Controllers.FighterController)
+                if fighter and fighter.LocalFighter then
+                    item = fighter.LocalFighter.EquippedItem
+                end
+            end)
+            if not item then return end
+
+            local target_part, target_char = manipulation.get_closest()
+            if not target_part or not target_char then return end
+
+            local cam = workspace.CurrentCamera.CFrame
+            local manip, height = manipulation.calculate_point(cam.Position, target_part.Position, target_char)
+
+            if not manip then return end
+
+            local shoot_pos = cam.Position
+            local shoot_height = height or 0
+            local final_pos = Vector3.new(manip.X, manip.Y, manip.Z)
+
+            local cameradata = {}
+            cameradata[utf8.char(1)] = {
+                [utf8.char(0)] = util:EncodeCFrame(CFrame.new(final_pos) * CFrame.Angles(CFrame.lookAt(final_pos, target_part.Position):ToOrientation())),
+                [utf8.char(1)] = util:EncodeCFrame(CFrame.new(target_part.Position) * CFrame.Angles(CFrame.lookAt(final_pos, target_part.Position):ToOrientation())),
+                [utf8.char(2)] = target_part,
+                [utf8.char(3)] = util:EncodeCFrame(target_part.CFrame:ToObjectSpace(CFrame.new(target_part.Position)))
+            }
+
+            local enums = require(rs.Modules.EnumLibrary)
+            rs.Remotes.Replication.Fighter.UseItem:FireServer(item:Get("ObjectID"), enums:ToEnum("StartShooting"), cameradata, nil)
+        end)
+    end)
+
+    local SilentManip = vape.Categories.Combat:CreateModule({
+        Name = "Silent Manip",
+        Function = function(callback) end,
+        Tooltip = "Silent aim using the manipulator method"
+    })
+
+    SilentManip:CreateToggle({
+        Name = "Wallbang",
+        Default = true,
+        Function = function(v) wallbangEnabled = v end,
+        Tooltip = "Scan upward for clear shot when target is behind a wall"
+    })
+end)                                                                                                                                                                                                                                                
                                                                                                                                                                 
 run(function()
     local camera = workspace.CurrentCamera
