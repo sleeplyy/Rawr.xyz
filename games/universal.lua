@@ -3537,6 +3537,97 @@ run(function()
 	})
 	ZToggle = SpinBot:CreateToggle({Name = 'Spin Z'})
 end)
+
+run(function()
+    local AntiAim
+    local Mode
+    local Direction
+    local renderConn
+
+    local function applyInverse()
+        if not entitylib.isAlive then return end
+        local root = entitylib.character.RootPart
+        local moveDir = entitylib.character.Humanoid.MoveDirection
+        if moveDir.Magnitude < 0.1 then return end
+
+        local lookCF = CFrame.lookAt(root.Position, root.Position - moveDir)
+        root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, select(2, lookCF:ToOrientation()), 0)
+    end
+
+    local function applyBackwards()
+        if not entitylib.isAlive then return end
+        local root = entitylib.character.RootPart
+        local moveDir = entitylib.character.Humanoid.MoveDirection
+        if moveDir.Magnitude < 0.1 then return end
+
+        local lookCF = CFrame.lookAt(root.Position, root.Position + moveDir)
+        root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, select(2, lookCF:ToOrientation()), 0)
+    end
+
+    local function applySideways()
+        if not entitylib.isAlive then return end
+        local root = entitylib.character.RootPart
+        local moveDir = entitylib.character.Humanoid.MoveDirection
+        if moveDir.Magnitude < 0.1 then return end
+
+        local dir = Direction and Direction.Value or "Left"
+        local camForward = gameCamera.CFrame.LookVector * Vector3.new(1, 0, 1)
+        local angle = math.atan2(camForward.X, camForward.Z)
+
+        if dir == "Left" then
+            angle = angle + math.rad(90)
+        elseif dir == "Right" then
+            angle = angle - math.rad(90)
+        else
+            angle = angle + (math.random(0, 1) == 0 and math.rad(90) or math.rad(-90))
+        end
+
+        root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, angle, 0)
+    end
+
+    AntiAim = vape.Categories.Blatant:CreateModule({
+        Name = 'AntiAim',
+        Function = function(callback)
+            if callback then
+                renderConn = runService.RenderStepped:Connect(function()
+                    local mode = Mode and Mode.Value or "Inverse"
+                    if mode == "Inverse" then
+                        applyInverse()
+                    elseif mode == "Backwards" then
+                        applyBackwards()
+                    elseif mode == "Sideways" then
+                        applySideways()
+                    end
+                end)
+            else
+                if renderConn then
+                    renderConn:Disconnect()
+                    renderConn = nil
+                end
+            end
+        end,
+        Tooltip = 'Fake movement direction'
+    })
+
+    Mode = AntiAim:CreateDropdown({
+        Name = 'Mode',
+        List = {'Inverse', 'Backwards', 'Sideways'},
+        Default = 'Inverse',
+        Function = function(val)
+            if Direction then
+                Direction.Object.Visible = (val == "Sideways")
+            end
+        end
+    })
+
+    Direction = AntiAim:CreateDropdown({
+        Name = 'Direction',
+        List = {'Left', 'Right', 'Random'},
+        Default = 'Left',
+        Visible = false,
+        Function = function() end
+    })
+end)
 	
 run(function()
 	local Swim
