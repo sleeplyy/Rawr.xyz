@@ -1034,68 +1034,108 @@ components = {
 			optionsettings.Function(self.Value, mouse)
 		end
 		
-		button.MouseButton1Click:Connect(function()
-			if not dropdownchildren then
-				arrow.Rotation = 270
-				dropdown.Size = UDim2.new(1, 0, 0, 40 + (#optionsettings.List - 1) * 26)
-				dropdownchildren = Instance.new('Frame')
-				dropdownchildren.Name = 'Children'
-				dropdownchildren.Size = UDim2.new(1, 0, 0, (#optionsettings.List - 1) * 26)
-				dropdownchildren.Position = UDim2.fromOffset(0, 27)
-				dropdownchildren.BackgroundTransparency = 1
-				dropdownchildren.Parent = button
-				local ind = 0
-				for _, v in optionsettings.List do
-					if v == optionapi.Value then continue end
-					local dropdownoption = Instance.new('TextButton')
-					dropdownoption.Name = v..'Option'
-					dropdownoption.Size = UDim2.new(1, 0, 0, 26)
-					dropdownoption.Position = UDim2.fromOffset(0, ind * 26)
-					dropdownoption.BackgroundColor3 = uipallet.Main
-					dropdownoption.BorderSizePixel = 0
-					dropdownoption.AutoButtonColor = false
-					dropdownoption.Text = '         '..v
-					dropdownoption.TextXAlignment = Enum.TextXAlignment.Left
-					dropdownoption.TextColor3 = color.Dark(uipallet.Text, 0.16)
-					dropdownoption.TextSize = 13
-					dropdownoption.TextTruncate = Enum.TextTruncate.AtEnd
-					dropdownoption.FontFace = uipallet.Font
-					dropdownoption.Parent = dropdownchildren
-					dropdownoption.MouseEnter:Connect(function()
-						tween:Tween(dropdownoption, uipallet.Tween, {
-							BackgroundColor3 = color.Light(uipallet.Main, 0.02)
-						})
-					end)
-					dropdownoption.MouseLeave:Connect(function()
-						tween:Tween(dropdownoption, uipallet.Tween, {
-							BackgroundColor3 = uipallet.Main
-						})
-					end)
-					dropdownoption.MouseButton1Click:Connect(function()
-						optionapi:SetValue(v, true)
-					end)
-					ind += 1
-				end
-			else
-				optionapi:SetValue(optionapi.Value, true)
-			end
-		end)
-		dropdown.MouseEnter:Connect(function()
-			tween:Tween(bkg, uipallet.Tween, {
-				BackgroundColor3 = color.Light(uipallet.Main, 0.0875)
-			})
-		end)
-		dropdown.MouseLeave:Connect(function()
-			tween:Tween(bkg, uipallet.Tween, {
-				BackgroundColor3 = color.Light(uipallet.Main, 0.034)
-			})
-		end)
-		
-		optionapi.Object = dropdown
-		api.Options[optionsettings.Name] = optionapi
-		
-		return optionapi
-	end,
+button.MouseButton1Click:Connect(function()
+    if not dropdownchildren then
+        arrow.Rotation = 270
+        
+        dropdownchildren = Instance.new('Frame')
+        dropdownchildren.Name = 'Children'
+        dropdownchildren.Size = UDim2.new(1, 0, 0, 0)
+        dropdownchildren.Position = UDim2.fromOffset(0, 27)
+        dropdownchildren.BackgroundTransparency = 1
+        dropdownchildren.ClipsDescendants = true
+        dropdownchildren.Parent = button
+        
+        local content = Instance.new('Frame')
+        content.Size = UDim2.new(1, 0, 0, (#optionsettings.List - 1) * 26)
+        content.BackgroundTransparency = 1
+        content.Parent = dropdownchildren
+        
+        local ind = 0
+        for _, v in optionsettings.List do
+            if v == optionapi.Value then continue end
+            local dropdownoption = Instance.new('TextButton')
+            dropdownoption.Name = v..'Option'
+            dropdownoption.Size = UDim2.new(1, 0, 0, 26)
+            dropdownoption.Position = UDim2.fromOffset(0, ind * 26)
+            dropdownoption.BackgroundColor3 = uipallet.Main
+            dropdownoption.BorderSizePixel = 0
+            dropdownoption.AutoButtonColor = false
+            dropdownoption.Text = '         '..v
+            dropdownoption.TextXAlignment = Enum.TextXAlignment.Left
+            dropdownoption.TextColor3 = color.Dark(uipallet.Text, 0.16)
+            dropdownoption.TextSize = 13
+            dropdownoption.TextTruncate = Enum.TextTruncate.AtEnd
+            dropdownoption.FontFace = uipallet.Font
+            dropdownoption.BackgroundTransparency = 1
+            dropdownoption.Parent = content
+            
+            dropdownoption.MouseEnter:Connect(function()
+                tween:Tween(dropdownoption, uipallet.Tween, {
+                    BackgroundColor3 = color.Light(uipallet.Main, 0.02)
+                })
+            end)
+            dropdownoption.MouseLeave:Connect(function()
+                tween:Tween(dropdownoption, uipallet.Tween, {
+                    BackgroundColor3 = uipallet.Main
+                })
+            end)
+            dropdownoption.MouseButton1Click:Connect(function()
+                optionapi:SetValue(v, true)
+            end)
+            
+            dropdownoption.BackgroundTransparency = 1
+            tween:Tween(dropdownoption, TweenInfo.new(0.1, Enum.EasingStyle.Linear), {
+                BackgroundTransparency = 0
+            })
+            
+            ind += 1
+        end
+        
+        local targetHeight = 40 + (#optionsettings.List - 1) * 26
+        tween:Tween(dropdown, uipallet.Tween, {
+            Size = UDim2.new(1, 0, 0, targetHeight)
+        })
+        
+        dropdownchildren:TweenSize(UDim2.new(1, 0, 0, (#optionsettings.List - 1) * 26), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.2, true)
+    else
+        for _, v in dropdownchildren:GetDescendants() do
+            if v:IsA("TextButton") then
+                tween:Tween(v, TweenInfo.new(0.08, Enum.EasingStyle.Linear), {
+                    BackgroundTransparency = 1
+                })
+            end
+        end
+        
+        tween:Tween(dropdown, uipallet.Tween, {
+            Size = UDim2.new(1, 0, 0, 40)
+        })
+        
+        dropdownchildren:TweenSize(UDim2.new(1, 0, 0, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+        
+        task.delay(0.15, function()
+            if dropdownchildren then
+                dropdownchildren:Destroy()
+                dropdownchildren = nil
+            end
+        end)
+    end
+end)
+dropdown.MouseEnter:Connect(function()
+    tween:Tween(bkg, uipallet.Tween, {
+        BackgroundColor3 = color.Light(uipallet.Main, 0.0875)
+    })
+end)
+dropdown.MouseLeave:Connect(function()
+    tween:Tween(bkg, uipallet.Tween, {
+        BackgroundColor3 = color.Light(uipallet.Main, 0.034)
+    })
+end)
+
+optionapi.Object = dropdown
+api.Options[optionsettings.Name] = optionapi
+
+return optionapi
 	Font = function(optionsettings, children, api)
 		local fonts = {
 			optionsettings.Blacklist,
