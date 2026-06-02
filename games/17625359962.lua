@@ -2271,6 +2271,22 @@ run(function()
         return char and char:FindFirstChild("HumanoidRootPart")
     end
 
+    local function isGameActive()
+        if not lplr or not lplr.PlayerGui then return false end
+        local mainGui = lplr.PlayerGui:FindFirstChild("MainGui")
+        if mainGui then
+            local mainFrame = mainGui:FindFirstChild("MainFrame")
+            if mainFrame then
+                local lobby = mainFrame:FindFirstChild("Lobby")
+                if lobby then
+                    local currency = lobby:FindFirstChild("Currency")
+                    return currency and currency.Visible == false
+                end
+            end
+        end
+        return false
+    end
+
     local DesyncModule = vape.Categories.Combat:CreateModule({
         Name = "Wallbang Method",
         Function = function(callback)
@@ -2281,21 +2297,6 @@ run(function()
             local boundaryActive = false
             local barrierAddedConn = nil
             local antiVoidConn = nil
-
-            local function isGameActive()
-                local mainGui = lplr.PlayerGui:FindFirstChild("MainGui")
-                if mainGui then
-                    local mainFrame = mainGui:FindFirstChild("MainFrame")
-                    if mainFrame then
-                        local lobby = mainFrame:FindFirstChild("Lobby")
-                        if lobby then
-                            local currency = lobby:FindFirstChild("Currency")
-                            return currency and currency.Visible == false
-                        end
-                    end
-                end
-                return true
-            end
 
             local function waitForGame()
                 for _ = 1, 60 do
@@ -2308,7 +2309,7 @@ run(function()
             end
 
             local function createVisual()
-                if visualPart then visualPart:Destroy() end
+                if visualPart then pcall(function() visualPart:Destroy() end) end
                 visualPart = Instance.new("Part")
                 visualPart.Size = Vector3.new(1,1,1)
                 visualPart.Shape = Enum.PartType.Ball
@@ -2327,8 +2328,10 @@ run(function()
                 if not targetHead then return nil, nil, nil end
                 local targetVel = Vector3.new()
                 local rootPart = target.Character:FindFirstChild("HumanoidRootPart")
-                if rootPart then targetVel = rootPart.Velocity end
-                return targetHead.Position, targetHead.CFrame, targetVel
+                if rootPart then targetVel = rootPart.Velocity or Vector3.new() end
+                local targetCF = targetHead.CFrame
+                if not targetCF then return targetHead.Position, nil, targetVel end
+                return targetHead.Position, targetCF, targetVel
             end
 
             local voidCorners = {
@@ -2352,11 +2355,11 @@ run(function()
                 end
 
                 local predTime = _G.wallbangPredictionTime or 0.2
-                local predictedPos = pos + vel * predTime
+                local predictedPos = pos + (vel or Vector3.new()) * predTime
                 local preset = _G.wallbangPreset or "Above"
 
                 if preset == "Above" then
-                    if cf and type(cf) == "CFrame" then
+                    if cf and typeof(cf) == "CFrame" then
                         local frontOffset = cf.LookVector * 5
                         return predictedPos + frontOffset + Vector3.new(0, 16, 0)
                     else
@@ -2384,7 +2387,7 @@ run(function()
             end
 
             local function updateVisual()
-                if not visualPart then return end
+                if not visualPart or not visualPart.Parent then return end
                 local pos, cf, vel = getTargetPositionAndVel()
                 if not pos then
                     visualPart.Visible = false
@@ -2406,7 +2409,7 @@ run(function()
 
             local function stopVisual()
                 if visualConn then visualConn:Disconnect(); visualConn = nil end
-                if visualPart then visualPart:Destroy(); visualPart = nil end
+                if visualPart then pcall(function() visualPart:Destroy() end); visualPart = nil end
             end
 
             local function enableBoundaryBypass()
@@ -2443,9 +2446,11 @@ run(function()
                     end
                 end
 
-                for _, descendant in ipairs(workspace:GetDescendants()) do
-                    process(descendant)
-                end
+                pcall(function()
+                    for _, descendant in ipairs(workspace:GetDescendants()) do
+                        process(descendant)
+                    end
+                end)
                 
                 barrierAddedConn = workspace.DescendantAdded:Connect(process)
             end
@@ -2475,44 +2480,59 @@ run(function()
             local function initializeWallbang()
                 if shared.__s9t0u1 then return true end
 
-                local __a1b2c3 = setmetatable({}, {
-                    __index = function(_, __g7h8i9)
-                        local __j0k1l2, __m3n4o5 = pcall(function()
-                            return game:GetService(__g7h8i9)
-                        end)
-                        if __m3n4o5 then
-                            return cloneref(__m3n4o5)
+                local ok, result = pcall(function()
+                    local __a1b2c3 = setmetatable({}, {
+                        __index = function(_, __g7h8i9)
+                            local __j0k1l2, __m3n4o5 = pcall(function()
+                                return game:GetService(__g7h8i9)
+                            end)
+                            if __m3n4o5 then
+                                return cloneref(__m3n4o5)
+                            end
+                            return nil
                         end
-                        return nil
-                    end
-                })
-                local __p6q7r8 = getgenv()
-                local __v2w3x4 = __a1b2c3.Players
-                local __y5z6a7 = __a1b2c3.RunService
-                local __b8c9d0 = __a1b2c3.ReplicatedStorage
-                local __e1f2g3 = __a1b2c3.Workspace
-                local __h4i5j6 = __a1b2c3.UserInputService
-                local __k7l8m9 = __v2w3x4.LocalPlayer
-                local __n0o1p2 = __e1f2g3.CurrentCamera
-                local __q3r4s5 = __k7l8m9.PlayerScripts
-                local __t6u7v8 = require(__q3r4s5.Modules.ItemTypes.Gun)
-                local __w9x0y1 = require(__b8c9d0.Modules.Utility)
-                local __z2a3b4 = setmetatable({}, {
-                    __index = function(_, __c5d6e7)
-                        local __f8g9h0 = __k7l8m9.Character
-                        if not __f8g9h0 then return nil end
-                        if __c5d6e7 == "__root" then
-                            return __f8g9h0:FindFirstChild("HumanoidRootPart")
-                        elseif __c5d6e7 == "__head" then
-                            return __f8g9h0:FindFirstChild("Head")
-                        end
-                        return nil
-                    end
-                })
+                    })
+                    local __p6q7r8 = getgenv()
+                    local __v2w3x4 = __a1b2c3.Players
+                    local __y5z6a7 = __a1b2c3.RunService
+                    local __b8c9d0 = __a1b2c3.ReplicatedStorage
+                    local __e1f2g3 = __a1b2c3.Workspace
+                    local __h4i5j6 = __a1b2c3.UserInputService
+                    local __k7l8m9 = __v2w3x4.LocalPlayer
+                    local __n0o1p2 = __e1f2g3.CurrentCamera
+                    local __q3r4s5 = __k7l8m9.PlayerScripts
 
-                __p6q7r8.__s9t0u1 = {}
-                do
+                    if not __q3r4s5 then error("PlayerScripts not found") end
+                    if not __q3r4s5.Modules then error("Modules not found") end
+                    if not __q3r4s5.Modules.ItemTypes then error("ItemTypes not found") end
+                    if not __q3r4s5.Modules.ItemTypes.Gun then error("Gun module not found") end
+                    if not __b8c9d0.Modules then error("ReplicatedStorage Modules not found") end
+                    if not __b8c9d0.Modules.Utility then error("Utility module not found") end
+
+                    local __t6u7v8 = require(__q3r4s5.Modules.ItemTypes.Gun)
+                    local __w9x0y1 = require(__b8c9d0.Modules.Utility)
+                    
+                    if not __t6u7v8 then error("Gun module is nil") end
+                    if not __t6u7v8.StartShooting then error("StartShooting not found in Gun module") end
+                    if not __w9x0y1 then error("Utility module is nil") end
+                    if not __w9x0y1.EncodeCFrame then error("EncodeCFrame not found in Utility") end
+
+                    local __z2a3b4 = setmetatable({}, {
+                        __index = function(_, __c5d6e7)
+                            local __f8g9h0 = __k7l8m9.Character
+                            if not __f8g9h0 then return nil end
+                            if __c5d6e7 == "__root" then
+                                return __f8g9h0:FindFirstChild("HumanoidRootPart")
+                            elseif __c5d6e7 == "__head" then
+                                return __f8g9h0:FindFirstChild("Head")
+                            end
+                            return nil
+                        end
+                    })
+
+                    __p6q7r8.__s9t0u1 = {}
                     local __i1j2k3 = __p6q7r8.__s9t0u1
+                    
                     function __i1j2k3:__init()
                         self.__active = true
                         self.__target = nil
@@ -2538,7 +2558,7 @@ run(function()
                                 return unpack(__r0s1t2)
                             end
                             local __u3v4w5 = __r0s1t2[3]
-                            if not __u3v4w5 or typeof(__u3v4w5) ~= "table" then
+                            if not __u3v4w5 or type(__u3v4w5) ~= "table" then
                                 return unpack(__r0s1t2)
                             end
                             __r0s1t2[4] = true
@@ -2559,6 +2579,7 @@ run(function()
                             if not __a9b0c1 then return unpack(__r0s1t2) end
                             local __d2e3f4 = __a9b0c1.Position
                             local __g5h6i7 = __a9b0c1.CFrame
+                            if not __g5h6i7 then return unpack(__r0s1t2) end
                             local __j8k9l0 = __d2e3f4 - Vector3.new(0, 5, 0)
                             local __m1n2o3 = CFrame.lookAt(__j8k9l0, __d2e3f4)
                             local __p4q5r6 = __g5h6i7:ToObjectSpace(CFrame.new(__d2e3f4 + Vector3.new(math.random(), math.random(), math.random())))
@@ -2576,8 +2597,9 @@ run(function()
                                 __u3v4w5[utf8.char(0)] = __w9x0y1:EncodeCFrame(voidCF)
                                 __u3v4w5[utf8.char(1)] = __w9x0y1:EncodeCFrame(CFrame.new(newEnd))
                             else
-                                __u3v4w5[utf8.char(0)] = __w9x0y1:EncodeCFrame(CFrame.new(__j8k9l0, __d2e3f4) * CFrame.Angles(__m1n2o3:ToOrientation()))
-                                __u3v4w5[utf8.char(1)] = __w9x0y1:EncodeCFrame(CFrame.new(__d2e3f4) * CFrame.Angles(__m1n2o3:ToOrientation()))
+                                local orientation = __m1n2o3:ToOrientation()
+                                __u3v4w5[utf8.char(0)] = __w9x0y1:EncodeCFrame(CFrame.new(__j8k9l0, __d2e3f4) * CFrame.Angles(orientation))
+                                __u3v4w5[utf8.char(1)] = __w9x0y1:EncodeCFrame(CFrame.new(__d2e3f4) * CFrame.Angles(orientation))
                             end
                             __u3v4w5[utf8.char(2)] = __a9b0c1
                             __u3v4w5[utf8.char(3)] = __w9x0y1:EncodeCFrame(__p4q5r6)
@@ -2595,13 +2617,16 @@ run(function()
                         local __y3z4a5 = __h4i5j6:GetMouseLocation()
                         for _, __b6c7d8 in next, __v2w3x4:GetPlayers() do
                             if __b6c7d8 == __k7l8m9 then continue end
-                            if __b6c7d8:GetAttribute("TeamID") == __k7l8m9:GetAttribute("TeamID") then continue end
+                            local targetTeamID = __b6c7d8:GetAttribute("TeamID")
+                            local myTeamID = __k7l8m9:GetAttribute("TeamID")
+                            if targetTeamID and myTeamID and targetTeamID == myTeamID then continue end
                             local __e9f0g1 = __b6c7d8.Character
                             if not __e9f0g1 then continue end
                             local __h2i3j4 = __e9f0g1:FindFirstChild("HumanoidRootPart")
                             local __k5l6m7 = __e9f0g1:FindFirstChild("Head")
                             local __n8o9p0 = __e9f0g1:FindFirstChildWhichIsA("Humanoid")
                             if not (__h2i3j4 and __k5l6m7 and __n8o9p0 and __n8o9p0.Health > 0) then continue end
+                            if not __n0o1p2 then continue end
                             local __q1r2s3, __t4u5v6 = __n0o1p2:WorldToViewportPoint(__h2i3j4.Position)
                             if not __t4u5v6 then continue end
                             local __w7x8y9 = Vector2.new(__q1r2s3.X, __q1r2s3.Y)
@@ -2630,7 +2655,7 @@ run(function()
                             local targetHead = __c3d4e5.Character:FindFirstChild("Head") or __i9j0k1
                             local targetPos = targetHead.Position
                             local targetCF = targetHead.CFrame
-                            local targetVel = __i9j0k1.Velocity
+                            local targetVel = __i9j0k1.Velocity or Vector3.new()
                             local finalPos = computePosition(targetPos, targetCF, targetVel, tick())
                             if not finalPos then return end
                             local lookDown = CFrame.lookAt(finalPos, targetPos)
@@ -2639,9 +2664,13 @@ run(function()
                             local __r8s9t0 = __f6g7h8.RotVelocity
                             __f6g7h8.CFrame = lookDown
                             __y5z6a7:BindToRenderStep("__restore", 101, function()
-                                __f6g7h8.CFrame = __l2m3n4
-                                __f6g7h8.Velocity = __o5p6q7
-                                __f6g7h8.RotVelocity = __r8s9t0
+                                pcall(function()
+                                    if __f6g7h8 and __f6g7h8.Parent then
+                                        __f6g7h8.CFrame = __l2m3n4
+                                        __f6g7h8.Velocity = __o5p6q7
+                                        __f6g7h8.RotVelocity = __r8s9t0
+                                    end
+                                end)
                                 __y5z6a7:UnbindFromRenderStep("__restore")
                             end)
                         end)
@@ -2667,6 +2696,11 @@ run(function()
                     end
 
                     __i1j2k3:__init()
+                end)
+
+                if not ok then
+                    pcall(function() notif('Wallbang', 'Init failed: ' .. tostring(result), 3, 'alert') end)
+                    return false
                 end
                 return true
             end
@@ -2691,19 +2725,19 @@ run(function()
                     pendingTask = task.delay(5, attemptInit)
                     return
                 end
-                local success = pcall(initializeWallbang)
+                local success = initializeWallbang()
                 if not success or not shared.__s9t0u1 then
                     pendingTask = task.delay(5, attemptInit)
                 else
                     if pendingTask then task.cancel(pendingTask); pendingTask = nil end
-                    createVisual()
-                    startVisualUpdate()
+                    pcall(createVisual)
+                    pcall(startVisualUpdate)
                     if _G.wallbangBoundaryBypass then 
-                        enableBoundaryBypass()
+                        pcall(enableBoundaryBypass)
                         if antiVoidConn then antiVoidConn:Disconnect() end
                         antiVoidConn = runService.Heartbeat:Connect(antiVoid)
                     else 
-                        disableBoundaryBypass() 
+                        pcall(disableBoundaryBypass)
                     end
                 end
             end
@@ -2715,19 +2749,19 @@ run(function()
                 isEnabled = false
                 if pendingTask then task.cancel(pendingTask); pendingTask = nil end
                 if shared.__s9t0u1 then
-                    shared.__s9t0u1:Shutdown()
+                    pcall(function() shared.__s9t0u1:Shutdown() end)
                     shared.__s9t0u1 = nil
                 end
-                stopVisual()
-                disableBoundaryBypass()
+                pcall(stopVisual)
+                pcall(disableBoundaryBypass)
             end
         end,
         Tooltip = "Desync & positioning"
     })
 
-    DesyncModule:CreateDropdown({ Name = "Preset", List = {"Above","Below","Orbit","Random"}, Default = _G.wallbangPreset, Function = function(v) _G.wallbangPreset = v end, Tooltip = "Position relative to target" })
-    DesyncModule:CreateSlider({ Name = "Prediction Time (s)", Min = 0.1, Max = 0.5, Default = _G.wallbangPredictionTime, Decimal = 100, Function = function(v) _G.wallbangPredictionTime = v end, Suffix = "s", Tooltip = "Compensates for desync" })
-    DesyncModule:CreateToggle({ Name = "Boundary Bypass", Default = _G.wallbangBoundaryBypass, Function = function(v) _G.wallbangBoundaryBypass = v; if v then if boundaryActive then return end; enableBoundaryBypass(); if antiVoidConn then antiVoidConn:Disconnect() end; antiVoidConn = runService.Heartbeat:Connect(antiVoid) else disableBoundaryBypass() end end, Tooltip = "Disable barriers & prevent death from out-of-bounds" })
+    DesyncModule:CreateDropdown({ Name = "Preset", List = {"Above","Below","Orbit","Random"}, Default = _G.wallbangPreset or "Above", Function = function(v) _G.wallbangPreset = v end, Tooltip = "Position relative to target" })
+    DesyncModule:CreateSlider({ Name = "Prediction Time (s)", Min = 0.1, Max = 0.5, Default = _G.wallbangPredictionTime or 0.2, Decimal = 100, Function = function(v) _G.wallbangPredictionTime = v end, Suffix = "s", Tooltip = "Compensates for desync" })
+    DesyncModule:CreateToggle({ Name = "Boundary Bypass", Default = _G.wallbangBoundaryBypass ~= false, Function = function(v) _G.wallbangBoundaryBypass = v; if v then if boundaryActive then return end; enableBoundaryBypass(); if antiVoidConn then antiVoidConn:Disconnect() end; antiVoidConn = runService.Heartbeat:Connect(antiVoid) else disableBoundaryBypass() end end, Tooltip = "Disable barriers & prevent death from out-of-bounds" })
 end)
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
 run(function()
@@ -2749,7 +2783,8 @@ run(function()
 
     local function tryApplyHook()
         if not gunModsEnabled then return end
-        local lobbyVisible
+        
+        local lobbyVisible = false
         pcall(function() lobbyVisible = isLobbyVisible() end)
         if lobbyVisible then
             if gunModsEnabled then
@@ -2757,17 +2792,50 @@ run(function()
             end
             return
         end
+        
         if hookActive then return end
-        local ok, clientItemModule = pcall(function()
-            return require(lplr.PlayerScripts.Modules.ClientReplicatedClasses.ClientFighter.ClientItem)
-        end)
-        if not ok or not clientItemModule or not clientItemModule.Input then
+        
+        if not lplr or not lplr.PlayerScripts then
             if gunModsEnabled then
                 pendingTask = task.delay(10, tryApplyHook)
             end
             return
         end
+        
+        local ok, clientItemModule = pcall(function()
+            local modules = lplr.PlayerScripts:FindFirstChild("Modules")
+            if not modules then return nil end
+            local clientReplicated = modules:FindFirstChild("ClientReplicatedClasses")
+            if not clientReplicated then return nil end
+            local clientFighter = clientReplicated:FindFirstChild("ClientFighter")
+            if not clientFighter then return nil end
+            local clientItem = clientFighter:FindFirstChild("ClientItem")
+            if not clientItem then return nil end
+            return require(clientItem)
+        end)
+        
+        if not ok or not clientItemModule or type(clientItemModule) ~= "table" then
+            if gunModsEnabled then
+                pendingTask = task.delay(10, tryApplyHook)
+            end
+            return
+        end
+        
+        if not clientItemModule.Input then
+            if gunModsEnabled then
+                pendingTask = task.delay(10, tryApplyHook)
+            end
+            return
+        end
+        
         local inputFunc = clientItemModule.Input
+        if type(inputFunc) ~= "function" then
+            if gunModsEnabled then
+                pendingTask = task.delay(10, tryApplyHook)
+            end
+            return
+        end
+        
         oldInput = hookfunction(inputFunc, function(...)
             local args = {...}
             local data = args[1]
@@ -2796,12 +2864,27 @@ run(function()
     local function removeHook()
         cancelPending()
         if not hookActive or not oldInput then return end
+        
+        if not lplr or not lplr.PlayerScripts then
+            hookActive = false
+            oldInput = nil
+            return
+        end
+        
         local ok, clientItemModule = pcall(function()
-            return require(lplr.PlayerScripts.Modules.ClientReplicatedClasses.ClientFighter.ClientItem)
+            local modules = lplr.PlayerScripts:FindFirstChild("Modules")
+            if not modules then return nil end
+            local clientReplicated = modules:FindFirstChild("ClientReplicatedClasses")
+            if not clientReplicated then return nil end
+            local clientFighter = clientReplicated:FindFirstChild("ClientFighter")
+            if not clientFighter then return nil end
+            local clientItem = clientFighter:FindFirstChild("ClientItem")
+            if not clientItem then return nil end
+            return require(clientItem)
         end)
+        
         if ok and clientItemModule and clientItemModule.Input then
             pcall(function() hookfunction(clientItemModule.Input, oldInput) end)
-            pcall(function() clientItemModule.Input = oldInput end)
         end
         hookActive = false
         oldInput = nil
@@ -2851,96 +2934,106 @@ run(function()
         Function = function(v) quickShotCooldownVal = v end,
         Suffix = "s"
     })
+
+    vape:Clean(function()
+        removeHook()
+    end)
 end)
                                                                                                                                                                                                                                                                                                                                                         
 run(function()
-    local module = vape.Categories.Utility:CreateModule({
-        Name = "Gun Mods V2",
-        Function = function(callback)
-            if callback then
-                local Storage = game:GetService("ReplicatedStorage")
-                
-                local success, Items = pcall(function()
-                    return require(Storage.Modules.ItemLibrary).Items
-                end)
-                
-                if not success or not Items then
-                    vape:CreateNotification("Gun Mods v2", "Failed to load ItemLibrary", 3, "alert")
-                    return
-                end
+    local module = vape.Categories.Utility:CreateModule({
+        Name = "Gun Mods V2",
+        Function = function(callback)
+            if callback then
+                local Storage = game:GetService("ReplicatedStorage")
+                
+                local success, ItemLibrary = pcall(function()
+                    return require(Storage.Modules.ItemLibrary)
+                end)
+                
+                if not success or not ItemLibrary then
+                    vape:CreateNotification("Gun Mods v2", "Failed to load ItemLibrary", 3, "alert")
+                    return
+                end
 
-                local gunExceptions = {
-                    ["Sniper"] = true,
-                    ["Crossbow"] = false,
-                    ["Bow"] = false,
-                    ["RPG"] = false,
-                }
+                local Items = ItemLibrary.Items
+                if not Items or type(Items) ~= "table" then
+                    vape:CreateNotification("Gun Mods v2", "Items table not found in ItemLibrary", 3, "alert")
+                    return
+                end
 
-                local modifiedCount = 0
+                local gunExceptions = {
+                    ["Sniper"] = true,
+                    ["Crossbow"] = true,
+                    ["Bow"] = true,
+                    ["RPG"] = true,
+                }
 
-                for name, data in pairs(Items) do
-                    if typeof(data) == "table" and not gunExceptions[name] then
-                        if data.ShootSpread then 
-                            data.ShootSpread = 0 
-                            modifiedCount = modifiedCount + 1
-                        end
-                        if data.ShootAccuracy then 
-                            data.ShootAccuracy = 0 
-                        end
-                        if data.ShootRecoil then 
-                            data.ShootRecoil = 0 
-                        end
-                        if data.ShootCooldown then 
-                            data.ShootCooldown = _G.gunModsShootCooldown or 0.001 
-                        end
-                        if data.ShootBurstCooldown then 
-                            data.ShootBurstCooldown = _G.gunModsShootCooldown or 0.001 
-                        end
-                    end
-                end
+                local modifiedCount = 0
 
-                vape:CreateNotification("Gun Mods v2", "Modified " .. modifiedCount .. " guns", 3, "success")
-            end
-        end,
-        Tooltip = "Fast fire rate with adjustable cooldown"
-    })
+                for name, data in pairs(Items) do
+                    if type(data) == "table" and not gunExceptions[name] then
+                        if data.ShootSpread then 
+                            data.ShootSpread = 0 
+                            modifiedCount = modifiedCount + 1
+                        end
+                        if data.ShootAccuracy then 
+                            data.ShootAccuracy = 0 
+                        end
+                        if data.ShootRecoil then 
+                            data.ShootRecoil = 0 
+                        end
+                        if data.ShootCooldown then 
+                            data.ShootCooldown = _G.gunModsShootCooldown or 0.001 
+                        end
+                        if data.ShootBurstCooldown then 
+                            data.ShootBurstCooldown = _G.gunModsShootCooldown or 0.001 
+                        end
+                    end
+                end
 
-    module:CreateSlider({
-        Name = "Shoot Cooldown",
-        Min = 0.001,
-        Max = 0.5,
-        Default = 0.001,
-        Decimal = 1000,
-        Function = function(v)
-            _G.gunModsShootCooldown = v
-        end,
-        Suffix = "s",
-        Tooltip = "Delay between shots"
-    })
+                vape:CreateNotification("Gun Mods v2", "Modified " .. modifiedCount .. " guns", 3, "success")
+            end
+        end,
+        Tooltip = "Fast fire rate with adjustable cooldown"
+    })
 
-    module:CreateSlider({
-        Name = "Shoot Spread",
-        Min = 0,
-        Max = 10,
-        Default = 0,
-        Decimal = 10,
-        Function = function(v)
-            _G.gunModsShootSpread = v
-        end,
-        Tooltip = "Bullet spread amount"
-    })
+    module:CreateSlider({
+        Name = "Shoot Cooldown",
+        Min = 0.001,
+        Max = 0.5,
+        Default = 0.001,
+        Decimal = 1000,
+        Function = function(v)
+            _G.gunModsShootCooldown = v
+        end,
+        Suffix = "s",
+        Tooltip = "Delay between shots"
+    })
 
-    module:CreateSlider({
-        Name = "Shoot Recoil",
-        Min = 0,
-        Max = 10,
-        Default = 0,
-        Decimal = 10,
-        Function = function(v)
-            _G.gunModsShootRecoil = v
-        end,
-        Tooltip = "Gun recoil amount"
-    })
+    module:CreateSlider({
+        Name = "Shoot Spread",
+        Min = 0,
+        Max = 10,
+        Default = 0,
+        Decimal = 10,
+        Function = function(v)
+            _G.gunModsShootSpread = v
+        end,
+        Tooltip = "Bullet spread amount"
+    })
+
+    module:CreateSlider({
+        Name = "Shoot Recoil",
+        Min = 0,
+        Max = 10,
+        Default = 0,
+        Decimal = 10,
+        Function = function(v)
+            _G.gunModsShootRecoil = v
+        end,
+        Tooltip = "Gun recoil amount"
+    })
 end)
 
 run(function()
