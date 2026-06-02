@@ -1373,59 +1373,102 @@ run(function()
     local highlightColor = Color3.fromRGB(255, 80, 80)
 
     local function isTripminePart(part)
-        if not part or not part:IsA("BasePart") then return false end
+        if not part then return false end
+        if not part:IsA("BasePart") then return false end
+        
         local vm = workspace:FindFirstChild("ViewModels")
-        if vm and part:IsDescendantOf(vm) then return false end
+        if vm then
+            local success, isDescendant = pcall(function()
+                return part:IsDescendantOf(vm)
+            end)
+            if success and isDescendant then return false end
+        end
+        
         local cam = workspace.CurrentCamera
-        if cam and part:IsDescendantOf(cam) then return false end
+        if cam then
+            local success, isDescendant = pcall(function()
+                return part:IsDescendantOf(cam)
+            end)
+            if success and isDescendant then return false end
+        end
+        
         local name = string.lower(part.Name or "")
         if string.find(name, "tripmine") then return true end
-        local anc = part:FindFirstAncestorOfClass("Model")
-        if anc and string.find(string.lower(anc.Name or ""), "tripmine") then return true end
+        
+        local anc = part.Parent
+        if anc and anc:IsA("Model") then
+            if string.find(string.lower(anc.Name or ""), "tripmine") then return true end
+        end
+        
         return false
     end
 
     local function makeHighlight(part)
+        if not part or not part.Parent then return end
         if highlights[part] then return end
         if labelCount >= MAX_LABELS then return end
-        if lplr.Character and part:IsDescendantOf(lplr.Character) then return end
+        
+        if lplr and lplr.Character then
+            local success, isDescendant = pcall(function()
+                return part:IsDescendantOf(lplr.Character)
+            end)
+            if success and isDescendant then return end
+        end
+        
         local cam = workspace.CurrentCamera
-        if cam and (part.Position - cam.CFrame.Position).Magnitude > MAX_DIST then return end
-
+        if cam and cam.CFrame then
+            local dist = (part.Position - cam.CFrame.Position).Magnitude
+            if dist > MAX_DIST then return end
+        end
+        
         local highlight = Instance.new("Highlight")
         highlight.Name = "Rivals_TrapHighlight"
         highlight.FillColor = highlightColor
         highlight.OutlineColor = highlightColor
         highlight.FillTransparency = 0.5
         highlight.OutlineTransparency = 0.3
-        highlight.Adornee = part
         highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-        highlight.Parent = part
+        
+        pcall(function()
+            highlight.Adornee = part
+            highlight.Parent = part
+        end)
+        
+        if not highlight.Parent then
+            highlight:Destroy()
+            return
+        end
+        
         highlights[part] = highlight
         labelCount = labelCount + 1
         
-        local originalTransparency = part.Transparency
         local hookConn
-        hookConn = part:GetPropertyChangedSignal("Transparency"):Connect(function()
-            if highlight and highlight.Parent then
-                highlight.Enabled = true
-            end
+        pcall(function()
+            hookConn = part:GetPropertyChangedSignal("Transparency"):Connect(function()
+                if highlight and highlight.Parent then
+                    highlight.Enabled = true
+                end
+            end)
         end)
-        if not part._highlightConn then
+        
+        if hookConn then
             part._highlightConn = hookConn
         end
     end
 
     local function removeHighlight(part)
+        if not part then return end
         local h = highlights[part]
         if not h then return end
+        
         if part._highlightConn then
             pcall(function() part._highlightConn:Disconnect() end)
             part._highlightConn = nil
         end
+        
         pcall(function() h:Destroy() end)
         highlights[part] = nil
-        labelCount = labelCount - 1
+        labelCount = math.max(0, labelCount - 1)
     end
 
     local function scanAndCreate()
@@ -1434,10 +1477,12 @@ run(function()
             for i = 1, #descs do
                 if labelCount >= MAX_LABELS then break end
                 local obj = descs[i]
-                if obj and obj:IsA("BasePart") and isTripminePart(obj) then
-                    if not pendingSet[obj] and not highlights[obj] then
-                        pendingSet[obj] = true
-                        pendingQueue[#pendingQueue + 1] = obj
+                if obj and pcall(function() return obj:IsA("BasePart") end) then
+                    if isTripminePart(obj) then
+                        if not pendingSet[obj] and not highlights[obj] then
+                            pendingSet[obj] = true
+                            pendingQueue[#pendingQueue + 1] = obj
+                        end
                     end
                 end
                 if (i % PROCESS_BATCH) == 0 then task.wait() end
@@ -1446,86 +1491,112 @@ run(function()
     end
 
     local function onDescendantAdded(desc)
-        if desc:IsA("BasePart") then
-            if isTripminePart(desc) and not pendingSet[desc] and not highlights[desc] then
-                pendingSet[desc] = true
-                pendingQueue[#pendingQueue + 1] = desc
-            end
-        else
-            task.spawn(function()
-                for _, d in ipairs(desc:GetDescendants()) do
-                    if labelCount >= MAX_LABELS then break end
-                    if d:IsA("BasePart") and isTripminePart(d) and not pendingSet[d] and not highlights[d] then
-                        pendingSet[d] = true
-                        pendingQueue[#pendingQueue + 1] = d
+        if not desc then return end
+        if not pcall(function() return desc:IsA("BasePart") end) then
+            if pcall(function() return desc:IsA("Instance") end) then
+                task.spawn(function()
+                    for _, d in ipairs(desc:GetDescendants()) do
+                        if labelCount >= MAX_LABELS then break end
+                        if pcall(function() return d:IsA("BasePart") end) and isTripminePart(d) and not pendingSet[d] and not highlights[d] then
+                            pendingSet[d] = true
+                            pendingQueue[#pendingQueue + 1] = d
+                        end
                     end
-                end
-            end)
+                end)
+            end
+            return
+        end
+        
+        if isTripminePart(desc) and not pendingSet[desc] and not highlights[desc] then
+            pendingSet[desc] = true
+            pendingQueue[#pendingQueue + 1] = desc
         end
     end
 
     local function onDescendantRemoving(desc)
-        if desc:IsA("BasePart") then
+        if not desc then return end
+        if pcall(function() return desc:IsA("BasePart") end) then
             removeHighlight(desc)
-        else
+        elseif pcall(function() return desc:IsA("Instance") end) then
             for _, d in ipairs(desc:GetDescendants()) do
-                if d:IsA("BasePart") then removeHighlight(d) end
+                if pcall(function() return d:IsA("BasePart") end) then 
+                    removeHighlight(d) 
+                end
             end
         end
     end
 
     local function enable()
         if renderConn then return end
+        
         scanAndCreate()
+        
         childAddedConn = workspace.DescendantAdded:Connect(onDescendantAdded)
+        
         if workspace.DescendantRemoving then
             childRemovedConn = workspace.DescendantRemoving:Connect(onDescendantRemoving)
         end
+        
         if not queueConn then
             queueConn = runService.Heartbeat:Connect(function()
                 if labelCount >= MAX_LABELS then return end
+                
                 local cam = workspace.CurrentCamera
-                local camPos = cam and cam.CFrame.Position or nil
+                local camPos = nil
+                if cam and cam.CFrame then
+                    camPos = cam.CFrame.Position
+                end
+                
                 local toProcess = math.min(PROCESS_BATCH, #pendingQueue)
                 for i = 1, toProcess do
+                    if labelCount >= MAX_LABELS then break end
+                    
                     local part = table.remove(pendingQueue, 1)
-                    if part then pendingSet[part] = nil end
-                    if not part or not part.Parent then
-                    else
-                        if isTripminePart(part) and not (camPos and (part.Position - camPos).Magnitude > MAX_DIST) then
-                            makeHighlight(part)
+                    if part then 
+                        pendingSet[part] = nil 
+                    end
+                    
+                    if part and part.Parent then
+                        if isTripminePart(part) then
+                            if not camPos or (part.Position - camPos).Magnitude <= MAX_DIST then
+                                makeHighlight(part)
+                            end
                         end
                     end
-                    if labelCount >= MAX_LABELS then break end
                 end
             end)
         end
+        
         renderConn = runService.RenderStepped:Connect(function()
             local cam = workspace.CurrentCamera
-            if not cam then return end
+            if not cam or not cam.CFrame then return end
             local camPos = cam.CFrame.Position
+            
             for part, highlight in pairs(highlights) do
                 if not part or not part.Parent then
                     removeHighlight(part)
                 else
-                    local dist = (part.Position - camPos).Magnitude
-                    if dist > MAX_DIST then
-                        highlight.Enabled = false
-                    else
-                        highlight.Enabled = true
-                    end
+                    pcall(function()
+                        local dist = (part.Position - camPos).Magnitude
+                        highlight.Enabled = (dist <= MAX_DIST)
+                    end)
                 end
             end
         end)
     end
 
     local function disable()
-        if renderConn then renderConn:Disconnect(); renderConn = nil end
-        if childAddedConn then childAddedConn:Disconnect(); childAddedConn = nil end
-        if childRemovedConn then childRemovedConn:Disconnect(); childRemovedConn = nil end
-        if queueConn then queueConn:Disconnect(); queueConn = nil end
+        if renderConn then pcall(function() renderConn:Disconnect() end); renderConn = nil end
+        if childAddedConn then pcall(function() childAddedConn:Disconnect() end); childAddedConn = nil end
+        if childRemovedConn then pcall(function() childRemovedConn:Disconnect() end); childRemovedConn = nil end
+        if queueConn then pcall(function() queueConn:Disconnect() end); queueConn = nil end
+        
         pendingQueue = {}
-        for p in pairs(highlights) do removeHighlight(p) end
+        pendingSet = {}
+        
+        for part, _ in pairs(highlights) do
+            removeHighlight(part)
+        end
         highlights = {}
         labelCount = 0
     end
