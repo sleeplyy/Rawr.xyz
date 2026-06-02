@@ -5423,12 +5423,17 @@ function mainapi:CreateNotification(title, text, duration, type, imageAsset)
 		if hasImage then
 			local animeImage = Instance.new('ImageLabel')
 			animeImage.Name = 'AnimeImage'
-			animeImage.Size = UDim2.fromOffset(20, 20)
-			animeImage.Position = UDim2.fromOffset(notification.Size.X.Offset - 28, 48)
+			animeImage.Size = UDim2.fromOffset(45, 45)
+			animeImage.Position = UDim2.fromOffset(12, 15)
 			animeImage.BackgroundTransparency = 1
 			animeImage.Image = getcustomasset(imageAsset)
 			animeImage.ZIndex = 5
 			animeImage.Parent = notification
+			
+			iconshadow.Visible = false
+			icon.Visible = false
+			titlelabel.Position = UDim2.fromOffset(70, 16)
+			textshadow.Position = UDim2.fromOffset(71, 44)
 			
 			if imageAsset:match("%.gif$") then
 				local angle = 0
@@ -5442,14 +5447,6 @@ function mainapi:CreateNotification(title, text, duration, type, imageAsset)
 					end
 				end)
 			end
-			
-			task.delay(duration - 0.5, function()
-				if animeImage and animeImage.Parent then
-					tween:Tween(animeImage, TweenInfo.new(0.3, Enum.EasingStyle.Linear), {
-						ImageTransparency = 1
-					})
-				end
-			end)
 		end
 		
 		local progress = Instance.new('Frame')
