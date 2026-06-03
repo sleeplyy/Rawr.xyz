@@ -3545,7 +3545,22 @@ run(function()
     local renderConn
     local lastAngle = 0
 
+    getgenv().AntiAimOverride = {
+        active = false,
+        direction = nil  -- left or right either one
+    }
+
     local function getAngleOffset()
+        if getgenv().AntiAimOverride and getgenv().AntiAimOverride.active then
+            local camForward = gameCamera.CFrame.LookVector * Vector3.new(1, 0, 1)
+            local angle = math.atan2(camForward.X, camForward.Z)
+            if getgenv().AntiAimOverride.direction == "Left" then
+                return angle + math.rad(90)
+            elseif getgenv().AntiAimOverride.direction == "Right" then
+                return angle - math.rad(90)
+            end
+        end
+
         local dir = Direction and Direction.Value or "Left"
         local camForward = gameCamera.CFrame.LookVector * Vector3.new(1, 0, 1)
         local angle = math.atan2(camForward.X, camForward.Z)
@@ -3632,9 +3647,13 @@ run(function()
                 if entitylib.isAlive then
                     entitylib.character.Humanoid.AutoRotate = true
                 end
+                if getgenv().AntiAimOverride then
+                    getgenv().AntiAimOverride.active = false
+                    getgenv().AntiAimOverride.direction = nil
+                end
             end
         end,
-        Tooltip = 'Fake'
+        Tooltip = 'Fake movement direction'
     })
 
     Mode = AntiAim:CreateDropdown({
@@ -3659,76 +3678,58 @@ end)
 																																																											
 run(function()
     local ManualAntiAim
-    local renderConn
-    local lastAngle = 0
-    local manualMode = false
-    local manualDirection = nil
-
-    local function getManualAngle()
-        local camForward = gameCamera.CFrame.LookVector * Vector3.new(1, 0, 1)
-        local angle = math.atan2(camForward.X, camForward.Z)
-        
-        if manualDirection == "Left" then
-            return angle + math.rad(90)
-        elseif manualDirection == "Right" then
-            return angle - math.rad(90)
-        end
-        return angle
-    end
-
-    local function applyManualSideways()
-        if not entitylib.isAlive then return end
-        local root = entitylib.character.RootPart
-        local moveDir = entitylib.character.Humanoid.MoveDirection
-        if moveDir.Magnitude < 0.1 then return end
-
-        lastAngle = getManualAngle()
-        root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, lastAngle, 0)
-        
-        local humanoid = entitylib.character.Humanoid
-        if humanoid.CameraOffset ~= Vector3.new(0, 0, 0) then
-            humanoid.CameraOffset = Vector3.new(0, 0, 0)
-        end
-        humanoid.AutoRotate = false
-    end
 
     ManualAntiAim = vape.Categories.Blatant:CreateModule({
         Name = 'Manual AntiAim',
         Function = function(callback)
             if callback then
-                manualMode = true
-                renderConn = runService.RenderStepped:Connect(function()
-                    if manualMode and manualDirection then
-                        applyManualSideways()
-                    end
-                end)
-                notif('Manual AntiAim', 'Enabled - Use Q/E keys', 2, 'info')
+                notif('Manual AntiAim', 'Enabled - Press Q/E to override, Shift+E to reset', 3, 'info')
             else
-                if renderConn then
-                    renderConn:Disconnect()
-                    renderConn = nil
-                end
-                manualMode = false
-                manualDirection = nil
-                if entitylib.isAlive then
-                    entitylib.character.Humanoid.AutoRotate = true
+                if getgenv().AntiAimOverride then
+                    getgenv().AntiAimOverride.active = false
+                    getgenv().AntiAimOverride.direction = nil
                 end
                 notif('Manual AntiAim', 'Disabled', 1, 'info')
             end
         end,
-        Tooltip = 'Manual'
+        Tooltip = 'Q/E manual for AntiAim - Shift+E to reset'
     })
 
     inputService.InputBegan:Connect(function(input, gameProcessed)
         if gameProcessed then return end
-        if not ManualAntiAim.Enabled then return end
+        if not ManualAntiAim or not ManualAntiAim.Enabled then return end
         
-        if input.KeyCode == Enum.KeyCode.Q then
-            manualDirection = "Left"
-            notif('Manual AntiAim', 'Facing Left', 1, 'info', "newvape/assets/new/anime.png")
-        elseif input.KeyCode == Enum.KeyCode.E then
-            manualDirection = "Right"
-            notif('Manual AntiAim', 'Facing Right', 1, 'info', "newvape/assets/new/anime.png")
+        local mainAntiAim = nil
+        for _, module in pairs(vape.Modules) do
+            if module.Name == "AntiAim" then
+                mainAntiAim = module
+                break
+            end
+        end
+        
+        if not mainAntiAim or not mainAntiAim.Enabled then
+            notif('Manual AntiAim', 'Main AntiAim is disabled - Enable it first', 2, 'warning')
+            return
+        end
+
+        if input.KeyCode == Enum.KeyCode.E and inputService:IsKeyDown(Enum.KeyCode.LeftShift) then
+            if getgenv().AntiAimOverride then
+                getgenv().AntiAimOverride.active = false
+                getgenv().AntiAimOverride.direction = nil
+                notif('Manual AntiAim', 'reset (Shift+E)', 1, 'info')
+            end
+        elseif input.KeyCode == Enum.KeyCode.Q then
+            if getgenv().AntiAimOverride then
+                getgenv().AntiAimOverride.active = true
+                getgenv().AntiAimOverride.direction = "Left"
+                notif('Manual AntiAim', '← Left (Q)', 1.5, 'info', "newvape/assets/new/anime.png")
+            end
+        elseif input.KeyCode == Enum.KeyCode.E and not inputService:IsKeyDown(Enum.KeyCode.LeftShift) then
+            if getgenv().AntiAimOverride then
+                getgenv().AntiAimOverride.active = true
+                getgenv().AntiAimOverride.direction = "Right"
+                notif('Manual AntiAim', '→ Right (E)', 1.5, 'info', "newvape/assets/new/anime.png")
+            end
         end
     end)
 end)																																																											
