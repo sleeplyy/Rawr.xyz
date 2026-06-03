@@ -3547,7 +3547,7 @@ run(function()
 
     getgenv().AntiAimOverride = {
         active = false,
-        direction = nil
+        direction = nil  -- "Left" or "Right"
     }
 
     local function getAngleOffset()
@@ -3695,38 +3695,50 @@ run(function()
         Tooltip = 'Q/E to change direction, Shift+E to reset'
     })
 
-    ManualAntiAim.EnabledChanged:Connect(function(enabled)
-        if enabled then
+    local success, err = pcall(function()
+        if ManualAntiAim and ManualAntiAim.EnabledChanged then
+            ManualAntiAim.EnabledChanged:Connect(function(enabled)
+            end)
         end
     end)
+    if not success then
+        warn('ManualAntiAim EnabledChanged connection failed: ' .. tostring(err))
+    end
 
-    inputService.InputBegan:Connect(function(input, gameProcessed)
-        if gameProcessed then return end
-        if not ManualAntiAim or not ManualAntiAim.Enabled then return end
+    local success2, err2 = pcall(function()
+        inputService.InputBegan:Connect(function(input, gameProcessed)
+            if gameProcessed then return end
+            if not ManualAntiAim or not ManualAntiAim.Enabled then return end
 
-        if input.KeyCode == Enum.KeyCode.Q then
-            if getgenv().AntiAimOverride then
-                getgenv().AntiAimOverride.active = true
-                getgenv().AntiAimOverride.direction = "Left"
-                notif('Manual AntiAim', '← Left', 1.5, 'info', "newvape/assets/new/anime.png")
-            end
-        elseif input.KeyCode == Enum.KeyCode.E then
-            if inputService:IsKeyDown(Enum.KeyCode.LeftShift) then
-                if getgenv().AntiAimOverride then
-                    getgenv().AntiAimOverride.active = false
-                    getgenv().AntiAimOverride.direction = nil
-                    notif('Manual AntiAim', 'Reset', 1, 'info')
-                end
-            else
+            if input.KeyCode == Enum.KeyCode.Q then
                 if getgenv().AntiAimOverride then
                     getgenv().AntiAimOverride.active = true
-                    getgenv().AntiAimOverride.direction = "Right"
-                    notif('Manual AntiAim', '→ Right', 1.5, 'info', "newvape/assets/new/anime.png")
+                    getgenv().AntiAimOverride.direction = "Left"
+                    notif('Manual AntiAim', '← Left', 1.5, 'info', "newvape/assets/new/anime.png")
+                end
+            elseif input.KeyCode == Enum.KeyCode.E then
+                if inputService:IsKeyDown(Enum.KeyCode.LeftShift) then
+
+                    if getgenv().AntiAimOverride then
+                        getgenv().AntiAimOverride.active = false
+                        getgenv().AntiAimOverride.direction = nil
+                        notif('Manual AntiAim', 'Reset', 1, 'info')
+                    end
+                else
+
+                    if getgenv().AntiAimOverride then
+                        getgenv().AntiAimOverride.active = true
+                        getgenv().AntiAimOverride.direction = "Right"
+                        notif('Manual AntiAim', '→ Right', 1.5, 'info', "newvape/assets/new/anime.png")
+                    end
                 end
             end
-        end
+        end)
     end)
-end)																																																											
+    if not success2 then
+        warn('InputBegan connection failed: ' .. tostring(err2))
+    end
+end)																																																								
 	
 run(function()
 	local Swim
