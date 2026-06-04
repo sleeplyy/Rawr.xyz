@@ -3540,6 +3540,7 @@ end)
 
 run(function()
     local AntiAim
+    local ManualAntiAim
     local Mode
     local Direction
     local renderConn
@@ -3547,13 +3548,14 @@ run(function()
 
     getgenv().AntiAimOverride = {
         active = false,
-        direction = nil  -- "Left" or "Right"
+        direction = nil
     }
 
     local function getAngleOffset()
+        local camForward = gameCamera.CFrame.LookVector * Vector3.new(1, 0, 1)
+        local angle = math.atan2(camForward.X, camForward.Z)
+
         if getgenv().AntiAimOverride and getgenv().AntiAimOverride.active then
-            local camForward = gameCamera.CFrame.LookVector * Vector3.new(1, 0, 1)
-            local angle = math.atan2(camForward.X, camForward.Z)
             if getgenv().AntiAimOverride.direction == "Left" then
                 return angle + math.rad(90)
             elseif getgenv().AntiAimOverride.direction == "Right" then
@@ -3562,9 +3564,6 @@ run(function()
         end
 
         local dir = Direction and Direction.Value or "Left"
-        local camForward = gameCamera.CFrame.LookVector * Vector3.new(1, 0, 1)
-        local angle = math.atan2(camForward.X, camForward.Z)
-
         if dir == "Left" then
             return angle + math.rad(90)
         elseif dir == "Right" then
@@ -3572,40 +3571,6 @@ run(function()
         else
             return angle + (math.random(0, 1) == 0 and math.rad(90) or math.rad(-90))
         end
-    end
-
-    local function applyInverse()
-        if not entitylib.isAlive then return end
-        local root = entitylib.character.RootPart
-        local moveDir = entitylib.character.Humanoid.MoveDirection
-        if moveDir.Magnitude < 0.1 then return end
-
-        local lookCF = CFrame.lookAt(root.Position, root.Position - moveDir)
-        local _, yaw, _ = lookCF:ToOrientation()
-        lastAngle = yaw
-        root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, yaw, 0)
-    end
-
-    local function applyBackwards()
-        if not entitylib.isAlive then return end
-        local root = entitylib.character.RootPart
-        local moveDir = entitylib.character.Humanoid.MoveDirection
-        if moveDir.Magnitude < 0.1 then return end
-
-        local camForward = gameCamera.CFrame.LookVector * Vector3.new(1, 0, 1)
-        local angle = math.atan2(camForward.X, camForward.Z)
-        lastAngle = angle
-        root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, angle, 0)
-    end
-	
-    local function applySideways()
-        if not entitylib.isAlive then return end
-        local root = entitylib.character.RootPart
-        local moveDir = entitylib.character.Humanoid.MoveDirection
-        if moveDir.Magnitude < 0.1 then return end
-
-        lastAngle = getAngleOffset()
-        root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, lastAngle, 0)
     end
 
     local function applyFirstPersonFix()
@@ -3620,6 +3585,49 @@ run(function()
         end
 
         humanoid.AutoRotate = false
+    end
+
+    local function applyInverse()
+        if not entitylib.isAlive then return end
+        local root = entitylib.character.RootPart
+        local moveDir = entitylib.character.Humanoid.MoveDirection
+        if moveDir.Magnitude < 0.1 then return end
+
+        if getgenv().AntiAimOverride and getgenv().AntiAimOverride.active then
+            lastAngle = getAngleOffset()
+        else
+            local lookCF = CFrame.lookAt(root.Position, root.Position - moveDir)
+            local _, yaw, _ = lookCF:ToOrientation()
+            lastAngle = yaw
+        end
+
+        root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, lastAngle, 0)
+    end
+
+    local function applyBackwards()
+        if not entitylib.isAlive then return end
+        local root = entitylib.character.RootPart
+        local moveDir = entitylib.character.Humanoid.MoveDirection
+        if moveDir.Magnitude < 0.1 then return end
+
+        if getgenv().AntiAimOverride and getgenv().AntiAimOverride.active then
+            lastAngle = getAngleOffset()
+        else
+            local camForward = gameCamera.CFrame.LookVector * Vector3.new(1, 0, 1)
+            lastAngle = math.atan2(camForward.X, camForward.Z)
+        end
+
+        root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, lastAngle, 0)
+    end
+
+    local function applySideways()
+        if not entitylib.isAlive then return end
+        local root = entitylib.character.RootPart
+        local moveDir = entitylib.character.Humanoid.MoveDirection
+        if moveDir.Magnitude < 0.1 then return end
+
+        lastAngle = getAngleOffset()
+        root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, lastAngle, 0)
     end
 
     AntiAim = vape.Categories.Blatant:CreateModule({
@@ -3674,10 +3682,6 @@ run(function()
         Visible = false,
         Function = function() end
     })
-end)
-																																																											
-run(function()
-    local ManualAntiAim
 
     ManualAntiAim = vape.Categories.Blatant:CreateModule({
         Name = 'Manual AntiAim',
@@ -3696,49 +3700,32 @@ run(function()
     })
 
     local success, err = pcall(function()
-        if ManualAntiAim and ManualAntiAim.EnabledChanged then
-            ManualAntiAim.EnabledChanged:Connect(function(enabled)
-            end)
-        end
-    end)
-    if not success then
-        warn('ManualAntiAim EnabledChanged connection failed: ' .. tostring(err))
-    end
-
-    local success2, err2 = pcall(function()
         inputService.InputBegan:Connect(function(input, gameProcessed)
             if gameProcessed then return end
             if not ManualAntiAim or not ManualAntiAim.Enabled then return end
+            if not AntiAim or not AntiAim.Enabled then return end
 
             if input.KeyCode == Enum.KeyCode.Q then
-                if getgenv().AntiAimOverride then
-                    getgenv().AntiAimOverride.active = true
-                    getgenv().AntiAimOverride.direction = "Left"
-                    notif('Manual AntiAim', '← Left', 1.5, 'info', "newvape/assets/new/anime.png")
-                end
+                getgenv().AntiAimOverride.active = true
+                getgenv().AntiAimOverride.direction = "Left"
+                notif('Manual AntiAim', '← Left', 1.5, 'info')
             elseif input.KeyCode == Enum.KeyCode.E then
                 if inputService:IsKeyDown(Enum.KeyCode.LeftShift) then
-
-                    if getgenv().AntiAimOverride then
-                        getgenv().AntiAimOverride.active = false
-                        getgenv().AntiAimOverride.direction = nil
-                        notif('Manual AntiAim', 'Reset', 1, 'info')
-                    end
+                    getgenv().AntiAimOverride.active = false
+                    getgenv().AntiAimOverride.direction = nil
+                    notif('Manual AntiAim', 'Reset', 1, 'info')
                 else
-
-                    if getgenv().AntiAimOverride then
-                        getgenv().AntiAimOverride.active = true
-                        getgenv().AntiAimOverride.direction = "Right"
-                        notif('Manual AntiAim', '→ Right', 1.5, 'info', "newvape/assets/new/anime.png")
-                    end
+                    getgenv().AntiAimOverride.active = true
+                    getgenv().AntiAimOverride.direction = "Right"
+                    notif('Manual AntiAim', '→ Right', 1.5, 'info')
                 end
             end
         end)
     end)
-    if not success2 then
-        warn('InputBegan connection failed: ' .. tostring(err2))
+    if not success then
+        warn('InputBegan connection failed: ' .. tostring(err))
     end
-end)																																																								
+end)																																																						
 	
 run(function()
 	local Swim
