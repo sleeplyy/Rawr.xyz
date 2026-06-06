@@ -566,12 +566,10 @@ run(function()
 	local old
 	local vtool = nil
 	
-	-- Define missing variables
 	local aimTimer = 0
 	local aimVec = Vector3.new()
 	local shootTimer = 0
 	
-	-- Create safe Spring if not exists
 	if not Spring then
 		Spring = {
 			new = function(config)
@@ -600,8 +598,10 @@ run(function()
 		if obj and obj:IsA('Tool') then
 			if old then
 				pcall(function()
-					for _, v in pairs(old:QueryDescendants('BasePart, Texture, Decal')) do
-						v.LocalTransparencyModifier = 0
+					for _, v in pairs(old:GetDescendants()) do
+						if v:IsA("BasePart") or v:IsA("Texture") or v:IsA("Decal") then
+							v.LocalTransparencyModifier = 0
+						end
 					end
 				end)
 			end
@@ -620,17 +620,21 @@ run(function()
 	
 			if ForceField and ForceField.Enabled and ColorSl then
 				pcall(function()
-					for _, v in pairs(vtool:QueryDescendants('BasePart')) do
-						v.Material = Enum.Material.ForceField
-						v.Color = Color3.fromHSV(ColorSl.Hue or 0, ColorSl.Sat or 1, ColorSl.Value or 1)
+					for _, v in pairs(vtool:GetDescendants()) do
+						if v:IsA("BasePart") then
+							v.Material = Enum.Material.ForceField
+							v.Color = Color3.fromHSV(ColorSl.Hue or 0, ColorSl.Sat or 1, ColorSl.Value or 1)
+						end
 					end
 				end)
 			end
 	
 			if old then
 				pcall(function()
-					for _, v in pairs(old:QueryDescendants('BasePart, Texture, Decal')) do
-						v.LocalTransparencyModifier = 1
+					for _, v in pairs(old:GetDescendants()) do
+						if v:IsA("BasePart") or v:IsA("Texture") or v:IsA("Decal") then
+							v.LocalTransparencyModifier = 1
+						end
 					end
 				end)
 			end
@@ -655,8 +659,10 @@ run(function()
 		
 					if old then
 						pcall(function()
-							for _, v in pairs(old:QueryDescendants('BasePart, Texture, Decal')) do
-								v.LocalTransparencyModifier = 0
+							for _, v in pairs(old:GetDescendants()) do
+								if v:IsA("BasePart") or v:IsA("Texture") or v:IsA("Decal") then
+									v.LocalTransparencyModifier = 0
+								end
 							end
 						end)
 					end
@@ -720,8 +726,10 @@ run(function()
 			else
 				if old then
 					pcall(function()
-						for _, v in pairs(old:QueryDescendants('BasePart, Texture, Decal')) do
-							v.LocalTransparencyModifier = 0
+						for _, v in pairs(old:GetDescendants()) do
+							if v:IsA("BasePart") or v:IsA("Texture") or v:IsA("Decal") then
+								v.LocalTransparencyModifier = 0
+							end
 						end
 					end)
 					old = nil
@@ -761,8 +769,10 @@ run(function()
 		Function = function(hue, sat, val)
 			if vtool then
 				pcall(function()
-					for _, v in pairs(vtool:QueryDescendants('BasePart')) do
-						v.Color = Color3.fromHSV(hue, sat, val)
+					for _, v in pairs(vtool:GetDescendants()) do
+						if v:IsA("BasePart") then
+							v.Color = Color3.fromHSV(hue, sat, val)
+						end
 					end
 				end)
 			end
