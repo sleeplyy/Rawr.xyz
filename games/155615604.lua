@@ -2591,96 +2591,87 @@ end)
 run(function()
 	local Crosshair
 	local Image
+	local RemoveCrosshair
 	local old = nil
 	local targetUpvalue = nil
+	local originalCrosshair = nil
+	
+	local function findGunControllerFunction()
+		local replicatedStorage = game:GetService("ReplicatedStorage")
+		local gunController = replicatedStorage:FindFirstChild("Scripts")
+		if gunController then
+			gunController = gunController:FindFirstChild("ToolScripts")
+			if gunController then
+				gunController = gunController:FindFirstChild("GunController")
+				if gunController then
+					for i = 1, 50 do
+						local success, upvalue = pcall(function()
+							return debug.getupvalue(gunController, i)
+						end)
+						if success and type(upvalue) == "function" then
+							local name = debug.getinfo(upvalue).name
+							if name == "onEquipped" then
+								return upvalue
+							end
+						end
+					end
+				end
+			end
+		end
+		return nil
+	end
+	
+	local function getCrosshairConstant(func)
+		if not func then return nil, nil end
+		for i = 1, 100 do
+			local success, constant = pcall(function()
+				return debug.getconstant(func, i)
+			end)
+			if success and type(constant) == "string" then
+				if constant:find("rbxasset") and (constant:find("98794608762931") or constant:find("mouse") or constant:find("cross")) then
+					return i, constant
+				end
+			end
+		end
+		return nil, nil
+	end
 	
 	Crosshair = vape.Legit:CreateModule({
 		Name = 'Crosshair',
 		Function = function(callback)
 			if callback then
 				if not old then
-					if not lplr.Character then
-						lplr.CharacterAdded:Wait()
-					end
-					
-					local success, connections = pcall(function()
-						return getconnections(lplr.CharacterAdded)
-					end)
-					
-					if success and connections then
-						for _, v in pairs(connections) do
-							local func = v and v.Function
-							if func then
-								local info = debug and debug.info and debug.info(func, 's')
-								if info and info:find('GunController') then
-									old = func
-									break
-								end
-							end
-						end
-					end
-					
-					if not old then
-						local signal = lplr.CharacterAdded
-						if signal and signal._events then
-							for _, conn in pairs(signal._events) do
-								local func = conn and conn.Fn
-								if func then
-									local info = debug and debug.info and debug.info(func, 's')
-									if info and info:find('GunController') then
-										old = func
-										break
-									end
-								end
-							end
-						end
-					end
-					
-					if not old then
-						pcall(function()
-							local replicatedStorage = game:GetService("ReplicatedStorage")
-							local gunController = replicatedStorage:FindFirstChild("Scripts")
-							if gunController then
-								gunController = gunController:FindFirstChild("ToolScripts")
-								if gunController then
-									gunController = gunController:FindFirstChild("GunController")
-									if gunController then
-										for i = 1, 50 do
-											local upvalue = debug.getupvalue(gunController, i)
-											if type(upvalue) == "function" then
-												local info = debug.info(upvalue, 'n')
-												if info == "onEquipped" then
-													old = upvalue
-													break
-												end
-											end
-										end
-									end
-								end
-							end
-						end)
-					end
+					old = findGunControllerFunction()
 				end
 				
-				if old and Image and Image.Value then
-					local success, err = pcall(function()
-						local assetPath = Image.Value
+				if old then
+					local index, defaultCrosshair = getCrosshairConstant(old)
+					if index and not originalCrosshair then
+						originalCrosshair = defaultCrosshair
+						targetUpvalue = index
+					end
+					
+					if not RemoveCrosshair or not RemoveCrosshair.Enabled then
+						local assetPath = Image and Image.Value or ""
+						local newPath = nil
+						
 						if assetPath:find('rbxasset') then
-							debug.setconstant(debug.getupvalue(old, 3), 30, assetPath)
+							newPath = assetPath
 						elseif isfile and isfile(assetPath) and getcustomasset then
-							debug.setconstant(debug.getupvalue(old, 3), 30, getcustomasset(assetPath))
-						else
-							debug.setconstant(debug.getupvalue(old, 3), 30, 'rbxassetid://98794608762931')
+							newPath = getcustomasset(assetPath)
 						end
-					end)
-					if not success then
-						warn("Failed to set crosshair: " .. tostring(err))
+						
+						if newPath and targetUpvalue then
+							pcall(function()
+								debug.setconstant(old, targetUpvalue, newPath)
+							end)
+						end
 					end
 				end
 			else
-				if old then
+				if old and originalCrosshair and targetUpvalue then
 					pcall(function()
-						debug.setconstant(debug.getupvalue(old, 3), 30, 'rbxassetid://98794608762931')
+						debug.setconstant(old, targetUpvalue, originalCrosshair)
 					end)
 				end
 			end
@@ -2689,18 +2680,41 @@ run(function()
 	})
 	
 	Image = Crosshair:CreateTextBox({
-		Name = 'Image',
+		Name = 'Image Path',
 		Placeholder = 'rbxassetid://123 or file path',
-		Function = function()
-			if Crosshair.Enabled and old and Image and Image.Value then
-				pcall(function()
-					local assetPath = Image.Value
+		Tooltip = 'Enter a Roblox asset ID or path to a custom image'
+	})
+	
+	RemoveCrosshair = Crosshair:CreateToggle({
+		Name = 'Remove Crosshair',
+		Default = false,
+		Tooltip = 'Removes the crosshair',
+		Function = function(callback)
+			if Crosshair.Enabled and old and targetUpvalue then
+				if callback then
+					pcall(function()
+						debug.setconstant(old, targetUpvalue, '')
+					end)
+				else
+					local assetPath = Image and Image.Value or ""
+					local newPath = nil
+					
 					if assetPath:find('rbxasset') then
-						debug.setconstant(debug.getupvalue(old, 3), 30, assetPath)
+						newPath = assetPath
 					elseif isfile and isfile(assetPath) and getcustomasset then
-						debug.setconstant(debug.getupvalue(old, 3), 30, getcustomasset(assetPath))
+						newPath = getcustomasset(assetPath)
 					end
-				end)
+					
+					if newPath then
+						pcall(function()
+							debug.setconstant(old, targetUpvalue, newPath)
+						end)
+					elseif originalCrosshair then
+						pcall(function()
+							debug.setconstant(old, targetUpvalue, originalCrosshair)
+						end)
+					end
+				end
 			end
 		end
 	})
