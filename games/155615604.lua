@@ -2435,6 +2435,160 @@ run(function()
 end)
 
 run(function()
+    local cam = gameCamera
+    local WeatherPart = nil
+    local Particle = nil
+    local enabled = false
+    local currentType = "rain"
+    local weatherColor = Color3.fromRGB(255, 255, 255)
+    local weatherRate = 100
+
+    local weatherPresets = {
+        ["rain"] = {
+            Speed = NumberRange.new(60, 60),
+            LockedToPart = true,
+            Rate = 600,
+            Texture = "rbxassetid://1822883048",
+            EmissionDirection = Enum.NormalId.Bottom,
+            Transparency = NumberSequence.new(0.4, 0.784, 0.784, 0.4),
+            Lifetime = NumberRange.new(0.8, 0.8),
+            LightEmission = 0.05,
+            LightInfluence = 0.9,
+            Orientation = Enum.ParticleOrientation.FacingCameraWorldUp,
+            Size = NumberSequence.new(10)
+        },
+        ["snow"] = {
+            LockedToPart = true,
+            Transparency = NumberSequence.new(0.737, 0.769, 1),
+            Texture = "http://www.roblox.com/asset/?id=99851851",
+            SpreadAngle = Vector2.new(50, 50),
+            Speed = NumberRange.new(30, 30),
+            LightEmission = 0.5,
+            Rate = 1000,
+            EmissionDirection = Enum.NormalId.Bottom,
+            Orientation = Enum.ParticleOrientation.FacingCameraWorldUp,
+            Size = NumberSequence.new(0.33, 0.402, 0.33)
+        },
+        ["light rain"] = {
+            LockedToPart = true,
+            Rate = 500,
+            Squash = NumberSequence.new(3, 3),
+            LightInfluence = 0.3,
+            Transparency = NumberSequence.new(0, 0, 0),
+            Texture = "rbxasset://textures/particles/sparkles_main.dds",
+            Speed = NumberRange.new(30, 50),
+            Lifetime = NumberRange.new(9, 9),
+            LightEmission = 0.5,
+            Brightness = 2,
+            EmissionDirection = Enum.NormalId.Bottom,
+            Orientation = Enum.ParticleOrientation.FacingCameraWorldUp,
+            Size = NumberSequence.new(0.2, 0.2)
+        }
+    }
+
+    local function recreateParticle()
+        if Particle then
+            Particle:Destroy()
+            Particle = nil
+        end
+        if WeatherPart then
+            local preset = weatherPresets[currentType]
+            if not preset then return end
+            Particle = Instance.new("ParticleEmitter")
+            for prop, value in pairs(preset) do
+                pcall(function() Particle[prop] = value end)
+            end
+            Particle.Color = ColorSequence.new(weatherColor)
+            local baseRate = preset.Rate or 500
+            Particle.Rate = baseRate * (weatherRate / 100)
+            Particle.Parent = WeatherPart
+        end
+    end
+
+    local weatherUpdate
+    weatherUpdate = game:GetService("RunService").Heartbeat:Connect(function()
+        if WeatherPart and WeatherPart.Parent then
+            WeatherPart.CFrame = CFrame.new(cam.CFrame.Position) + Vector3.new(0, 20, 0)
+        end
+    end)
+
+    local WeatherModule = vape.Categories.Render:CreateModule({
+        Name = 'Weather',
+        Function = function(callback)
+            enabled = callback
+            if callback then
+                if not WeatherPart then
+                    WeatherPart = Instance.new("Part")
+                    WeatherPart.Size = Vector3.new(40, 40, 85)
+                    WeatherPart.CanCollide = false
+                    WeatherPart.Massless = true
+                    WeatherPart.CastShadow = false
+                    WeatherPart.Transparency = 1
+                    WeatherPart.Anchored = true
+                    WeatherPart.Name = "WeatherPart"
+                    WeatherPart.Parent = workspace
+                end
+                recreateParticle()
+            else
+                if Particle then
+                    Particle:Destroy()
+                    Particle = nil
+                end
+                if WeatherPart then
+                    WeatherPart:Destroy()
+                    WeatherPart = nil
+                end
+            end
+        end,
+        Tooltip = 'Rain, snow, etc.'
+    })
+
+    WeatherModule:CreateDropdown({
+        Name = 'Type',
+        List = {'rain', 'snow', 'light rain'},
+        Default = 'rain',
+        Function = function(val)
+            currentType = val
+            if enabled then
+                recreateParticle()
+            end
+        end
+    })
+    WeatherModule:CreateColorSlider({
+        Name = 'Color',
+        Darker = true,
+        Function = function(h, s, v)
+            weatherColor = Color3.fromHSV(h, s, v)
+            if Particle then
+                Particle.Color = ColorSequence.new(weatherColor)
+            end
+        end
+    })
+    WeatherModule:CreateSlider({
+        Name = 'Rate',
+        Min = 1,
+        Max = 100,
+        Default = 100,
+        Suffix = '%',
+        Function = function(v)
+            weatherRate = v
+            if Particle then
+                local preset = weatherPresets[currentType]
+                if preset then
+                    Particle.Rate = (preset.Rate or 500) * (v / 100)
+                end
+            end
+        end
+    })
+
+    vape:Clean(function()
+        if weatherUpdate then weatherUpdate:Disconnect() end
+        if Particle then Particle:Destroy() end
+        if WeatherPart then WeatherPart:Destroy() end
+    end)
+end)																																																	
+
+run(function()
     local Lighting = game:GetService("Lighting")
     local originalBrightness = Lighting.Brightness
     local originalClockTime = Lighting.ClockTime
