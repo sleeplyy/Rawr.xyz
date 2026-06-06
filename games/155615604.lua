@@ -2125,9 +2125,11 @@ run(function()
         debris:AddItem(sound, 2)
     end
     
+    -- Hook the ShootEvent directly (same as your working silent aim)
     if ShootEvent then
         local oldFire = ShootEvent.FireServer
         ShootEvent.FireServer = function(hits)
+            -- Check if we hit someone
             if hitsoundEnabled and hits and type(hits) == "table" then
                 for _, hit in pairs(hits) do
                     if hit and hit[3] and typeof(hit[3]) == "Instance" then
@@ -2142,6 +2144,7 @@ run(function()
                     end
                 end
             end
+            -- Call original
             return oldFire(hits)
         end
     end
@@ -2150,6 +2153,11 @@ run(function()
         Name = 'HitSound',
         Function = function(callback)
             hitsoundEnabled = callback
+            if callback then
+                print("HitSound Enabled")
+            else
+                print("HitSound Disabled")
+            end
         end,
         Tooltip = 'Plays sound when you hit an enemy'
     })
@@ -2167,6 +2175,7 @@ run(function()
         List = soundNames,
         Function = function(val)
             currentSoundId = soundMap[val] or sounds[1]
+            print("Selected sound: " .. val .. " | ID: " .. currentSoundId)
         end
     })
     
@@ -2175,7 +2184,10 @@ run(function()
         Min = 0,
         Max = 2,
         Default = 1,
-        Decimal = 10
+        Decimal = 10,
+        Function = function(v)
+            print("Volume set to: " .. v)
+        end
     })
     
     HitSound:CreateSlider({
@@ -2263,25 +2275,53 @@ run(function()
         debris:AddItem(sound, 3)
     end
     
+    local function getKillMessageFromIntValue(intValue)
+        for _, child in pairs(intValue:GetChildren()) do
+            if child:IsA("StringValue") and child.Value then
+                return child.Value
+            end
+        end
+        return nil
+    end
+    
+    local function checkKillMessage(message)
+        if not message or not killsoundEnabled then return false end
+        local playerName = lplr.Name
+        if message:find(playerName) and message:find("killed") then
+            playKillSound()
+            return true
+        end
+        return false
+    end
+    
     if killfeed then
         killfeed.ChildAdded:Connect(function(child)
             if not killsoundEnabled then return end
-            if child:IsA("StringValue") and child.Value then
-                local killMessage = child.Value
-                local playerName = lplr.Name
-                if killMessage:find(playerName) and killMessage:find("killed") then
-                    playKillSound()
-                end
+            
+            local killMessage = nil
+            
+            if child:IsA("IntValue") then
+                killMessage = getKillMessageFromIntValue(child)
+            elseif child:IsA("StringValue") then
+                killMessage = child.Value
+            end
+            
+            if killMessage then
+                checkKillMessage(killMessage)
             end
         end)
         
         for _, child in pairs(killfeed:GetChildren()) do
-            if child:IsA("StringValue") and child.Value then
-                local killMessage = child.Value
-                local playerName = lplr.Name
-                if killMessage:find(playerName) and killMessage:find("killed") then
-                    playKillSound()
-                end
+            local killMessage = nil
+            
+            if child:IsA("IntValue") then
+                killMessage = getKillMessageFromIntValue(child)
+            elseif child:IsA("StringValue") then
+                killMessage = child.Value
+            end
+            
+            if killMessage and killMessage:find(lplr.Name) and killMessage:find("killed") then
+                playKillSound()
             end
         end
     end
@@ -2292,11 +2332,16 @@ run(function()
             killsoundEnabled = callback
             if callback and killfeed then
                 for _, child in pairs(killfeed:GetChildren()) do
-                    if child:IsA("StringValue") and child.Value then
-                        local killMessage = child.Value
-                        if killMessage:find(lplr.Name) and killMessage:find("killed") then
-                            playKillSound()
-                        end
+                    local killMessage = nil
+                    
+                    if child:IsA("IntValue") then
+                        killMessage = getKillMessageFromIntValue(child)
+                    elseif child:IsA("StringValue") then
+                        killMessage = child.Value
+                    end
+                    
+                    if killMessage and killMessage:find(lplr.Name) and killMessage:find("killed") then
+                        playKillSound()
                     end
                 end
             end
