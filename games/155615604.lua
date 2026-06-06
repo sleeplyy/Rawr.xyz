@@ -2114,20 +2114,20 @@ run(function()
     
     currentSoundId = sounds[1]
     
+    local debris = game:GetService("Debris")
+    
     local function playHitSound()
         local sound = Instance.new("Sound")
         sound.SoundId = currentSoundId
         sound.Volume = Volume and Volume.Value or 0.5
         sound.Parent = game:GetService("CoreGui")
         sound:Play()
-        game:GetService("Debris"):AddItem(sound, 2)
+        debris:AddItem(sound, 2)
     end
     
     local originalRedirect = t.sa.redirect
-    
     local lastShotTime = 0
-    local shootCooldown = 0.1
-    
+    local ourShotTime = 0
     local UserInputService = game:GetService("UserInputService")
     
     UserInputService.InputBegan:Connect(function(input, gameProcessed)
@@ -2137,8 +2137,6 @@ run(function()
             lastShotTime = tick()
         end
     end)
-    
-    local ourShotTime = 0
     
     t.sa.redirect = function(args)
         local isOurShot = (tick() - lastShotTime) < 0.2 or (tick() - ourShotTime) < 0.1
@@ -2207,7 +2205,7 @@ run(function()
                 end
             end
         end,
-        Tooltip = 'Plays a sound when u hit an enemy'
+        Tooltip = 'Plays sound when u hit an enemy'
     })
     
     HitSound:CreateToggle({
@@ -2307,18 +2305,19 @@ run(function()
     
     currentSoundId = sounds[1]
     
+    local debris = game:GetService("Debris")
+    
     local function playKillSound()
         local sound = Instance.new("Sound")
         sound.SoundId = currentSoundId
         sound.Volume = Volume and Volume.Value or 0.5
         sound.Parent = game:GetService("CoreGui")
         sound:Play()
-        game:GetService("Debris"):AddItem(sound, 3)
+        debris:AddItem(sound, 3)
     end
     
     local lastHitTarget = nil
     local lastHitTime = 0
-    
     local originalRedirect = t.sa.redirect
     
     t.sa.redirect = function(args)
@@ -2398,7 +2397,7 @@ run(function()
                 setupKillDetection()
             end
         end,
-        Tooltip = 'Plays sound when u kill an enemy'
+        Tooltip = 'Plays sound when YOU kill an enemy'
     })
     
     KillSound:CreateToggle({
