@@ -392,6 +392,41 @@ run(function()
 end)
 
 run(function()
+    local TestModule = vape.Categories.Utility:CreateModule({
+        Name = "MultiChoice Test",
+        Function = function(callback) end,
+        Tooltip = "Testing the new MultiChoice dropdown"
+    })
+
+    TestModule:CreateMultiChoice({
+        Name = "Target Parts",
+        List = {"Head", "Body", "Legs", "Arms"},
+        Default = {"Head"},
+        Function = function(selected)
+            print("Selected parts:", table.concat(selected, ", "))
+        end
+    })
+
+    TestModule:CreateMultiChoice({
+        Name = "Weapons",
+        List = {"M9", "Revolver", "M4A1", "Remington 870", "Taser"},
+        Default = {"M9", "Revolver"},
+        Function = function(selected)
+            print("Selected weapons:", table.concat(selected, ", "))
+        end
+    })
+
+    TestModule:CreateMultiChoice({
+        Name = "Modes",
+        List = {"Silent Aim", "Trigger Bot", "Wall Check", "Prediction"},
+        Default = {},
+        Function = function(selected)
+            print("Selected modes:", #selected > 0 and table.concat(selected, ", ") or "None")
+        end
+    })
+end)
+                                                    
+run(function()
     if not hookfunction then
         notif('Silent Aim V2', 'Your executor does not support hookfunction.', 5, 'alert')
         return
