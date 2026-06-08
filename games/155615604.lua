@@ -1912,135 +1912,47 @@ end)
                                                                                                                                 
 run(function()
     local GunMods
-    local modifiedTools = {}
+    local Range
+    local SpreadRadius
+    local FireRate
 
-    local WeaponsAF = {
-        ["M700"] = true,
-        ["M9"] = true,
-        ["Revolver"] = true,
-        ["Remington 870"] = true,
-    }
-
-    local function applyMods(tool)
-        if not tool or not tool:IsA("Tool") then return end
-        if not tool:GetAttribute("Local_ReloadSession") then return end
-
-        pcall(function()
-            tool:SetAttribute("Range", GunMods.Range.Value)
-            tool:SetAttribute("AccurateRange", GunMods.Range.Value)
-            tool:SetAttribute("SpreadRadius", GunMods.SpreadRadius.Value)
-            tool:SetAttribute("FireRate", GunMods.FireRate.Value)
-            tool:SetAttribute("AutoFire", GunMods.Automatic.Enabled and WeaponsAF[tool.Name] or false)
-        end)
-    end
-
-    local function onDescendantAdded(obj)
-        if obj:IsA("Tool") then
-            applyMods(obj)
-            modifiedTools[obj] = true
-            
-            obj.Destroying:Connect(function()
-                modifiedTools[obj] = nil
-            end)
+    local function itemAdded(v)
+        if v and v:IsA("Tool") and v:GetAttribute("Local_ReloadSession") then
+            v:SetAttribute("Range", Range and Range.Value)
+            v:SetAttribute("AccurateRange", Range and Range.Value)
+            v:SetAttribute("SpreadRadius", SpreadRadius and SpreadRadius.Value)
+            v:SetAttribute("FireRate", FireRate and FireRate.Value)
         end
     end
 
-    local function setupCharacter(char)
+    local function characterAdded(char)
         if not char then return end
-        
-        if GunMods.CharacterConnection then
-            GunMods.CharacterConnection:Disconnect()
+        local character = char.Character
+        if character then
+            GunMods:Clean(character.ChildAdded:Connect(itemAdded))
+            local children = character:GetChildren()
+            for i = 1, #children do itemAdded(children[i]) end
         end
-        
-        GunMods.CharacterConnection = char.DescendantAdded:Connect(onDescendantAdded)
-        
-        for _, tool in pairs(char:GetDescendants()) do
-            onDescendantAdded(tool)
+        local backpack = lplr and lplr.Backpack
+        if backpack then
+            GunMods:Clean(backpack.ChildAdded:Connect(itemAdded))
+            local children = backpack:GetChildren()
+            for i = 1, #children do itemAdded(children[i]) end
         end
-    end
-
-    local function onPlayerAdded(player)
-        if player.Character then
-            setupCharacter(player.Character)
-        end
-        player.CharacterAdded:Connect(setupCharacter)
     end
 
     GunMods = vape.Categories.Combat:CreateModule({
         Name = "GunMods",
         Function = function(callback)
             if callback then
-                for _, player in pairs(game:GetService("Players"):GetPlayers()) do
-                    onPlayerAdded(player)
-                end
-                GunMods.PlayerConnection = game:GetService("Players").PlayerAdded:Connect(onPlayerAdded)
-            else
-                if GunMods.CharacterConnection then
-                    GunMods.CharacterConnection:Disconnect()
-                end
-                if GunMods.PlayerConnection then
-                    GunMods.PlayerConnection:Disconnect()
-                end
-                modifiedTools = {}
+                if entitylib and entitylib.character then characterAdded(entitylib.character) end
+                GunMods:Clean(entitylib.Events.LocalAdded:Connect(characterAdded))
             end
         end
     })
-
-    GunMods:CreateSlider({
-        Name = "Range",
-        Min = 1,
-        Max = 9999,
-        Default = 150,
-        Function = function()
-            for tool in pairs(modifiedTools) do
-                if tool and tool.Parent then
-                    applyMods(tool)
-                end
-            end
-        end
-    })
-
-    GunMods:CreateSlider({
-        Name = "SpreadRadius",
-        Min = 0,
-        Max = 1,
-        Default = 0.03,
-        Decimal = 100,
-        Function = function()
-            for tool in pairs(modifiedTools) do
-                if tool and tool.Parent then
-                    applyMods(tool)
-                end
-            end
-        end
-    })
-
-    GunMods:CreateSlider({
-        Name = "FireRate",
-        Min = 0,
-        Max = 1,
-        Default = 0.1,
-        Decimal = 100,
-        Function = function()
-            for tool in pairs(modifiedTools) do
-                if tool and tool.Parent then
-                    applyMods(tool)
-                end
-            end
-        end
-    })
-
-    GunMods:CreateToggle({
-        Name = "Automatic",
-        Default = true,
-        Function = function()
-            for tool in pairs(modifiedTools) do
-                if tool and tool.Parent then
-                    applyMods(tool)
-                end
-            end
-        end
-    })
+    Range = GunMods:CreateSlider({ Name = "Range", Min=1, Max=9999, Default=150, Suffix=function(val) return val==1 and 'stud' or 'studs' end })
+    SpreadRadius = GunMods:CreateSlider({ Name = "Spread Radius", Min=0, Max=1, Default=0.03, Decimal=100, Suffix='studs' })
+    FireRate = GunMods:CreateSlider({ Name = "Fire Rate", Min=0, Max=1, Decimal=100, Default=0.1, Suffix=function(val) return val==1 and 'second' or 'seconds' end })
 end)
                                                                                                                                                                     
 run(function()
