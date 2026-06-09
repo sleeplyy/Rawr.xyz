@@ -1194,195 +1194,351 @@ return optionapi
 		return optionapi
 	end,
 	MultiChoice = function(optionsettings, children, api)
-		local optionapi = {
-			Type = 'MultiChoice',
-			Value = optionsettings.Default or {},
-			Index = 0
-		}
-		
-		local multi = Instance.new('TextButton')
-		multi.Name = optionsettings.Name..'MultiChoice'
-		multi.Size = UDim2.new(1, 0, 0, 40)
-		multi.BackgroundColor3 = color.Dark(children.BackgroundColor3, optionsettings.Darker and 0.02 or 0)
-		multi.BorderSizePixel = 0
-		multi.AutoButtonColor = false
-		multi.Visible = optionsettings.Visible == nil or optionsettings.Visible
-		multi.Text = ''
-		multi.Parent = children
-		addTooltip(multi, optionsettings.Tooltip or optionsettings.Name)
-		local bkg = Instance.new('Frame')
-		bkg.Name = 'BKG'
-		bkg.Size = UDim2.new(1, -20, 1, -9)
-		bkg.Position = UDim2.fromOffset(10, 4)
-		bkg.BackgroundColor3 = color.Light(uipallet.Main, 0.034)
-		bkg.Parent = multi
-		addCorner(bkg, UDim.new(0, 6))
-		local button = Instance.new('TextButton')
-		button.Name = 'MultiChoice'
-		button.Size = UDim2.new(1, -2, 1, -2)
-		button.Position = UDim2.fromOffset(1, 1)
-		button.BackgroundColor3 = uipallet.Main
-		button.AutoButtonColor = false
-		button.Text = ''
-		button.Parent = bkg
-		local title = Instance.new('TextLabel')
-		title.Name = 'Title'
-		title.Size = UDim2.new(1, 0, 0, 29)
-		title.BackgroundTransparency = 1
-		title.Text = '         '..optionsettings.Name..' - '..(#optionapi.Value > 0 and table.concat(optionapi.Value, ', ') or 'None')
-		title.TextXAlignment = Enum.TextXAlignment.Left
-		title.TextColor3 = color.Dark(uipallet.Text, 0.16)
-		title.TextSize = 13
-		title.TextTruncate = Enum.TextTruncate.AtEnd
-		title.FontFace = uipallet.Font
-		title.Parent = button
-		addCorner(button, UDim.new(0, 6))
-		local arrow = Instance.new('ImageLabel')
-		arrow.Name = 'Arrow'
-		arrow.Size = UDim2.fromOffset(4, 8)
-		arrow.Position = UDim2.new(1, -17, 0, 11)
-		arrow.BackgroundTransparency = 1
-		arrow.Image = getcustomasset('newvape/assets/new/expandright.png')
-		arrow.ImageColor3 = Color3.fromRGB(140, 140, 140)
-		arrow.Rotation = 90
-		arrow.Parent = button
-		optionsettings.Function = optionsettings.Function or function() end
-		local dropdownchildren
+    if not table.find then
+        function table.find(tbl, value)
+            for i, v in ipairs(tbl) do
+                if v == value then return i end
+            end
+            return nil
+        end
+    end
 
-		function optionapi:Save(tab)
-			tab[optionsettings.Name] = {Value = self.Value}
-		end
+    local optionapi = {
+        Type = 'MultiChoice',
+        Value = {},
+        Index = 0,
+        MaxDisplay = optionsettings.MaxDisplay or 3
+    }
+    
+    if optionsettings.Default and type(optionsettings.Default) == "table" then
+        for _, v in ipairs(optionsettings.Default) do
+            if table.find(optionsettings.List, v) then
+                table.insert(optionapi.Value, v)
+            end
+        end
+    end
+    
+    local multi = Instance.new('TextButton')
+    multi.Name = optionsettings.Name..'MultiChoice'
+    multi.Size = UDim2.new(1, 0, 0, 40)
+    multi.BackgroundColor3 = color.Dark(children.BackgroundColor3, optionsettings.Darker and 0.02 or 0)
+    multi.BorderSizePixel = 0
+    multi.AutoButtonColor = false
+    multi.Visible = optionsettings.Visible == nil or optionsettings.Visible
+    multi.Text = ''
+    multi.Parent = children
+    addTooltip(multi, optionsettings.Tooltip or optionsettings.Name)
+    
+    local bkg = Instance.new('Frame')
+    bkg.Name = 'BKG'
+    bkg.Size = UDim2.new(1, -20, 1, -9)
+    bkg.Position = UDim2.fromOffset(10, 4)
+    bkg.BackgroundColor3 = color.Light(uipallet.Main, 0.034)
+    bkg.Parent = multi
+    addCorner(bkg, UDim.new(0, 6))
+    
+    local button = Instance.new('TextButton')
+    button.Name = 'MultiChoice'
+    button.Size = UDim2.new(1, -2, 1, -2)
+    button.Position = UDim2.fromOffset(1, 1)
+    button.BackgroundColor3 = uipallet.Main
+    button.AutoButtonColor = false
+    button.Text = ''
+    button.Parent = bkg
+    addCorner(button, UDim.new(0, 6))
+    
+    local title = Instance.new('TextLabel')
+    title.Name = 'Title'
+    title.Size = UDim2.new(1, -30, 0, 29)
+    title.Position = UDim2.fromOffset(5, 0)
+    title.BackgroundTransparency = 1
+    title.TextXAlignment = Enum.TextXAlignment.Left
+    title.TextColor3 = color.Dark(uipallet.Text, 0.16)
+    title.TextSize = 13
+    title.TextTruncate = Enum.TextTruncate.AtEnd
+    title.FontFace = uipallet.Font
+    title.Parent = button
+    
+    local arrow = Instance.new('ImageLabel')
+    arrow.Name = 'Arrow'
+    arrow.Size = UDim2.fromOffset(4, 8)
+    arrow.Position = UDim2.new(1, -17, 0, 11)
+    arrow.BackgroundTransparency = 1
+    arrow.Image = getcustomasset('newvape/assets/new/expandright.png')
+    arrow.ImageColor3 = Color3.fromRGB(140, 140, 140)
+    arrow.Rotation = 90
+    arrow.Parent = button
+    
+    local clearButton = Instance.new('ImageButton')
+    clearButton.Name = 'Clear'
+    clearButton.Size = UDim2.fromOffset(14, 14)
+    clearButton.Position = UDim2.new(1, -35, 0, 8)
+    clearButton.BackgroundTransparency = 1
+    clearButton.Image = getcustomasset('newvape/assets/new/close.png')
+    clearButton.ImageColor3 = color.Dark(uipallet.Text, 0.3)
+    clearButton.Visible = false
+    clearButton.Parent = button
+    
+    optionsettings.Function = optionsettings.Function or function() end
+    local dropdownchildren = nil
+    local isOpen = false
 
-		function optionapi:Load(tab)
-			if tab and tab.Value then
-				self:SetValue(tab.Value)
-			end
-		end
+    local function getDisplayText()
+        if #optionapi.Value == 0 then
+            return optionsettings.Name..' - None'
+        elseif #optionapi.Value <= optionapi.MaxDisplay then
+            return optionsettings.Name..' - '..table.concat(optionapi.Value, ', ')
+        else
+            return optionsettings.Name..' - '..table.concat(optionapi.Value, ', ', 1, optionapi.MaxDisplay)..'... (+'..(#optionapi.Value - optionapi.MaxDisplay)..')'
+        end
+    end
 
-		function optionapi:UpdateTitle()
-			title.Text = '         '..optionsettings.Name..' - '..(#self.Value > 0 and table.concat(self.Value, ', ') or 'None')
-		end
+    function optionapi:Save(tab)
+        tab[optionsettings.Name] = {Value = {}} 
+        for i, v in ipairs(self.Value) do
+            tab[optionsettings.Name].Value[i] = v
+        end
+    end
 
-		function optionapi:SetValue(val)
-			if type(val) == "table" then
-				self.Value = val
-			end
-			self:UpdateTitle()
-			if dropdownchildren then
-				for _, child in ipairs(dropdownchildren:GetDescendants()) do
-					if child:IsA('TextButton') and child.Name:find('Option$') then
-						local optName = child.Name:gsub('Option$', '')
-						local isSelected = table.find(self.Value, optName)
-						child.BackgroundColor3 = isSelected and Color3.fromHSV(mainapi.GUIColor.Hue, mainapi.GUIColor.Sat, mainapi.GUIColor.Value) or uipallet.Main
-						child.TextColor3 = isSelected and mainapi:TextColor(mainapi.GUIColor.Hue, mainapi.GUIColor.Sat, mainapi.GUIColor.Value) or color.Dark(uipallet.Text, 0.16)
-					end
-				end
-			end
-			optionsettings.Function(self.Value)
-		end
+    function optionapi:Load(tab)
+        if tab and tab.Value and type(tab.Value) == "table" then
+            local newValue = {}
+            for _, v in ipairs(tab.Value) do
+                if table.find(optionsettings.List, v) then
+                    table.insert(newValue, v)
+                end
+            end
+            self:SetValue(newValue)
+        end
+    end
 
-		function optionapi:ToggleOption(name)
-			local idx = table.find(self.Value, name)
-			if idx then
-				table.remove(self.Value, idx)
-			else
-				table.insert(self.Value, name)
-			end
-			self:SetValue(self.Value)
-		end
+    function optionapi:UpdateTitle()
+        title.Text = '         '..getDisplayText()
+        clearButton.Visible = #self.Value > 0
+    end
 
-		button.MouseButton1Click:Connect(function()
-			if not dropdownchildren then
-				arrow.Rotation = 270
-				
-				dropdownchildren = Instance.new('Frame')
-				dropdownchildren.Name = 'Children'
-				dropdownchildren.Size = UDim2.new(1, 0, 0, 0)
-				dropdownchildren.Position = UDim2.fromOffset(0, 27)
-				dropdownchildren.BackgroundTransparency = 1
-				dropdownchildren.ClipsDescendants = true
-				dropdownchildren.Parent = button
-				
-				local content = Instance.new('Frame')
-				content.Size = UDim2.new(1, 0, 0, #optionsettings.List * 26)
-				content.BackgroundTransparency = 1
-				content.Parent = dropdownchildren
-				
-				local ind = 0
-				for _, v in ipairs(optionsettings.List) do
-					local isSelected = table.find(optionapi.Value, v)
-					local option = Instance.new('TextButton')
-					option.Name = v..'Option'
-					option.Size = UDim2.new(1, 0, 0, 26)
-					option.Position = UDim2.fromOffset(0, ind * 26)
-					option.BackgroundColor3 = isSelected and Color3.fromHSV(mainapi.GUIColor.Hue, mainapi.GUIColor.Sat, mainapi.GUIColor.Value) or uipallet.Main
-					option.BorderSizePixel = 0
-					option.AutoButtonColor = false
-					option.Text = '         '..v
-					option.TextXAlignment = Enum.TextXAlignment.Left
-					option.TextColor3 = isSelected and mainapi:TextColor(mainapi.GUIColor.Hue, mainapi.GUIColor.Sat, mainapi.GUIColor.Value) or color.Dark(uipallet.Text, 0.16)
-					option.TextSize = 13
-					option.TextTruncate = Enum.TextTruncate.AtEnd
-					option.FontFace = uipallet.Font
-					option.BackgroundTransparency = 1
-					option.Parent = content
-					
-					option.MouseEnter:Connect(function()
-						if not table.find(optionapi.Value, v) then
-							tween:Tween(option, uipallet.Tween, {BackgroundColor3 = color.Light(uipallet.Main, 0.02)})
-						end
-					end)
-					option.MouseLeave:Connect(function()
-						if not table.find(optionapi.Value, v) then
-							tween:Tween(option, uipallet.Tween, {BackgroundColor3 = uipallet.Main})
-						end
-					end)
-					option.MouseButton1Click:Connect(function()
-						optionapi:ToggleOption(v)
-					end)
-					
-					tween:Tween(option, TweenInfo.new(0.1, Enum.EasingStyle.Linear), {BackgroundTransparency = 0})
-					
-					ind += 1
-				end
-				
-				local targetHeight = 40 + #optionsettings.List * 26
-				tween:Tween(multi, uipallet.Tween, {Size = UDim2.new(1, 0, 0, targetHeight)})
-				dropdownchildren:TweenSize(UDim2.new(1, 0, 0, #optionsettings.List * 26), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.2, true)
-			else
-				for _, v in ipairs(dropdownchildren:GetDescendants()) do
-					if v:IsA("TextButton") then
-						tween:Tween(v, TweenInfo.new(0.08, Enum.EasingStyle.Linear), {BackgroundTransparency = 1})
-					end
-				end
-				
-				dropdownchildren:TweenSize(UDim2.new(1, 0, 0, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
-				tween:Tween(multi, uipallet.Tween, {Size = UDim2.new(1, 0, 0, 40)})
-				
-				task.delay(0.15, function()
-					if dropdownchildren then
-						dropdownchildren:Destroy()
-						dropdownchildren = nil
-					end
-				end)
-				
-				arrow.Rotation = 90
-			end
-		end)
+    function optionapi:SetValue(val)
+        if type(val) == "table" then
+            local newValue = {}
+            for _, v in ipairs(val) do
+                if table.find(optionsettings.List, v) and not table.find(newValue, v) then
+                    table.insert(newValue, v)
+                end
+            end
+            self.Value = newValue
+        end
+        
+        self:UpdateTitle()
+        
+        if dropdownchildren then
+            for _, child in ipairs(dropdownchildren:GetDescendants()) do
+                if child:IsA('TextButton') and child.Name:find('Option$') then
+                    local optName = child.Name:gsub('Option$', '')
+                    local isSelected = table.find(self.Value, optName) ~= nil
+                    local mainHue, mainSat, mainVal = mainapi.GUIColor.Hue, mainapi.GUIColor.Sat, mainapi.GUIColor.Value
+                    child.BackgroundColor3 = isSelected and Color3.fromHSV(mainHue, mainSat, mainVal) or uipallet.Main
+                    child.TextColor3 = isSelected and mainapi:TextColor(mainHue, mainSat, mainVal) or color.Dark(uipallet.Text, 0.16)
+                end
+            end
+        end
+        
+        optionsettings.Function(self.Value)
+    end
 
-		multi.MouseEnter:Connect(function()
-			tween:Tween(bkg, uipallet.Tween, {BackgroundColor3 = color.Light(uipallet.Main, 0.0875)})
-		end)
-		multi.MouseLeave:Connect(function()
-			tween:Tween(bkg, uipallet.Tween, {BackgroundColor3 = color.Light(uipallet.Main, 0.034)})
-		end)
+    function optionapi:ToggleOption(name)
+        local idx = table.find(self.Value, name)
+        if idx then
+            table.remove(self.Value, idx)
+        else
+            table.insert(self.Value, name)
+        end
+        self:SetValue(self.Value)
+    end
 
-		optionapi.Object = multi
-		api.Options[optionsettings.Name] = optionapi
+    function optionapi:Clear()
+        self:SetValue({})
+    end
 
-		return optionapi
-	end,
-	Slider = function(optionsettings, children, api)
+    function optionapi:SelectAll()
+        self:SetValue(optionsettings.List)
+    end
+
+    function optionapi:IsSelected(name)
+        return table.find(self.Value, name) ~= nil
+    end
+
+    function optionapi:Close()
+        if isOpen and dropdownchildren then
+            for _, v in ipairs(dropdownchildren:GetDescendants()) do
+                if v:IsA("TextButton") then
+                    tween:Tween(v, TweenInfo.new(0.08, Enum.EasingStyle.Linear), {BackgroundTransparency = 1})
+                end
+            end
+            
+            dropdownchildren:TweenSize(UDim2.new(1, 0, 0, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+            tween:Tween(multi, uipallet.Tween, {Size = UDim2.new(1, 0, 0, 40)})
+            
+            task.delay(0.15, function()
+                if dropdownchildren then
+                    dropdownchildren:Destroy()
+                    dropdownchildren = nil
+                end
+            end)
+            
+            arrow.Rotation = 90
+            isOpen = false
+        end
+    end
+
+    local function openDropdown()
+        if dropdownchildren then 
+            optionapi:Close()
+            return 
+        end
+        
+        arrow.Rotation = 270
+        isOpen = true
+        
+        dropdownchildren = Instance.new('Frame')
+        dropdownchildren.Name = 'Children'
+        dropdownchildren.Size = UDim2.new(1, 0, 0, 0)
+        dropdownchildren.Position = UDim2.fromOffset(0, 27)
+        dropdownchildren.BackgroundTransparency = 1
+        dropdownchildren.ClipsDescendants = true
+        dropdownchildren.Parent = button
+        
+        local content = Instance.new('Frame')
+        content.Size = UDim2.new(1, 0, 0, #optionsettings.List * 26)
+        content.BackgroundTransparency = 1
+        content.Parent = dropdownchildren
+        
+        local startIndex = 0
+        if optionsettings.ShowSelectAll then
+            local selectAllBtn = Instance.new('TextButton')
+            selectAllBtn.Name = 'SelectAllOption'
+            selectAllBtn.Size = UDim2.new(1, 0, 0, 26)
+            selectAllBtn.Position = UDim2.fromOffset(0, 0)
+            selectAllBtn.BackgroundColor3 = color.Light(uipallet.Main, 0.05)
+            selectAllBtn.BorderSizePixel = 0
+            selectAllBtn.AutoButtonColor = false
+            selectAllBtn.Text = '         [ Select All ]'
+            selectAllBtn.TextXAlignment = Enum.TextXAlignment.Left
+            selectAllBtn.TextColor3 = Color3.fromRGB(100, 200, 100)
+            selectAllBtn.TextSize = 12
+            selectAllBtn.FontFace = uipallet.Font
+            selectAllBtn.Parent = content
+            addCorner(selectAllBtn, UDim.new(0, 4))
+            
+            selectAllBtn.MouseButton1Click:Connect(function()
+                if #optionapi.Value == #optionsettings.List then
+                    optionapi:Clear()
+                else
+                    optionapi:SelectAll()
+                end
+            end)
+            
+            startIndex = 1
+        end
+        
+        local ind = startIndex
+        for _, v in ipairs(optionsettings.List) do
+            local isSelected = table.find(optionapi.Value, v) ~= nil
+            local option = Instance.new('TextButton')
+            option.Name = v..'Option'
+            option.Size = UDim2.new(1, 0, 0, 26)
+            option.Position = UDim2.fromOffset(0, ind * 26)
+            option.BackgroundColor3 = isSelected and Color3.fromHSV(mainapi.GUIColor.Hue, mainapi.GUIColor.Sat, mainapi.GUIColor.Value) or uipallet.Main
+            option.BorderSizePixel = 0
+            option.AutoButtonColor = false
+            option.Text = '         '..v
+            option.TextXAlignment = Enum.TextXAlignment.Left
+            option.TextColor3 = isSelected and mainapi:TextColor(mainapi.GUIColor.Hue, mainapi.GUIColor.Sat, mainapi.GUIColor.Value) or color.Dark(uipallet.Text, 0.16)
+            option.TextSize = 13
+            option.TextTruncate = Enum.TextTruncate.AtEnd
+            option.FontFace = uipallet.Font
+            option.BackgroundTransparency = 1
+            option.Parent = content
+            
+            option.MouseEnter:Connect(function()
+                if not table.find(optionapi.Value, v) then
+                    tween:Tween(option, uipallet.Tween, {BackgroundColor3 = color.Light(uipallet.Main, 0.02)})
+                end
+            end)
+            option.MouseLeave:Connect(function()
+                if not table.find(optionapi.Value, v) then
+                    tween:Tween(option, uipallet.Tween, {BackgroundColor3 = uipallet.Main})
+                end
+            end)
+            option.MouseButton1Click:Connect(function()
+                optionapi:ToggleOption(v)
+            end)
+            
+            tween:Tween(option, TweenInfo.new(0.1, Enum.EasingStyle.Linear), {BackgroundTransparency = 0})
+            ind += 1
+        end
+        
+        local totalItems = #optionsettings.List + (optionsettings.ShowSelectAll and 1 or 0)
+        local targetHeight = 40 + (totalItems * 26)
+        tween:Tween(multi, uipallet.Tween, {Size = UDim2.new(1, 0, 0, targetHeight)})
+        dropdownchildren:TweenSize(UDim2.new(1, 0, 0, totalItems * 26), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.2, true)
+    end
+
+    button.MouseButton1Click:Connect(openDropdown)
+    
+    clearButton.MouseButton1Click:Connect(function()
+        optionapi:Clear()
+    end)
+    
+    clearButton.MouseEnter:Connect(function()
+        clearButton.ImageColor3 = Color3.new(1, 1, 1)
+    end)
+    clearButton.MouseLeave:Connect(function()
+        clearButton.ImageColor3 = color.Dark(uipallet.Text, 0.3)
+    end)
+
+    multi.MouseEnter:Connect(function()
+        tween:Tween(bkg, uipallet.Tween, {BackgroundColor3 = color.Light(uipallet.Main, 0.0875)})
+    end)
+    multi.MouseLeave:Connect(function()
+        if not isOpen then
+            tween:Tween(bkg, uipallet.Tween, {BackgroundColor3 = color.Light(uipallet.Main, 0.034)})
+        end
+    end)
+
+    local function onGlobalClick(input)
+        if isOpen and dropdownchildren and input.UserInputType == Enum.UserInputType.MouseButton1 then
+            local mousePos = input.Position
+            local multiPos = multi.AbsolutePosition
+            local multiSize = multi.AbsoluteSize
+            if not (mousePos.X >= multiPos.X and mousePos.X <= multiPos.X + multiSize.X and
+                    mousePos.Y >= multiPos.Y and mousePos.Y <= multiPos.Y + multiSize.Y) then
+                optionapi:Close()
+            end
+        end
+    end
+    
+    local connection
+    multi.AncestryChanged:Connect(function()
+        if not multi.Parent then
+            if connection then connection:Disconnect() end
+        end
+    end)
+    
+    if optionsettings.CloseOnExternalClick ~= false then
+        connection = inputService.InputBegan:Connect(onGlobalClick)
+    end
+
+    optionapi:UpdateTitle()
+    
+    optionapi.Object = multi
+    optionapi.IsOpen = function() return isOpen end
+    optionapi.Close = optionapi.Close
+    
+    api.Options[optionsettings.Name] = optionapi
+    
+    return optionapi
+end,
+Slider = function(optionsettings, children, api)
 		local optionapi = {
 			Type = 'Slider',
 			Value = optionsettings.Default or optionsettings.Min,
