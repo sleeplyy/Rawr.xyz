@@ -1440,7 +1440,6 @@ run(function()
             table.insert(hits, {origin, targetPart.Position, targetPart})
         end
 
-        -- Fix: Check if ShootEvent exists before calling
         local shootEvent = replicatedStorageService:FindFirstChild("GunRemotes") and replicatedStorageService.GunRemotes:FindFirstChild("ShootEvent")
         if shootEvent then
             shootEvent:FireServer(hits)
@@ -1477,7 +1476,6 @@ run(function()
     local function getTarget(origin, obj)
         local enabled = (AutoFire and AutoFire.Enabled)
         local chance = enabled and 100 or (HitChance and HitChance.Value or 0)
-        -- Fix: Use dot notation for NextNumber (original working syntax)
         if rand.NextNumber(rand, 0, 100) > chance then return end
         local headshotChance = enabled and 100 or (HeadshotChance and HeadshotChance.Value or 0)
         local targetPart = (rand.NextNumber(rand, 0, 100) < headshotChance) and 'Head' or 'RootPart'
@@ -1677,27 +1675,30 @@ run(function()
         end,
         Tooltip = 'Only target players on the selected team'
     })
-    SilentAim:CreateToggle({
-        Name = 'Range Circle',
-        Function = function(callback)
-            if callback then
-                CircleObject = Drawing.new('Circle')
-                CircleObject.Filled = CircleFilled and CircleFilled.Enabled
-                CircleObject.Color = Color3.fromHSV((CircleColor and CircleColor.Hue or 0), (CircleColor and CircleColor.Sat or 1), (CircleColor and CircleColor.Value or 1))
-                CircleObject.Position = vape.gui.AbsoluteSize / 2
-                CircleObject.Radius = Range and Range.Value or 150
-                CircleObject.NumSides = 100
-                CircleObject.Transparency = 1 - (CircleTransparency and CircleTransparency.Value or 0)
-                CircleObject.Visible = SilentAim.Enabled and Mode and Mode.Value == 'Mouse'
-            else
-                safeCall('Remove Circle', function() if CircleObject then CircleObject:Remove() end end)
-                CircleObject = nil
-            end
-            if CircleColor then CircleColor.Object.Visible = callback end
-            if CircleTransparency then CircleTransparency.Object.Visible = callback end
-            if CircleFilled then CircleFilled.Object.Visible = callback end
-        end
-    })
+	SilentAim:CreateToggle({
+	    Name = 'Range Circle',
+	    Function = function(callback)
+	        if callback then
+	            CircleObject = Drawing.new('Circle')
+	            CircleObject.Filled = CircleFilled and CircleFilled.Enabled or false
+	            CircleObject.Color = Color3.fromHSV((CircleColor and CircleColor.Hue or 0), (CircleColor and CircleColor.Sat or 1), (CircleColor and CircleColor.Value or 1))
+	            CircleObject.Position = inputService:GetMouseLocation()
+	            CircleObject.Radius = Range and Range.Value or 150
+	            CircleObject.NumSides = 100
+	            CircleObject.Thickness = 1
+	            CircleObject.Transparency = 1 - (CircleTransparency and CircleTransparency.Value or 0.5)
+	            CircleObject.Visible = SilentAim.Enabled and Mode and Mode.Value == 'Mouse'
+	        else
+	            if CircleObject then
+	                CircleObject:Remove()
+	                CircleObject = nil
+	            end
+	        end
+	        if CircleColor then CircleColor.Object.Visible = callback end
+	        if CircleTransparency then CircleTransparency.Object.Visible = callback end
+	        if CircleFilled then CircleFilled.Object.Visible = callback end
+    	end
+	})
     CircleColor = SilentAim:CreateColorSlider({
         Name = 'Circle Color', Function = function(hue,sat,val) if CircleObject then CircleObject.Color = Color3.fromHSV(hue,sat,val) end end,
         Darker = true, Visible = false
