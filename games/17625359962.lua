@@ -136,15 +136,6 @@ local function isLobbyVisible()
 end
 
 run(function()
-    if not table.find then
-        function table.find(tbl, value)
-            for i, v in ipairs(tbl) do
-                if v == value then return i end
-            end
-            return nil
-        end
-    end
-
     local screenCache = {}
     local visibilityCache = {}
     local CACHE_DURATION = 0.1
@@ -188,44 +179,22 @@ run(function()
         return part.Position + vel * predictionTime
     end
 
-    local function getTargetPart(character, selectedParts, predictionTime)
-        if not character or type(selectedParts) ~= "table" then return nil, nil end
-        
-        local hasRandom = false
-        for _, partName in ipairs(selectedParts) do
-            if partName == "Random" then
-                hasRandom = true
-                break
-            end
-        end
+    local function getTargetPart(character, aimPart, predictionTime)
+        if not character then return nil, nil end
         
         local part = nil
-        
-        if hasRandom then
-            local randomParts = {"Head", "HumanoidRootPart", "UpperTorso", "LowerTorso"}
+        if aimPart == "Head" then
+            part = character:FindFirstChild("Head")
+        elseif aimPart == "Body" then
+            part = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("UpperTorso") or character:FindFirstChild("LowerTorso") or character:FindFirstChild("Head")
+        elseif aimPart == "Random" then
+            local parts = {"Head", "HumanoidRootPart", "UpperTorso", "LowerTorso"}
             local valid = {}
-            for _, p in ipairs(randomParts) do
+            for _, p in ipairs(parts) do
                 local bp = character:FindFirstChild(p)
                 if bp then table.insert(valid, bp) end
             end
-            if #valid > 0 then 
-                part = valid[math.random(1, #valid)]
-            end
-        else
-            for _, partName in ipairs(selectedParts) do
-                if partName == "Head" then
-                    part = character:FindFirstChild("Head")
-                elseif partName == "Body" then
-                    part = character:FindFirstChild("HumanoidRootPart") 
-                        or character:FindFirstChild("UpperTorso") 
-                        or character:FindFirstChild("LowerTorso") 
-                        or character:FindFirstChild("Head")
-                else
-                    part = character:FindFirstChild(partName)
-                end
-                
-                if part then break end
-            end
+            if #valid > 0 then part = valid[math.random(1, #valid)] end
         end
         
         if part and predictionTime and predictionTime > 0 then
@@ -235,7 +204,7 @@ run(function()
         return part, part and part.Position
     end
 
-    local function getClosestPlayerToMouse(fovRadius)
+    local function getClosestPlayerToMouse(fovRadius, aimPart)
         local closest = nil
         local shortest = math.huge
         local mousePos = inputService:GetMouseLocation()
@@ -245,7 +214,7 @@ run(function()
             if player ~= lplr and isEnemy(player) then
                 local char = player.Character
                 if not char then continue end
-                local part, _ = getTargetPart(char, aimSelectedParts, 0)
+                local part, _ = getTargetPart(char, aimPart, 0)
                 if not part then continue end
                 local distToPlayer = (part.Position - myPos).Magnitude
                 if distToPlayer > 1000 then continue end
@@ -269,7 +238,7 @@ run(function()
     local silenton = false
     local lockChance = 100
     local clickInterval = 0.10
-    local aimSelectedParts = {"Head"}
+    local aimPartSA = "Head"
     local smoothnessSA = 1
     local wallCheckSA = true
     local fovRadiusSA = 100
@@ -280,9 +249,9 @@ run(function()
     local predictionEnabled = false
     local predictionTime = 0.1
 
-    local function lockCameraToHead()
+    local function lockCameraToTarget()
         if not targetPlayer or not targetPlayer.Character then return end
-        local part, targetPos = getTargetPart(targetPlayer.Character, aimSelectedParts, predictionEnabled and predictionTime or 0)
+        local part, targetPos = getTargetPart(targetPlayer.Character, aimPartSA, predictionEnabled and predictionTime or 0)
         if not part or not targetPos then return end
         if wallCheckSA and not isVisibleCached(part, targetPlayer.Character) then return end
         local screenPos, onScreen = getScreenPosition(part)
@@ -372,9 +341,9 @@ run(function()
                         CircleObject.Position = inputService:GetMouseLocation()
                     end
                     if not isLobbyVisible() then
-                        targetPlayer = getClosestPlayerToMouse(fovRadiusSA)
+                        targetPlayer = getClosestPlayerToMouse(fovRadiusSA, aimPartSA)
                         if targetPlayer and math.random(100) <= lockChance then
-                            lockCameraToHead()
+                            lockCameraToTarget()
                         end
                     end
                 end)
@@ -390,17 +359,14 @@ run(function()
         Tooltip = '<3'
     })
 
-    SilentAim:CreateMultiChoice({
-        Name = 'Aim Parts',
+    SilentAim:CreateDropdown({
+        Name = 'Aim Part',
         List = {'Head', 'Body', 'Random'},
-        Default = {'Head'},
-        MaxDisplay = 2,
-        ShowSelectAll = true,
-        CloseOnExternalClick = true,
-        Function = function(selected)
-            aimSelectedParts = selected
+        Default = 'Head',
+        Function = function(v)
+            aimPartSA = v
         end,
-        Tooltip = 'Select which body parts to aim at'
+        Tooltip = 'Part to aim at'
     })
     
     SilentAim:CreateSlider({Name='FOV', Min=10, Max=500, Default=100, Function=function(v) fovRadiusSA=v; if CircleObject then CircleObject.Radius=v end end, Suffix='px', Tooltip='Max distance from crosshair in pixels'})
