@@ -6037,40 +6037,72 @@ function mainapi:SaveOptions(object, savedoptions)
 end
 
 function mainapi:Uninject()
-	mainapi:Save()
-	mainapi.Loaded = nil
-	for _, v in self.Modules do
-		if v.Enabled then
-			v:Toggle()
-		end
-	end
-	for _, v in self.Legit.Modules do
-		if v.Enabled then
-			v:Toggle()
-		end
-	end
-	for _, v in self.Categories do
-		if v.Type == 'Overlay' and v.Button.Enabled then
-			v.Button:Toggle()
-		end
-	end
-	for _, v in mainapi.Connections do
-		pcall(function()
-			v:Disconnect()
-		end)
-	end
-	if mainapi.ThreadFix then
-		setthreadidentity(8)
-		clickgui.Visible = false
-		mainapi:BlurCheck()
-	end
-	mainapi.gui:ClearAllChildren()
-	mainapi.gui:Destroy()
-	table.clear(mainapi.Libraries)
-	loopClean(mainapi)
-	shared.vape = nil
-	shared.vapereload = nil
-	shared.VapeIndependent = nil
+    mainapi:Save()
+    mainapi.Loaded = false
+    
+    for _, v in pairs(self.Modules or {}) do
+        if type(v) == "table" and v.Enabled and v.Toggle then
+            pcall(function() v:Toggle() end)
+        end
+    end
+    
+    if self.Legit and self.Legit.Modules then
+        for _, v in pairs(self.Legit.Modules) do
+            if type(v) == "table" and v.Enabled and v.Toggle then
+                pcall(function() v:Toggle() end)
+            end
+        end
+    end
+    
+    for _, v in pairs(self.Categories or {}) do
+        if type(v) == "table" and v.Type == 'Overlay' and v.Button and v.Button.Enabled and v.Button.Toggle then
+            pcall(function() v.Button:Toggle() end)
+        end
+    end
+    
+    if mainapi.Connections then
+        for _, v in pairs(mainapi.Connections) do
+            pcall(function()
+                if v and v.Disconnect then
+                    v:Disconnect()
+                end
+            end)
+        end
+        mainapi.Connections = {}
+    end
+    
+    pcall(function()
+        if mainapi.ThreadFix then
+            setthreadidentity(8)
+        end
+        
+        if clickgui then
+            clickgui.Visible = false
+        end
+        
+        mainapi:BlurCheck()
+        
+        if mainapi.gui then
+            mainapi.gui:ClearAllChildren()
+            mainapi.gui:Destroy()
+        end
+    end)
+    
+    if mainapi.Libraries then
+        table.clear(mainapi.Libraries)
+    end
+    
+    pcall(function()
+        for key in pairs(mainapi) do
+            if key ~= "Uninject" and key ~= "Clean" then
+                mainapi[key] = nil
+            end
+        end
+    end)
+    
+    shared.vape = nil
+    shared.vapereload = nil
+    shared.VapeIndependent = nil
 end
 
 gui = Instance.new('ScreenGui')
@@ -6080,10 +6112,10 @@ gui.ZIndexBehavior = Enum.ZIndexBehavior.Global
 gui.IgnoreGuiInset = true
 gui.OnTopOfCoreBlur = true
 if mainapi.ThreadFix then
-	gui.Parent = cloneref(game:GetService('CoreGui'))--(gethui and gethui()) or cloneref(game:GetService('CoreGui'))
+    gui.Parent = cloneref(game:GetService('CoreGui'))
 else
-	gui.Parent = cloneref(game:GetService('Players')).LocalPlayer.PlayerGui
-	gui.ResetOnSpawn = false
+    gui.Parent = cloneref(game:GetService('Players')).LocalPlayer.PlayerGui
+    gui.ResetOnSpawn = false
 end
 mainapi.gui = gui
 scaledgui = Instance.new('Frame')
@@ -6151,19 +6183,19 @@ mainapi.guiscale = scale
 scaledgui.Size = UDim2.fromScale(1 / scale.Scale, 1 / scale.Scale)
 
 mainapi:Clean(gui:GetPropertyChangedSignal('AbsoluteSize'):Connect(function()
-	if mainapi.Scale.Enabled then
-		scale.Scale = math.max(gui.AbsoluteSize.X / 1920, 0.6)
-	end
+    if mainapi.Scale.Enabled then
+        scale.Scale = math.max(gui.AbsoluteSize.X / 1920, 0.6)
+    end
 end))
 
 mainapi:Clean(scale:GetPropertyChangedSignal('Scale'):Connect(function()
-	scaledgui.Size = UDim2.fromScale(1 / scale.Scale, 1 / scale.Scale)
-	for _, v in scaledgui:GetDescendants() do
-		if v:IsA('GuiObject') and v.Visible then
-			v.Visible = false
-			v.Visible = true
-		end
-	end
+    scaledgui.Size = UDim2.fromScale(1 / scale.Scale, 1 / scale.Scale)
+    for _, v in scaledgui:GetDescendants() do
+        if v:IsA('GuiObject') and v.Visible then
+            v.Visible = false
+            v.Visible = true
+        end
+    end
 end))
 
 mainapi:Clean(clickgui:GetPropertyChangedSignal('Visible'):Connect(function()
