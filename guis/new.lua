@@ -6384,16 +6384,28 @@ general:CreateButton({
 	Tooltip = 'Removes vape from the current game'
 })
 general:CreateButton({
-	Name = 'Reinject',
-	Function = function()
-		shared.vapereload = true
-		if shared.VapeDeveloper then
-			loadstring(readfile('newvape/loader.lua'), 'loader')()
-		else
-			loadstring(game:HttpGet('https://raw.githubusercontent.com/imcomingforyou6959-gif/RPL/'..readfile('newvape/profiles/commit.txt')..'/loader.lua', true))()
-		end
-	end,
-	Tooltip = 'Reloads vape for debugging purposes'
+    Name = 'Reinject',
+    Function = function()
+        task.spawn(function()
+            pcall(function()
+                if shared.VapeDeveloper then
+                    local success, result = pcall(function()
+                        return loadfile('newvape/loader.lua')
+                    end)
+                    if success and result then
+                        result()
+                    else
+                        loadstring(game:HttpGet('https://raw.githubusercontent.com/imcomingforyou6959-gif/RPL/main/loader.lua', true))()
+                    end
+                else
+                    local commit = pcall(readfile, 'newvape/profiles/commit.txt') and readfile('newvape/profiles/commit.txt') or 'main'
+                    local url = 'https://raw.githubusercontent.com/imcomingforyou6959-gif/RPL/' .. commit .. '/loader.lua'
+                    loadstring(game:HttpGet(url, true))()
+                end
+            end)
+        end)
+    end,
+    Tooltip = 'Reloads vape for debugging purposes'
 })
 
 --[[
