@@ -1402,55 +1402,62 @@ run(function()
     local TeamFilterSA
     local rand = Random.new()
     local delayCheck = tick()
-    local GunTracers = require(replicatedStorageService:WaitForChild("SharedModules"):WaitForChild("GunTracers"))
+    local GunTracers = replicatedStorageService:FindFirstChild("SharedModules") and replicatedStorageService.SharedModules:FindFirstChild("GunTracers")
     local hud = playerGui:FindFirstChild("Home") and playerGui.Home:FindFirstChild("Hud")
     local Method
     local mouseClicked = false
-    local renderStepConnection
-    local watchdogConnection
+    local renderStepConnection = nil
+    local watchdogConnection = nil
     local cacheCleanupTick = 0
     local CACHE_CLEANUP_INTERVAL = 30
+    local lastTarget = nil
+    local lastTargetTime = 0
+    local isActive = false
+
+    local function getCurrentTool(character)
+        if not character then return nil end
+        return character:FindFirstChildOfClass("Tool")
+    end
 
     local function tryShoot(origin, targetPart, tool)
         if not tool or not targetPart or not targetPart.Parent then return end
-        local ammo = tool:GetAttribute("Local_CurrentAmmo")
-        if not ammo or ammo <= 0 then return end
-        local reloadSession = tool:GetAttribute("Local_ReloadSession")
-        if reloadSession and reloadSession > 0 then return end
+        
+        local success, result = pcall(function()
+            local ammo = tool:GetAttribute("Local_CurrentAmmo")
+            if not ammo or ammo <= 0 then return false end
+            local reloadSession = tool:GetAttribute("Local_ReloadSession")
+            if reloadSession and reloadSession > 0 then return false end
 
-        local projectileCount = tool:GetAttribute("ProjectileCount") or 1
-        local hits = {}
-        local lastBehavior
-        tool:SetAttribute("Local_IsShooting", true)
+            local projectileCount = tool:GetAttribute("ProjectileCount") or 1
+            local hits = {}
+            local lastBehavior
+            tool:SetAttribute("Local_IsShooting", true)
 
-        for _ = 1, projectileCount do
-            local muzzle = (tool:FindFirstChild("muzzle") and tool.muzzle.Position) or origin
-            lastBehavior = tool:GetAttribute("Behavior")
-            if GunTracers then
-                if lastBehavior == "Sniper" and GunTracers.createSniper then
-                    GunTracers.createSniper(muzzle, targetPart.Position)
-                elseif lastBehavior == "Taser" and GunTracers.createTaser then
-                    GunTracers.createTaser(muzzle, targetPart.Position)
-                else
-                    if GunTracers.createBullet then
+            for _ = 1, projectileCount do
+                local muzzle = (tool:FindFirstChild("muzzle") and tool.muzzle.Position) or origin
+                lastBehavior = tool:GetAttribute("Behavior")
+                if GunTracers and type(GunTracers) == "table" then
+                    if lastBehavior == "Sniper" and GunTracers.createSniper then
+                        GunTracers.createSniper(muzzle, targetPart.Position)
+                    elseif lastBehavior == "Taser" and GunTracers.createTaser then
+                        GunTracers.createTaser(muzzle, targetPart.Position)
+                    elseif GunTracers.createBullet then
                         GunTracers.createBullet(muzzle, targetPart.Position)
                     end
                 end
+                table.insert(hits, {origin, targetPart.Position, targetPart})
             end
-            table.insert(hits, {origin, targetPart.Position, targetPart})
-        end
 
-        safeCall('ShootEvent', function()
-            ShootEvent:FireServer(hits)
-        end)
+            if ShootEvent then
+                ShootEvent:FireServer(hits)
+            end
 
-        local newAmmo = ammo - 1
-        tool:SetAttribute("Local_CurrentAmmo", newAmmo)
+            local newAmmo = ammo - 1
+            tool:SetAttribute("Local_CurrentAmmo", newAmmo)
 
-        if hud then
-            local BottomRightFrame = hud:FindFirstChild("BottomRightFrame")
-            if BottomRightFrame then
-                local gunFrame = BottomRightFrame:FindFirstChild("GunFrame")
+            if hud and hud:FindFirstChild("BottomRightFrame") then
+                local BottomRightFrame = hud.BottomRightFrame
+                local gunFrame = BottomRightFrame and BottomRightFrame:FindFirstChild("GunFrame")
                 if gunFrame then
                     local bulletsLabel = gunFrame:FindFirstChild("BulletsLabel")
                     if bulletsLabel then
@@ -1462,23 +1469,31 @@ run(function()
                     end
                 end
             end
-        end
 
-        tool:SetAttribute("Local_IsShooting", false)
+            tool:SetAttribute("Local_IsShooting", false)
+            return true
+        end)
+        
+        return success and result
     end
 
     local function passesTeamCheckSA(player)
         if not filterTeamSA then return true end
-        return player and player.Team == filterTeamSA
+        if not player or not player.Team then return false end
+        return player.Team == filterTeamSA
     end
 
     local function getTarget(origin, obj)
-        local enabled = (AutoFire and AutoFire.Enabled)
+        if not entitylib or not entitylib.isAlive then return end
+        
+        local enabled = AutoFire and AutoFire.Enabled
         local chance = enabled and 100 or (HitChance and HitChance.Value or 0)
-        if not rand or rand.NextNumber(rand, 0, 100) > chance then return end
+        if rand:NextNumber(0, 100) > chance then return end
+        
         local headshotChance = enabled and 100 or (HeadshotChance and HeadshotChance.Value or 0)
-        local targetPart = (rand.NextNumber(rand, 0, 100) < headshotChance) and 'Head' or 'RootPart'
+        local targetPart = (rand:NextNumber(0, 100) < headshotChance) and 'Head' or 'RootPart'
         local wallcheck = Target and Target.Walls and Target.Walls.Enabled and (obj or true) or nil
+        
         local ent = entitylib['Entity' .. (Mode and Mode.Value or 'Mouse')]({
             Range = Range and Range.Value or 150,
             Wallcheck = wallcheck,
@@ -1487,54 +1502,79 @@ run(function()
             Players = Target and Target.Players and Target.Players.Enabled,
             NPCs = Target and Target.NPCs and Target.NPCs.Enabled
         })
-        if ent and targetinfo then targetinfo.Targets[ent] = tick() + 1 end
+        
         if ent and ent.Player and not passesTeamCheckSA(ent.Player) then
             return nil
         end
+        
         return ent, ent and ent[targetPart], origin
     end
 
     local function silentAimRedirect(args)
-        if not entitylib or not entitylib.isAlive then return end
+        if not entitylib or not entitylib.isAlive or not isActive then return end
+        if not args or type(args[1]) ~= "table" then return end
+        
         local ent, targetPart, origin = getTarget(entitylib.character.Head.Position, nil)
-        if not ent or not targetPart or typeof(args[1]) ~= "table" then return end
+        if not ent or not targetPart then return end
 
         local originalHits = args[1]
-        if SilentAim and SilentAim.Enabled then
-            for _, hit in ipairs(originalHits) do
-                if typeof(hit) == "table" then
-                    hit[1] = origin
-                    hit[2] = targetPart.Position
-                    hit[3] = targetPart
-                end
+        for _, hit in ipairs(originalHits) do
+            if type(hit) == "table" then
+                hit[1] = origin
+                hit[2] = targetPart.Position
+                hit[3] = targetPart
             end
         end
+    end
+
+    local function cleanup()
+        isActive = false
+        if renderStepConnection then
+            renderStepConnection:Disconnect()
+            renderStepConnection = nil
+        end
+        if watchdogConnection then
+            watchdogConnection:Disconnect()
+            watchdogConnection = nil
+        end
+        if mouseClicked then
+            mouse1release()
+            mouseClicked = false
+        end
+        if t and t.sa then
+            t.sa.redirect = nil
+        end
+        cacheCleanupTick = 0
+        lastTarget = nil
     end
 
     SilentAim = vape.Categories.Combat:CreateModule({
         Name = 'SilentAim',
         Function = function(callback)
-            if CircleObject then CircleObject.Visible = callback and Mode and Mode.Value == 'Mouse' end
+            isActive = callback
+            
+            if CircleObject then 
+                CircleObject.Visible = callback and Mode and Mode.Value == 'Mouse' 
+            end
+            
             if callback then
-                if renderStepConnection then renderStepConnection:Disconnect() end
+                cleanup()
+                
                 renderStepConnection = runService.RenderStepped:Connect(function()
+                    if not isActive or not entitylib or not entitylib.isAlive then 
+                        return 
+                    end
+                    
                     pcall(function()
-                        if not entitylib or not entitylib.isAlive then return end
                         local character = entitylib.character and entitylib.character.Character
                         local head = entitylib.character and entitylib.character.Head
                         if not head or not character then
-                            task.wait(0.05)
                             return
                         end
 
                         local now = tick()
                         if now - cacheCleanupTick >= CACHE_CLEANUP_INTERVAL then
                             cacheCleanupTick = now
-                            if t and t.bt then
-                                t.bt.m = false
-                                t.bt.q = false
-                                t.bt.p = Vector3.new()
-                            end
                         end
 
                         local origin = head.CFrame
@@ -1555,49 +1595,45 @@ run(function()
                             targetinfo.Targets[ent] = tick() + 1
                         end
 
-                        if CircleObject then
+                        if CircleObject and Mode and Mode.Value == 'Mouse' then
                             CircleObject.Position = inputService:GetMouseLocation()
                         end
 
-                        if AutoFire and AutoFire.Enabled then
-                            local mouseDown = mouse1click()
+                        -- Auto fire logic
+                        if AutoFire and AutoFire.Enabled and ent and ent.Head and ent.Head.Parent then
                             local windowActive = (isrbxactive or iswindowactive)()
-                            if mouseDown and windowActive then
-                                if ent and canClick() then
-                                    if Method and Method.Value == 'Click' then
-                                        if delayCheck < tick() then
-                                            if mouseClicked then
-                                                mouse1release()
-                                                mouseClicked = false
-                                                delayCheck = tick() + (AutoFireShootDelay and AutoFireShootDelay.Value or 0)
-                                            else
-                                                mouse1press()
-                                                mouseClicked = true
-                                                delayCheck = tick() + (AutoFireShootDelay and AutoFireShootDelay.Value or 0)
-                                            end
+                            if windowActive then
+                                if Method and Method.Value == 'Click' then
+                                    if delayCheck < now then
+                                        if mouseClicked then
+                                            mouse1release()
+                                            mouseClicked = false
+                                            delayCheck = now + (AutoFireShootDelay and AutoFireShootDelay.Value or 0.1)
+                                        else
+                                            mouse1press()
+                                            mouseClicked = true
+                                            delayCheck = now + (AutoFireShootDelay and AutoFireShootDelay.Value or 0.1)
                                         end
-                                    else
-                                        if delayCheck < tick() then
-                                            delayCheck = tick() + (AutoFireShootDelay and AutoFireShootDelay.Value or 0)
-                                            local tool = character:FindFirstChildOfClass("Tool")
-                                            if tool and ent.Head and ent.Head.Parent then
-                                                tryShoot(origin.Position, ent.Head, tool)
-                                            end
+                                    end
+                                else
+                                    if delayCheck < now then
+                                        delayCheck = now + (AutoFireShootDelay and AutoFireShootDelay.Value or 0.1)
+                                        local tool = getCurrentTool(character)
+                                        if tool then
+                                            tryShoot(origin.Position, ent.Head, tool)
                                         end
                                     end
                                 end
-                            else
-                                if mouseClicked then
-                                    mouse1release()
-                                    mouseClicked = false
-                                end
                             end
+                        elseif mouseClicked then
+                            mouse1release()
+                            mouseClicked = false
                         end
 
-                        if Face and Face.Enabled and ent then
-                            local rootPart = ent.Character and ent.Character:FindFirstChild("HumanoidRootPart")
+                        if Face and Face.Enabled and ent and ent.Character then
+                            local rootPart = ent.Character:FindFirstChild("HumanoidRootPart")
                             if rootPart and entitylib.character and entitylib.character.RootPart then
-                                local vec = rootPart.Position * Vector3.new(1,0,1)
+                                local vec = rootPart.Position * Vector3.new(1, 0, 1)
                                 entitylib.character.RootPart.CFrame = CFrame.lookAt(
                                     entitylib.character.RootPart.Position,
                                     Vector3.new(vec.X, entitylib.character.RootPart.Position.Y + 0.01, vec.Z)
@@ -1606,6 +1642,8 @@ run(function()
                         end
 
                         if ent and ent.Character and ent.Character:FindFirstChild("HumanoidRootPart") then
+                            lastTarget = ent
+                            lastTargetTime = now
                             if t and t.bt then
                                 t.bt.m = true
                                 t.bt.p = ent.HumanoidRootPart.Position
@@ -1614,117 +1652,189 @@ run(function()
                     end)
                 end)
 
-                if watchdogConnection then watchdogConnection:Disconnect() end
-                watchdogConnection = runService.Heartbeat:Connect(function()
-                    if SilentAim and SilentAim.Enabled then
-                        if not renderStepConnection or not renderStepConnection.Connected then
-                            if renderStepConnection then
-                                pcall(function() renderStepConnection:Disconnect() end)
-                            end
-                            SilentAim:Toggle()
-                            task.wait(0.1)
-                            SilentAim:Toggle()
-                        end
-                    end
-                end)
+                if t and t.sa then
+                    t.sa.redirect = silentAimRedirect
+                end
+                
             else
-                if renderStepConnection then
-                    renderStepConnection:Disconnect()
-                    renderStepConnection = nil
-                end
-                if watchdogConnection then
-                    watchdogConnection:Disconnect()
-                    watchdogConnection = nil
-                end
-                if mouseClicked then
-                    mouse1release()
-                    mouseClicked = false
-                end
-                if t then t.sa.redirect = nil end
-                cacheCleanupTick = 0
+                cleanup()
             end
         end,
         Tooltip = 'Silently adjusts your aim towards the enemy'
     })
 
-    t.sa.redirect = silentAimRedirect
-
     Target = SilentAim:CreateTargets({Players = true})
+    
     Mode = SilentAim:CreateDropdown({
         Name = 'Mode',
         List = {'Mouse', 'Position'},
         Function = function(val)
-            if CircleObject then CircleObject.Visible = SilentAim.Enabled and val == 'Mouse' end
+            if CircleObject and SilentAim and SilentAim.Enabled then 
+                CircleObject.Visible = val == 'Mouse'
+            end
         end,
         Tooltip = 'Mouse - Checks for entities near the mouses position\nPosition - Checks for entities near the local character'
     })
+    
     Range = SilentAim:CreateSlider({
-        Name = 'Range', Min = 1, Max = 1000, Default = 150,
-        Function = function(val) if CircleObject then CircleObject.Radius = val end end,
-        Suffix = function(val) return val == 1 and 'stud' or 'studs' end
+        Name = 'Range', 
+        Min = 1, 
+        Max = 1000, 
+        Default = 150,
+        Function = function(val) 
+            if CircleObject then 
+                CircleObject.Radius = val 
+            end 
+        end,
+        Suffix = function(val) 
+            return val == 1 and 'stud' or 'studs' 
+        end
     })
-    HitChance = SilentAim:CreateSlider({ Name = 'Hit Chance', Min = 0, Max = 100, Default = 85, Suffix = '%' })
-    HeadshotChance = SilentAim:CreateSlider({ Name = 'Headshot Chance', Min = 0, Max = 100, Default = 65, Suffix = '%' })
+    
+    HitChance = SilentAim:CreateSlider({ 
+        Name = 'Hit Chance', 
+        Min = 0, 
+        Max = 100, 
+        Default = 85, 
+        Suffix = '%' 
+    })
+    
+    HeadshotChance = SilentAim:CreateSlider({ 
+        Name = 'Headshot Chance', 
+        Min = 0, 
+        Max = 100, 
+        Default = 65, 
+        Suffix = '%' 
+    })
+    
     AutoFire = SilentAim:CreateToggle({
         Name = 'AutoFire',
         Function = function(callback)
-            if AutoFireShootDelay then AutoFireShootDelay.Object.Visible = callback end
-            if Method then Method.Object.Visible = callback end
+            if AutoFireShootDelay then 
+                AutoFireShootDelay.Object.Visible = callback 
+            end
+            if Method then 
+                Method.Object.Visible = callback 
+            end
         end
     })
+    
     AutoFireShootDelay = SilentAim:CreateSlider({
-        Name = 'Next Shot Delay', Min = 0, Max = 1, Decimal = 100, Visible = false, Darker = true,
-        Suffix = function(val) return val == 1 and 'second' or 'seconds' end
+        Name = 'Next Shot Delay', 
+        Min = 0, 
+        Max = 1, 
+        Decimal = 100, 
+        Default = 0.1,
+        Visible = false, 
+        Darker = true,
+        Suffix = function(val) 
+            return val == 1 and 'second' or 'seconds' 
+        end
     })
-    Method = SilentAim:CreateDropdown({ Name = 'Shoot Method', List = {'Simulation', 'Click'} })
+    
+    Method = SilentAim:CreateDropdown({ 
+        Name = 'Shoot Method', 
+        List = {'Simulation', 'Click'},
+        Visible = false
+    })
+    
     TeamFilterSA = SilentAim:CreateDropdown({
         Name = 'Team Filter',
         List = {'All', 'Criminals', 'Inmates', 'Guards', 'Neutral'},
         Function = function(val)
-            if val == 'Criminals' then filterTeamSA = criminalsTeam
-            elseif val == 'Inmates' then filterTeamSA = inmatesTeam
-            elseif val == 'Guards' then filterTeamSA = guardsTeam
-            elseif val == 'Neutral' then filterTeamSA = neutralTeam
-            else filterTeamSA = nil end
+            if val == 'Criminals' then 
+                filterTeamSA = criminalsTeam
+            elseif val == 'Inmates' then 
+                filterTeamSA = inmatesTeam
+            elseif val == 'Guards' then 
+                filterTeamSA = guardsTeam
+            elseif val == 'Neutral' then 
+                filterTeamSA = neutralTeam
+            else 
+                filterTeamSA = nil 
+            end
         end,
         Tooltip = 'Only target players on the selected team'
     })
+    
     SilentAim:CreateToggle({
         Name = 'Range Circle',
         Function = function(callback)
             if callback then
                 CircleObject = Drawing.new('Circle')
-                CircleObject.Filled = CircleFilled and CircleFilled.Enabled
-                CircleObject.Color = Color3.fromHSV((CircleColor and CircleColor.Hue or 0), (CircleColor and CircleColor.Sat or 1), (CircleColor and CircleColor.Value or 1))
+                CircleObject.Filled = CircleFilled and CircleFilled.Enabled or false
+                CircleObject.Color = Color3.fromHSV(
+                    (CircleColor and CircleColor.Hue or 0), 
+                    (CircleColor and CircleColor.Sat or 1), 
+                    (CircleColor and CircleColor.Value or 1)
+                )
                 CircleObject.Position = vape.gui.AbsoluteSize / 2
                 CircleObject.Radius = Range and Range.Value or 150
                 CircleObject.NumSides = 100
-                CircleObject.Transparency = 1 - (CircleTransparency and CircleTransparency.Value or 0)
-                CircleObject.Visible = SilentAim.Enabled and Mode and Mode.Value == 'Mouse'
+                CircleObject.Transparency = 1 - (CircleTransparency and CircleTransparency.Value or 0.5)
+                CircleObject.Visible = SilentAim and SilentAim.Enabled and Mode and Mode.Value == 'Mouse'
             else
-                safeCall('Remove Circle', function() CircleObject:Remove() end)
-                CircleObject = nil
+                if CircleObject then
+                    pcall(function() CircleObject:Remove() end)
+                    CircleObject = nil
+                end
             end
-            if CircleColor then CircleColor.Object.Visible = callback end
-            if CircleTransparency then CircleTransparency.Object.Visible = callback end
-            if CircleFilled then CircleFilled.Object.Visible = callback end
+            if CircleColor then 
+                CircleColor.Object.Visible = callback 
+            end
+            if CircleTransparency then 
+                CircleTransparency.Object.Visible = callback 
+            end
+            if CircleFilled then 
+                CircleFilled.Object.Visible = callback 
+            end
         end
     })
+    
     CircleColor = SilentAim:CreateColorSlider({
-        Name = 'Circle Color', Function = function(hue,sat,val) if CircleObject then CircleObject.Color = Color3.fromHSV(hue,sat,val) end end,
-        Darker = true, Visible = false
+        Name = 'Circle Color', 
+        Function = function(hue, sat, val) 
+            if CircleObject then 
+                CircleObject.Color = Color3.fromHSV(hue, sat, val) 
+            end 
+        end,
+        Darker = true, 
+        Visible = false
     })
+    
     CircleTransparency = SilentAim:CreateSlider({
-        Name = 'Transparency', Min = 0, Max = 1, Decimal = 10, Default = 0.5,
-        Function = function(val) if CircleObject then CircleObject.Transparency = 1 - val end end,
-        Darker = true, Visible = false
+        Name = 'Transparency', 
+        Min = 0, 
+        Max = 1, 
+        Decimal = 10, 
+        Default = 0.5,
+        Function = function(val) 
+            if CircleObject then 
+                CircleObject.Transparency = 1 - val 
+            end 
+        end,
+        Darker = true, 
+        Visible = false
     })
+    
     CircleFilled = SilentAim:CreateToggle({
-        Name = 'Circle Filled', Function = function(callback) if CircleObject then CircleObject.Filled = callback end end,
-        Darker = true, Visible = false
+        Name = 'Circle Filled', 
+        Function = function(callback) 
+            if CircleObject then 
+                CircleObject.Filled = callback 
+            end 
+        end,
+        Darker = true, 
+        Visible = false
     })
-    Face = SilentAim:CreateToggle({ Name = 'Face target' })
-    ShowTarget = SilentAim:CreateToggle({ Name = "Show Target Info" })
+    
+    Face = SilentAim:CreateToggle({ 
+        Name = 'Face target' 
+    })
+    
+    ShowTarget = SilentAim:CreateToggle({ 
+        Name = "Show Target Info" 
+    })
 end)
                                                                                                                     
 run(function()
