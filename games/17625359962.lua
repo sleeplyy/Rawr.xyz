@@ -136,6 +136,15 @@ local function isLobbyVisible()
 end
 
 run(function()
+    if not table.find then
+        function table.find(tbl, value)
+            for i, v in ipairs(tbl) do
+                if v == value then return i end
+            end
+            return nil
+        end
+    end
+
     local screenCache = {}
     local visibilityCache = {}
     local CACHE_DURATION = 0.1
@@ -180,28 +189,43 @@ run(function()
     end
 
     local function getTargetPart(character, selectedParts, predictionTime)
-        if not character then return nil, nil end
+        if not character or type(selectedParts) ~= "table" then return nil, nil end
+        
+        local hasRandom = false
+        for _, partName in ipairs(selectedParts) do
+            if partName == "Random" then
+                hasRandom = true
+                break
+            end
+        end
         
         local part = nil
-        for _, partName in ipairs(selectedParts) do
-            if partName == "Head" then
-                part = character:FindFirstChild("Head")
-            elseif partName == "Body" then
-                part = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("UpperTorso") or character:FindFirstChild("LowerTorso") or character:FindFirstChild("Head")
-            elseif partName == "Random" then
-                local parts = {"Head", "HumanoidRootPart", "UpperTorso", "LowerTorso"}
-                local valid = {}
-                for _, p in ipairs(parts) do
-                    local bp = character:FindFirstChild(p)
-                    if bp then table.insert(valid, bp) end
-                end
-                if #valid > 0 then part = valid[math.random(1, #valid)] end
-                break
-            else
-                part = character:FindFirstChild(partName)
+        
+        if hasRandom then
+            local randomParts = {"Head", "HumanoidRootPart", "UpperTorso", "LowerTorso"}
+            local valid = {}
+            for _, p in ipairs(randomParts) do
+                local bp = character:FindFirstChild(p)
+                if bp then table.insert(valid, bp) end
             end
-            
-            if part then break end
+            if #valid > 0 then 
+                part = valid[math.random(1, #valid)]
+            end
+        else
+            for _, partName in ipairs(selectedParts) do
+                if partName == "Head" then
+                    part = character:FindFirstChild("Head")
+                elseif partName == "Body" then
+                    part = character:FindFirstChild("HumanoidRootPart") 
+                        or character:FindFirstChild("UpperTorso") 
+                        or character:FindFirstChild("LowerTorso") 
+                        or character:FindFirstChild("Head")
+                else
+                    part = character:FindFirstChild(partName)
+                end
+                
+                if part then break end
+            end
         end
         
         if part and predictionTime and predictionTime > 0 then
@@ -216,7 +240,6 @@ run(function()
         local shortest = math.huge
         local mousePos = inputService:GetMouseLocation()
         local myPos = gameCamera.CFrame.Position
-        local now = tick()
 
         for _, player in ipairs(playersService:GetPlayers()) do
             if player ~= lplr and isEnemy(player) then
@@ -259,7 +282,6 @@ run(function()
 
     local function lockCameraToHead()
         if not targetPlayer or not targetPlayer.Character then return end
-        -- UPDATED: Pass selectedParts table
         local part, targetPos = getTargetPart(targetPlayer.Character, aimSelectedParts, predictionEnabled and predictionTime or 0)
         if not part or not targetPos then return end
         if wallCheckSA and not isVisibleCached(part, targetPlayer.Character) then return end
@@ -372,6 +394,9 @@ run(function()
         Name = 'Aim Parts',
         List = {'Head', 'Body', 'Random'},
         Default = {'Head'},
+        MaxDisplay = 2,
+        ShowSelectAll = true,
+        CloseOnExternalClick = true,
         Function = function(selected)
             aimSelectedParts = selected
         end,
