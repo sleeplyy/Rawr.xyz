@@ -7,7 +7,6 @@ local vape = shared.vape
 local entitylib = vape.Libraries.entity
 local targetinfo = vape.Libraries.targetinfo
 
-
 run(function()
     local SilentAim
     local Mode
@@ -21,14 +20,10 @@ run(function()
     local WhitelistPlayers
     local BlacklistPlayers
     local renderConn
-    local spectateConn
-    local spectateTarget = nil
     local targetPlayer = nil
     local targetPart = nil
     local targetPosition = nil
     local active = false
-    local lastHealth = {}
-    local wasKnocked = {}
     local stickyTarget = nil
     local pickTime = nil
     local multiTargets = {}
@@ -61,6 +56,16 @@ run(function()
         return false
     end
 
+    local function isInList(listObj, plr)
+        if not listObj or not listObj.ListEnabled then return false end
+        for _, name in ipairs(listObj.ListEnabled) do
+            if name:lower() == plr.Name:lower() or name:lower() == plr.DisplayName:lower() then
+                return true
+            end
+        end
+        return false
+    end
+
     local function isValid(plr)
         if not plr or plr == lplr then return false end
         if not isAlive(plr) then return false end
@@ -71,19 +76,12 @@ run(function()
             if shared.FriendsCache and shared.FriendsCache[plr.UserId] then return false end
         end
 
-        if BlacklistEnabled and BlacklistEnabled.Enabled and BlacklistPlayers then
-            local sel = BlacklistPlayers.Value or {}
-            local name = plr.Name
-            local dname = plr.DisplayName
-            if sel[name] or sel[dname] then return false end
+        if BlacklistEnabled and BlacklistEnabled.Enabled then
+            if isInList(BlacklistPlayers, plr) then return false end
         end
 
-        if WhitelistEnabled and WhitelistEnabled.Enabled and WhitelistPlayers then
-            local sel = WhitelistPlayers.Value or {}
-            if not next(sel) then return true end
-            local name = plr.Name
-            local dname = plr.DisplayName
-            if not (sel[name] or sel[dname]) then return false end
+        if WhitelistEnabled and WhitelistEnabled.Enabled then
+            if not isInList(WhitelistPlayers, plr) then return false end
         end
 
         return true
@@ -204,7 +202,11 @@ run(function()
     end
 
     local function updateLines()
-        if not targetPlayer or not targetPlayer.Character then return end
+        if not targetPlayer or not targetPlayer.Character then
+            for _, line in pairs(lineObjects) do line.Visible = false end
+            for _, line in pairs(lineShadows) do line.Visible = false end
+            return
+        end
         local root = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
         if not root then return end
         local pos, onScreen = gameCamera:WorldToViewportPoint(root.Position)
@@ -268,9 +270,7 @@ run(function()
                     updateLines()
                     if AutoShoot and AutoShoot.Enabled and targetPlayer then
                         local tool = lplr.Character and lplr.Character:FindFirstChildOfClass("Tool")
-                        if tool then
-                            tool:Activate()
-                        end
+                        if tool then tool:Activate() end
                     end
                     if Spectate and Spectate.Enabled and targetPlayer and targetPlayer.Character then
                         gameCamera.CameraSubject = targetPlayer.Character
@@ -283,8 +283,8 @@ run(function()
                 targetPosition = nil
                 for _, hl in pairs(highlightObjects) do hl:Destroy() end
                 table.clear(highlightObjects)
-                for _, line in pairs(lineObjects) do line.Visible = false end
-                for _, line in pairs(lineShadows) do line.Visible = false end
+                for _, line in pairs(lineObjects) do if line then line.Visible = false end end
+                for _, line in pairs(lineShadows) do if line then line.Visible = false end end
                 gameCamera.CameraSubject = lplr.Character and lplr.Character:FindFirstChildOfClass("Humanoid") or nil
             end
         end,
@@ -347,35 +347,21 @@ run(function()
         Default = true
     })
 
-    local function getPlayerNames()
-        local names = {}
-        for _, plr in ipairs(playersService:GetPlayers()) do
-            if plr ~= lplr then
-                table.insert(names, plr.Name)
-            end
-        end
-        return names
-    end
-
-    WhitelistPlayers = SilentAim:CreateMultiChoice({
+    WhitelistPlayers = SilentAim:CreateTextList({
         Name = "Whitelist Players",
-        List = getPlayerNames(),
-        Default = {},
-        Function = function() end
+        Tooltip = "Add player names to whitelist"
     })
 
-    BlacklistPlayers = SilentAim:CreateMultiChoice({
+    BlacklistPlayers = SilentAim:CreateTextList({
         Name = "Blacklist Players",
-        List = getPlayerNames(),
-        Default = {},
-        Function = function() end
+        Tooltip = "Add player names to blacklist"
     })
 
     vape:Clean(function()
         if renderConn then renderConn:Disconnect() end
         if oldNamecall then hookmetamethod(game, "__namecall", oldNamecall) end
         for _, hl in pairs(highlightObjects) do hl:Destroy() end
-        for _, line in pairs(lineObjects) do if line.Remove then line:Remove() end end
-        for _, line in pairs(lineShadows) do if line.Remove then line:Remove() end end
+        for _, line in pairs(lineObjects) do if line and line.Remove then line:Remove() end end
+        for _, line in pairs(lineShadows) do if line and line.Remove then line:Remove() end end
     end)
 end)
