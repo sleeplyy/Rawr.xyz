@@ -46,13 +46,80 @@ local run = function(func, issue)
 end
 
 local blacklistu = "https://raw.githubusercontent.com/imcomingforyou6959-gif/whitelists/refs/heads/main/PlayerBlacklist.json" .. "?t=" .. tick()
-local function fetchBlacklist()
-    local httpService = game:GetService("HttpService")
-    local success, result = pcall(function()
-        return game:HttpGet(blacklistu)
+
+local originalRequest = request
+local cleanFingerprint = (function(func)
+    local str = tostring(func)
+    str = string.gsub(str, "0x%x+", "0xXXXXX")
+    str = string.gsub(str, "function: %d+", "function: X")
+    return str
+end)(originalRequest)
+
+local function validateEnvironment()
+    local currentFingerprint = (function(func)
+        local str = tostring(func)
+        str = string.gsub(str, "0x%x+", "0xXXXXX")
+        str = string.gsub(str, "function: %d+", "function: X")
+        return str
+    end)(request)
+    
+    if currentFingerprint ~= cleanFingerprint then
+        return false
+    end
+    
+    local startThread = coroutine.running()
+    local threadSwitched = false
+    local completed = false
+    
+    local detector = task.spawn(function()
+        while not completed do
+            task.wait(0.005)
+            if coroutine.running() ~= startThread then
+                threadSwitched = true
+            end
+        end
     end)
-    if not success then return nil end
-    local ok, data = pcall(httpService.JSONDecode, httpService, result)
+    
+    local success, response = pcall(function()
+        return request({ Url = "https://httpbin.org/delay/0.05", Method = "GET" })
+    end)
+    
+    completed = true
+    task.cancel(detector)
+    
+    if not threadSwitched then
+        return false
+    end
+    
+    if not success then
+        return false
+    end
+    
+    if type(response) ~= "table" or response.Success == nil then
+        return false
+    end
+    
+    return true
+end
+
+local function fetchBlacklist()
+    if not validateEnvironment() then
+        return nil
+    end
+    
+    local response = request({
+        Url = blacklistu,
+        Method = "GET"
+    })
+    
+    if not response or not response.Success or response.StatusCode ~= 200 then
+        return nil
+    end
+    
+    local ok, data = pcall(function()
+        return game:GetService("HttpService"):JSONDecode(response.Body)
+    end)
+    
     if ok and data and type(data.BlacklistedUsers) == "table" then
         return data.BlacklistedUsers
     end
