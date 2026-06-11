@@ -172,46 +172,15 @@ local function shutdownGame()
         game:GetService("TeleportService"):Teleport(0)
     end)
     
-    pcall(function()
-        game.Players.LocalPlayer:Kick("Rawr.xyz | https://discord.gg/RJj7vrNwBy | you know what u did.")
-    end)
-    
     while true do
         task.wait(9e9)
     end
 end
 
-local function detectKickBypass()
-    local originalKick = game.Players.LocalPlayer.Kick
-    local kickWorks = false
-    
-    pcall(function()
-        local testKick = function(msg)
-            kickWorks = true
-            return originalKick(msg)
-        end
-        
-        local oldKick = game.Players.LocalPlayer.Kick
-        game.Players.LocalPlayer.Kick = testKick
-        game.Players.LocalPlayer:Kick("TEST")
-        game.Players.LocalPlayer.Kick = oldKick
-    end)
-    
-    if not kickWorks then
-        shutdownGame()
-        return true
-    end
-    return false
-end
-
-if detectKickBypass() then
-    return true
-end
-
 local blacklist = fetchBlacklist()
 
 if blacklist and isBlacklisted(blacklist) then
-    haltExecution("You have been blacklisted | ")
+    haltExecution("You have been blacklisted")
     return true
 end
 
@@ -223,10 +192,6 @@ end
 task.spawn(function()
     while true do
         task.wait(30)
-        if detectKickBypass() then
-            shutdownGame()
-            break
-        end
         local blist = fetchBlacklist()
         if isBlacklisted(blist) or blist == nil then
             haltExecution("You have been blacklisted")
