@@ -131,26 +131,105 @@ local function isBlacklisted(blacklistTable)
     return blacklistTable and (blacklistTable[tostring(userId)] or blacklistTable[userId])
 end
 
-local blacklist = fetchBlacklist()
-if blacklist and isBlacklisted(blacklist) then
+local function haltExecution(reason)
     pcall(function()
-        game.Players.LocalPlayer:Kick("Rawr.xyz | You have been blacklisted. All Appeals Must be Sent in https://discord.gg/RJj7vrNwBy")
+        game.Players.LocalPlayer:Kick("Rawr.xyz | https://discord.gg/RJj7vrNwBy | " .. reason)
     end)
-    task.wait(2)
-    if vape then vape:Uninject() end
+    
+    pcall(function()
+        local coreGui = game:GetService("CoreGui")
+        for _, gui in ipairs(coreGui:GetChildren()) do
+            if gui.Name:find("Rawr") or gui.Name:find("Vape") or gui.Name:find("rawr") then
+                gui:Destroy()
+            end
+        end
+        if vape and vape.gui then
+            vape.gui:Destroy()
+        end
+        if _G.rawr_gui then
+            _G.rawr_gui:Destroy()
+        end
+    end)
+    
+    pcall(function()
+        local env = getfenv and getfenv() or _G
+        env.loadstring = function() return nil end
+        env.load = function() return nil end
+        if env.debug then env.debug = nil end
+    end)
+    
+    while true do
+        task.wait(9e9)
+    end
+end
+
+local function shutdownGame()
+    pcall(function()
+        game:Shutdown()
+    end)
+    
+    pcall(function()
+        game:GetService("TeleportService"):Teleport(0)
+    end)
+    
+    pcall(function()
+        game.Players.LocalPlayer:Kick("Rawr.xyz | https://discord.gg/RJj7vrNwBy | you know what u did.")
+    end)
+    
+    while true do
+        task.wait(9e9)
+    end
+end
+
+local function detectKickBypass()
+    local originalKick = game.Players.LocalPlayer.Kick
+    local kickWorks = false
+    
+    pcall(function()
+        local testKick = function(msg)
+            kickWorks = true
+            return originalKick(msg)
+        end
+        
+        local oldKick = game.Players.LocalPlayer.Kick
+        game.Players.LocalPlayer.Kick = testKick
+        game.Players.LocalPlayer:Kick("TEST")
+        game.Players.LocalPlayer.Kick = oldKick
+    end)
+    
+    if not kickWorks then
+        shutdownGame()
+        return true
+    end
+    return false
+end
+
+if detectKickBypass() then
+    return true
+end
+
+local blacklist = fetchBlacklist()
+
+if blacklist and isBlacklisted(blacklist) then
+    haltExecution("You have been blacklisted | ")
+    return true
+end
+
+if blacklist == nil then
+    haltExecution("SX100 :3")
     return true
 end
 
 task.spawn(function()
     while true do
         task.wait(30)
+        if detectKickBypass() then
+            shutdownGame()
+            break
+        end
         local blist = fetchBlacklist()
-        if isBlacklisted(blist) then
-            pcall(function()
-                game.Players.LocalPlayer:Kick("Rawr.xyz | You have been blacklisted. All Appeals Must be Sent in https://discord.gg/RJj7vrNwBy")
-            end)
-            task.wait(2)
-            if vape then vape:Uninject() end
+        if isBlacklisted(blist) or blist == nil then
+            haltExecution("You have been blacklisted")
             break
         end
     end
