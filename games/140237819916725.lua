@@ -284,18 +284,17 @@ local function getClosestEnemy()
             
             if targetPart and hum and hum.Health > 0 then
                 local dist = (targetPart.Position - myHead.Position).Magnitude
-                if dist > range then goto continue end
-                
-                local screenPos, onScreen = camera:WorldToViewportPoint(targetPart.Position)
-                if onScreen and screenPos.Z > 0 then
-                    local fovDist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
-                    if fovDist < closestDist and fovDist <= fovRadius then
-                        closestDist = fovDist
-                        closest = targetPart
+                if dist <= range then
+                    local screenPos, onScreen = camera:WorldToViewportPoint(targetPart.Position)
+                    if onScreen and screenPos.Z > 0 then
+                        local fovDist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                        if fovDist < closestDist and fovDist <= fovRadius then
+                            closestDist = fovDist
+                            closest = targetPart
+                        end
                     end
                 end
             end
-            ::continue::
         end
     end
     
@@ -330,8 +329,6 @@ if mainEvent then
         end
         return oldFire(self, data, token)
     end
-else
-    warn("Silent Aim: Could not find main_event remote")
 end
 
 local silentAimModule = createModule("Silent Aim", function(callback)
