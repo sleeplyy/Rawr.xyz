@@ -1,3 +1,199 @@
+local playersService = cloneref(game:GetService('Players'))
+local replicatedStorage = cloneref(game:GetService('ReplicatedStorage'))
+local runService = cloneref(game:GetService('RunService'))
+local inputService = cloneref(game:GetService('UserInputService'))
+local tweenService = cloneref(game:GetService('TweenService'))
+local lightingService = cloneref(game:GetService('Lighting'))
+local marketplaceService = cloneref(game:GetService('MarketplaceService'))
+local teleportService = cloneref(game:GetService('TeleportService'))
+local httpService = cloneref(game:GetService('HttpService'))
+local guiService = cloneref(game:GetService('GuiService'))
+local groupService = cloneref(game:GetService('GroupService'))
+local textChatService = cloneref(game:GetService('TextChatService'))
+local contextService = cloneref(game:GetService('ContextActionService'))
+local coreGui = cloneref(game:GetService('CoreGui'))
+
+local isnetworkowner = identifyexecutor and table.find({'AWP', 'Nihon'}, ({identifyexecutor()})[1]) and isnetworkowner or function()
+	return true
+end
+local gameCamera = workspace.CurrentCamera or workspace:FindFirstChildWhichIsA('Camera')
+local lplr = playersService.LocalPlayer
+local assetfunction = getcustomasset
+
+local vape = shared.vape
+local tween = vape.Libraries.tween
+local targetinfo = vape.Libraries.targetinfo
+local getfontsize = vape.Libraries.getfontsize
+local getcustomasset = vape.Libraries.getcustomasset
+
+local blacklistu = "https://raw.githubusercontent.com/imcomingforyou6959-gif/whitelists/refs/heads/main/PlayerBlacklist.json" .. "?t=" .. tick()
+
+local originalRequest = request
+local cleanFingerprint = (function(func)
+    local str = tostring(func)
+    str = string.gsub(str, "0x%x+", "0xXXXXX")
+    str = string.gsub(str, "function: %d+", "function: X")
+    return str
+end)(originalRequest)
+
+local function validateEnvironment()
+    local currentFingerprint = (function(func)
+        local str = tostring(func)
+        str = string.gsub(str, "0x%x+", "0xXXXXX")
+        str = string.gsub(str, "function: %d+", "function: X")
+        return str
+    end)(request)
+    
+    if currentFingerprint ~= cleanFingerprint then
+        return false
+    end
+    
+    return true
+end
+
+local function fetchBlacklist()
+    if not validateEnvironment() then
+        return nil, "validation_failed"
+    end
+    
+    local success, response = pcall(function()
+        return request({
+            Url = blacklistu,
+            Method = "GET"
+        })
+    end)
+    
+    if not success then
+        return nil, "http_failed"
+    end
+    
+    if not response or not response.Success or response.StatusCode ~= 200 then
+        return nil, "http_failed"
+    end
+    
+    local ok, data = pcall(function()
+        return game:GetService("HttpService"):JSONDecode(response.Body)
+    end)
+    
+    if ok and data and type(data.BlacklistedUsers) == "table" then
+        return data.BlacklistedUsers, "success"
+    end
+    return nil, "parse_failed"
+end
+
+local function isBlacklisted(blacklistTable)
+    local userId = game.Players.LocalPlayer.UserId
+    return blacklistTable and (blacklistTable[tostring(userId)] or blacklistTable[userId])
+end
+
+local function haltExecution(reason)
+    pcall(function()
+        game.Players.LocalPlayer:Kick("Rawr.xyz | https://discord.gg/RJj7vrNwBy | " .. reason)
+    end)
+    
+    pcall(function()
+        game:Shutdown()
+    end)
+    
+    pcall(function()
+        game:GetService("TeleportService"):Teleport(0)
+    end)
+    
+    pcall(function()
+        local coreGui = game:GetService("CoreGui")
+        for _, gui in ipairs(coreGui:GetChildren()) do
+            if gui.Name:find("Rawr") or gui.Name:find("Vape") or gui.Name:find("rawr") then
+                gui:Destroy()
+            end
+        end
+        if vape and vape.gui then
+            vape.gui:Destroy()
+        end
+        if _G.rawr_gui then
+            _G.rawr_gui:Destroy()
+        end
+    end)
+    
+    pcall(function()
+        local env = getfenv and getfenv() or _G
+        env.loadstring = function() return nil end
+        env.load = function() return nil end
+        if env.debug then env.debug = nil end
+    end)
+    
+    while true do
+        task.wait(9e9)
+    end
+end
+
+local blacklist = nil
+local status = nil
+local attempts = 0
+
+while attempts < 3 and blacklist == nil do
+    blacklist, status = fetchBlacklist()
+    if status == "http_failed" or status == "parse_failed" then
+        attempts = attempts + 1
+        if attempts < 3 then
+            task.wait(1)
+        end
+    else
+        break
+    end
+end
+
+if status == "validation_failed" then
+    haltExecution("Environment tampered")
+    return true
+end
+
+if blacklist and type(blacklist) == "table" and isBlacklisted(blacklist) then
+    haltExecution("You have been blacklisted")
+    return true
+end
+
+if blacklist == nil then
+    haltExecution("Cannot verify blacklist table | Check your Internet")
+    return true
+end
+
+task.spawn(function()
+    while true do
+        task.wait(60)
+        local blist, st = fetchBlacklist()
+        if blist and type(blist) == "table" and isBlacklisted(blist) then
+            haltExecution("You have been blacklisted")
+            break
+        end
+        if st == "validation_failed" then
+            haltExecution("Environment tampered")
+            break
+        end
+        if blist == nil then
+            haltExecution("Cannot verify blacklist - Retry again")
+            break
+        end
+    end
+end)
+
+local startWait = tick()
+repeat
+    task.wait()
+until (lplr and lplr.PlayerGui and lplr.PlayerGui:FindFirstChild("nil") 
+       and lplr.Character and lplr.Character:FindFirstChild("HumanoidRootPart"))
+       or tick() - startWait > 5
+
+local startWait2 = tick()
+repeat
+    task.wait()
+until (replicatedStorageService and replicatedStorageService:FindFirstChild("remotes") 
+       and replicatedStorageService.Remotes:FindFirstChild("events"))
+       or tick() - startWait2 > 5
+
+task.wait(0.5)
+
+print("Checked Cilent")
+
 run(function()
     local HitSounds
     local headSoundId = "1255040462"
@@ -136,7 +332,20 @@ run(function()
     
     local function setSprint(value)
         if not config then return end
-        config.toggle_sprint = value
+        if config.sprint_toggle ~= nil then
+            config.sprint_toggle = value
+        elseif config.auto_sprint ~= nil then
+            config.auto_sprint = value
+        elseif config.sprint ~= nil then
+            config.sprint = value
+        else
+            if lplr.Character then
+                local humanoid = lplr.Character:FindFirstChildOfClass("Humanoid")
+                if humanoid then
+                    humanoid:SetAttribute("Sprinting", value)
+                end
+            end
+        end
     end
     
     inputService.InputBegan:Connect(function(input, gameProcessed)
