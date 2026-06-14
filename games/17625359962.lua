@@ -3260,7 +3260,7 @@ run(function()
         Function = function(callback)
             if callback then enable() else disable() end
         end,
-        Tooltip = "..."
+        Tooltip = "o"
     })
 
     Spoofer:CreateTextBox({
@@ -3282,21 +3282,27 @@ run(function()
         Default = "N" .. tostring(config.level_spoof),
         Placeholder = "Enter level as Nxxxx (max N9999)",
         Function = function(val)
+            if type(val) ~= "string" then return end
             if val == "" then return end
-            local numStr = string.match(val, "^[Nn](%d+)$")
+
+            local numStr = val:match("^[Nn](%d+)$")
             if not numStr then
                 notif("Name/Level Spoofer", "Format must be N followed by number (e.g. N1234)", 2, "alert")
                 return
             end
             local num = tonumber(numStr)
-            if num > 9999 then
-                notif("Name/Level Spoofer", "Level cannot exceed 9999 – capped to 9999", 2, "alert")
-                config.level_spoof = 9999
+            if num then
+                if num > 9999 then
+                    notif("Name/Level Spoofer", "Level cannot exceed 9999 – capped to 9999", 2, "alert")
+                    config.level_spoof = 9999
+                else
+                    config.level_spoof = num
+                end
+                if spoofEnabled then
+                    applyLevelSpoof()
+                end
             else
-                config.level_spoof = num
-            end
-            if spoofEnabled then
-                applyLevelSpoof()
+                notif("Name/Level Spoofer", "Invalid number", 2, "alert")
             end
         end
     })
