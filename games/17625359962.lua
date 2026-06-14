@@ -3135,7 +3135,7 @@ run(function()
     local originalLevel, originalAttributeLevel
 
     local config = {
-        level_spoof = 1,
+        level_spoof = 1381,
         client_name = "rawr.xyz",
         enemy_name = "rawr.xyz | discord.gg/UFjWRWsSB"
     }
@@ -3211,7 +3211,7 @@ run(function()
     local function enable()
         if spoofEnabled then return end
         if not checksPass() then
-            notif("Name/Level Spoofer", "Failed: missing CustomLeaderstats/Level", 3, "alert")
+            notif("Name/Level Spoofer", "Missing CustomLeaderstats/Level – cannot spoof", 3, "alert")
             return
         end
         spoofEnabled = true
@@ -3244,14 +3244,8 @@ run(function()
         if not spoofEnabled then return end
         spoofEnabled = false
 
-        if heartbeatConn then
-            heartbeatConn:Disconnect()
-            heartbeatConn = nil
-        end
-        if playerAddedConn then
-            playerAddedConn:Disconnect()
-            playerAddedConn = nil
-        end
+        if heartbeatConn then heartbeatConn:Disconnect(); heartbeatConn = nil end
+        if playerAddedConn then playerAddedConn:Disconnect(); playerAddedConn = nil end
 
         restoreLevel()
         restoreAllPlayers()
@@ -3260,16 +3254,12 @@ run(function()
     local Spoofer = vape.Categories.Blatant:CreateModule({
         Name = "Name/Level Spoofer",
         Function = function(callback)
-            if callback then
-                enable()
-            else
-                disable()
-            end
+            if callback then enable() else disable() end
         end,
-        Tooltip = "Spoofs your name"
+        Tooltip = "Your name → rawr.xyz | Level spoof | Others show rawr.xyz tag"
     })
 
-    Spoofer:CreateConfigInput({
+    Spoofer:CreateTextBox({
         Name = "Name",
         Default = config.client_name,
         Placeholder = "Your fake name",
@@ -3283,7 +3273,7 @@ run(function()
         end
     })
 
-    Spoofer:CreateConfigInput({
+    Spoofer:CreateTextBox({
         Name = "Level Spoof",
         Default = tostring(config.level_spoof),
         Placeholder = "Set level (max 9999)",
@@ -3301,7 +3291,7 @@ run(function()
             end
         end
     })
-end)                                                                                                                                                                                                                                                                                                
+end)                                                                                                                                                                                                                                                                                  
                                                                                                                                                                                                                                                                                                                                                         
 run(function()
     local module = vape.Categories.Utility:CreateModule({
