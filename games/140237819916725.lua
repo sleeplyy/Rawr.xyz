@@ -1,3 +1,6 @@
+-- ============================================
+-- GLOBALS
+-- ============================================
 
 local playersService = cloneref(game:GetService('Players'))
 local replicatedStorage = cloneref(game:GetService('ReplicatedStorage'))
@@ -14,26 +17,13 @@ local textChatService = cloneref(game:GetService('TextChatService'))
 local contextService = cloneref(game:GetService('ContextActionService'))
 local coreGui = cloneref(game:GetService('CoreGui'))
 
-local isnetworkowner = identifyexecutor and table.find({'AWP', 'Nihon'}, ({identifyexecutor()})[1]) and isnetworkowner or function()
-    return true
-end
 local gameCamera = workspace.CurrentCamera or workspace:FindFirstChildWhichIsA('Camera')
 local lplr = playersService.LocalPlayer
-local assetfunction = getcustomasset
 
 local vape = shared.vape
-local tween = vape.Libraries.tween
-local targetinfo = vape.Libraries.targetinfo
-local getfontsize = vape.Libraries.getfontsize
-local getcustomasset = vape.Libraries.getcustomasset
 
 for _, v in {
-    'SilentAim', 'Reach', 'AntiFall', 'AntiRagdoll', 'Blink',
-    'Disabler', 'SafeWalk', 'MurderMystery', 'TriggerBot',
-    'ChatSpammer', 'Arrest Highlight', 'HitNotifications',
-    'Bullet Tracers', 'Head Pitch Spinbot (Client)', 'AutoArrest',
-    'Anti Riot', 'Anti Taze', 'C4 ESP',
-    'AutoReset', 'AutoHeal'
+    'SilentAim'
 } do pcall(function() vape:Remove(v) end) end
 
 run(function()
@@ -71,10 +61,9 @@ run(function()
     end
     
     local mouse = lplr:GetMouse()
-    local oldIdx
     local met = getrawmetatable(game)
     if met then
-        oldIdx = met.__index
+        local oldIdx = met.__index
         setreadonly(met, false)
         met.__index = newcclosure(function(self, key)
             if silentEnabled and self == mouse and key == "Target" then
