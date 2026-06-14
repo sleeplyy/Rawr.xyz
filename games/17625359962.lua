@@ -3135,7 +3135,7 @@ run(function()
     local originalLevel, originalAttributeLevel
 
     local config = {
-        level_spoof = 1381,
+        level_spoof = 1,
         client_name = "rawr.xyz",
         enemy_name = "rawr.xyz | discord.gg/UFjWRWsSB"
     }
@@ -3286,17 +3286,22 @@ run(function()
     Spoofer:CreateTextBox({
         Name = "Level Spoof",
         Default = tostring(config.level_spoof),
-        Placeholder = "Set level",
+        Placeholder = "Set level (max 9999)",
         Function = function(val)
             local num = tonumber(val)
             if num then
-                config.level_spoof = num
+                if num > 9999 then
+                    warn("Level cannot exceed 9999 – set to 9999")
+                    config.level_spoof = 9999
+                else
+                    config.level_spoof = num
+                end
             else
                 warn("Level must be a number")
             end
         end
     })
-end)                                                                                                                                                                                                                                                                                                                
+end)                                                                                                                                                                                                                                                                                                       
                                                                                                                                                                                                                                                                                                                                                         
 run(function()
     local module = vape.Categories.Utility:CreateModule({
