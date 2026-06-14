@@ -1283,7 +1283,7 @@ run(function()
         end
     end
 
-    local soundNames = {}
+    local soundNames = {"Default"}
     local soundMap = {}
 
     for _, s in ipairs(assetSounds) do
@@ -1295,59 +1295,79 @@ run(function()
         soundMap[s.name] = s.id
     end
 
-    local hitsoundEnabled = false
-    local currentSoundId = soundMap["Bell"]
-    local hitConnection = nil
+    local categoryMap = {
+        Body       = "rbxassetid://0",
+        Head       = "rbxassetid://0",
+        Kill       = "rbxassetid://0",
+        Eliminated = "rbxassetid://0",
+    }
 
-    local function applySoundReplacement()
-        if hitConnection then hitConnection:Disconnect() end
-        if not hitsoundEnabled then return end
-        local viewModel = nil
-        pcall(function()
-            viewModel = lplr.PlayerScripts.Modules.ClientReplicatedClasses.ClientFighter.ClientItem:WaitForChild("ClientViewModel", 5)
-        end)
-        if viewModel then
-            hitConnection = viewModel.ChildAdded:Connect(function(v)
-                if v:IsA("Sound") then
-                    local newSoundId = currentSoundId
-                    if newSoundId and v.SoundId ~= newSoundId then
-                        v.SoundId = newSoundId
-                        v.Pitch = 1
-                        v.Volume = 1
-                    end
-                end
+    local childAddedConn
+    local enabled = false
+
+    local function processSound(inst)
+        if not inst:IsA("Sound") then return end
+        local name = inst.Name
+        local id = nil
+        if name:find("HitBody") or name:find("Body") then
+            id = categoryMap.Body
+        elseif name:find("HitHead") or name:find("Head") then
+            id = categoryMap.Head
+        elseif name:find("Kill") then
+            id = categoryMap.Kill
+        elseif name:find("Eliminated") then
+            id = categoryMap.Eliminated
+        end
+        if id and id ~= "rbxassetid://0" then
+            pcall(function()
+                inst.SoundId = id
             end)
         end
     end
 
-    local HitsoundModule = vape.Categories.Utility:CreateModule({
-        Name = "Hitsound",
-        Function = function(callback)
-            hitsoundEnabled = callback
-            applySoundReplacement()
-            if not callback and hitConnection then
-                hitConnection:Disconnect()
-                hitConnection = nil
+    local function enable()
+        if childAddedConn then return end
+        childAddedConn = workspace.DescendantAdded:Connect(processSound)
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            pcall(processSound, obj)
+        end
+    end
+
+    local function disable()
+        if childAddedConn then
+            childAddedConn:Disconnect()
+            childAddedConn = nil
+        end
+    end
+
+    local AudioSwap = vape.Categories.Utility:CreateModule({
+        Name = "Audio Swapper",
+        Function = function(cb)
+            if cb then enable() else disable() end
+        end,
+        Tooltip = "Replace"
+    })
+
+    local function addCategoryDropdown(categoryName, defaultId)
+        AudioSwap:CreateDropdown({
+            Name = categoryName .. " Sound",
+            List = soundNames,
+            Default = "Default",
+            Function = function(val)
+                categoryMap[categoryName] = (val == "Default") and "rbxassetid://0" or soundMap[val]
+                if enabled then
+                    for _, obj in ipairs(workspace:GetDescendants()) do
+                        pcall(processSound, obj)
+                    end
+                end
             end
-        end
-    })
-    HitsoundModule:CreateToggle({
-        Name = "Hitsound",
-        Default = false,
-        Function = function(c)
-            hitsoundEnabled = c
-            applySoundReplacement()
-        end
-    })
-    HitsoundModule:CreateDropdown({
-        Name = "Select Sound",
-        List = soundNames,
-        Function = function(val)
-            currentSoundId = soundMap[val] or soundMap["Bell"]
-            applySoundReplacement()
-            notif('Hitsound', 'Selected: '..val, 2, 'success')
-        end
-    })
+        })
+    end
+
+    addCategoryDropdown("Body",       "rbxassetid://0")
+    addCategoryDropdown("Head",       "rbxassetid://0")
+    addCategoryDropdown("Kill",       "rbxassetid://0")
+    addCategoryDropdown("Eliminated", "rbxassetid://0")
 end)
 
 run(function()
