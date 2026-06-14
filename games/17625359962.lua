@@ -3391,19 +3391,6 @@ run(function()
         end,
         Tooltip = "Gun recoil amount"
     })
-
-    module:CreateSlider({
-        Name = "Reload Time",
-        Min = 0.001,
-        Max = 3,
-        Default = 0.001,
-        Decimal = 1000,
-        Function = function(v)
-            _G.gunModsReloadTime = v
-        end,
-        Suffix = "s",
-        Tooltip = "Reload duration (0.001 = instant)"
-    })
 end)
 
 run(function()
@@ -3476,85 +3463,7 @@ run(function()
         Tooltip = "Delay between melee swings"
     })
 end)
-                                                                                                                                                                                                                                                                                                                                                    
-run(function()
-    local animTrack = nil
-    local speed = 1
-    local startPercent = 0
-    local endPercent = 100
-
-    local function playAnimation(id)
-        local humanoid = lp.Character and lp.Character:FindFirstChildWhichIsA("Humanoid")
-        if not humanoid then return end
-        local animator = humanoid:FindFirstChildOfClass("Animator")
-        if not animator then
-            animator = Instance.new("Animator", humanoid)
-        end
-        if animTrack then animTrack:Stop(); animTrack:Destroy() end
-        local anim = Instance.new("Animation")
-        anim.AnimationId = "rbxassetid://" .. id
-        local track = animator:LoadAnimation(anim)
-        track.Priority = Enum.AnimationPriority.Action
-        track:Play()
-        track:AdjustSpeed(speed)
-        track:AdjustWeight(1)
-        animTrack = track
-    end
-
-    local function enable()
-        local preset = Options.AnimPreset.Value or "Normal"
-        if preset == "Long Legs" then playAnimation("4049646104")
-        elseif preset == "Spin" then playAnimation("2825744398")
-        elseif preset == "Floppy" then playAnimation("3335483079")
-        elseif preset == "Zesty" then playAnimation("3360689775")
-        elseif Options.CustomAnimID.Value ~= "" then
-            playAnimation(Options.CustomAnimID.Value)
-        end
-    end
-
-    local function disable()
-        if animTrack then animTrack:Stop(); animTrack:Destroy(); animTrack = nil end
-    end
-
-    vape.Categories.Visuals:CreateModule({
-        Name = "Animation Player",
-        Function = function(cb) if cb then enable() else disable() end end,
-        Tooltip = "Play custom animations on your character"
-    }):CreateDropdown({
-        Name = "Preset", Values = {"Normal", "Long Legs", "Spin", "Floppy", "Zesty"}, Default = "Normal",
-        Function = function(v) if v ~= "Normal" then enable() else disable() end end
-    }):CreateTextBox({
-        Name = "Custom Animation ID", Placeholder = "id...",
-        Function = function(v) Options.CustomAnimID.Value = v end
-    })
-end)
-                                                                                                                                                                                                                                                                                                                                                                
-run(function()
-    local gui = nil
-
-    local function enable()
-        gui = Instance.new("ScreenGui", lp.PlayerGui)
-        gui.Name = "CustomImageCrosshair"
-        gui.IgnoreGuiInset = true
-        local img = Instance.new("ImageLabel", gui)
-        img.BackgroundTransparency = 1
-        img.AnchorPoint = Vector2.new(0.5, 0.5)
-        img.Position = UDim2.new(0.5, 0, 0.5, 0)
-        img.Size = UDim2.new(0, 24, 0, 24)
-        img.Image = "rbxassetid://97119437608195"
-    end
-
-    local function disable()
-        if gui then gui:Destroy(); gui = nil end
-    end
-
-    vape.Categories.Render:CreateModule({
-        Name = "Image Crosshair",
-        Function = function(cb) if cb then enable() else disable() end end,
-        Tooltip = "remove rivals crosshair"
-    })
-end)                                                                                                                                                                                                                                                                                                                                                                
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   
 run(function()
     if hookmetamethod and getnamecallmethod then
         local SkinModule = vape.Categories.Utility:CreateModule({Name = "Skin Unlocker", Function = function(callback)
@@ -4153,4 +4062,4 @@ run(function()
 end)
 
 entitylib.start()
-print("Welcome, V4.5.8")
+print("Welcome, V4.6.2")
