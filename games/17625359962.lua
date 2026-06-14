@@ -3125,6 +3125,178 @@ run(function()
         removeHook()
     end)
 end)
+                                                                                                                                                                                                                                                                                                                
+run(function()
+    local spoofEnabled = false
+    local heartbeatConn
+    local playerAddedConn
+
+    local originalNames = {}
+    local originalLevel, originalAttributeLevel
+
+    local config = {
+        level_spoof = 1381,
+        client_name = "rawr.xyz",
+        enemy_name = "rawr.xyz | discord.gg/UFjWRWsSB"
+    }
+
+    local alloc = function(str) return cloneref(game:GetService(str)) end
+    local players = alloc("Players")
+    local runService = alloc("RunService")
+    local localplayer = players.LocalPlayer
+
+    local function checksPass()
+        if not localplayer:FindFirstChild("CustomLeaderstats") or not localplayer:FindFirstChild("CustomLeaderstats"):FindFirstChild("Level") then
+            return false
+        end
+        if not tonumber(config.level_spoof) then return false end
+        if not localplayer:GetAttribute("Level") then return false end
+        return true
+    end
+
+    local function saveOriginalLevel()
+        if localplayer:FindFirstChild("CustomLeaderstats") and localplayer.CustomLeaderstats:FindFirstChild("Level") then
+            originalLevel = localplayer.CustomLeaderstats.Level.Value
+        end
+        originalAttributeLevel = localplayer:GetAttribute("Level")
+    end
+
+    local function restoreLevel()
+        if originalLevel and localplayer:FindFirstChild("CustomLeaderstats") and localplayer.CustomLeaderstats:FindFirstChild("Level") then
+            localplayer.CustomLeaderstats.Level.Value = originalLevel
+        end
+        if originalAttributeLevel then
+            localplayer:SetAttribute("Level", originalAttributeLevel)
+        end
+    end
+
+    local function spoofPlayerName(plr, isLocal)
+        if not originalNames[plr] then
+            originalNames[plr] = {plr.Name, plr.DisplayName}
+        end
+        local newName = isLocal and config.client_name or config.enemy_name
+        pcall(function()
+            plr.Name = newName
+            plr.DisplayName = newName
+        end)
+    end
+
+    local function restorePlayerName(plr)
+        if originalNames[plr] then
+            local orig = originalNames[plr]
+            pcall(function()
+                plr.Name = orig[1]
+                plr.DisplayName = orig[2]
+            end)
+            originalNames[plr] = nil
+        end
+    end
+
+    local function spoofAllPlayers()
+        for _, player in ipairs(players:GetPlayers()) do
+            if player == localplayer then
+                spoofPlayerName(player, true)
+            else
+                spoofPlayerName(player, false)
+            end
+        end
+    end
+
+    local function restoreAllPlayers()
+        for _, player in ipairs(players:GetPlayers()) do
+            restorePlayerName(player)
+        end
+    end
+
+    local function enable()
+        if spoofEnabled then return end
+        if not checksPass() then
+            warn("Spoofer prerequisites not met (no CustomLeaderstats/Level or Level attribute)")
+            return
+        end
+        spoofEnabled = true
+
+        saveOriginalLevel()
+        spoofAllPlayers()
+
+        playerAddedConn = players.PlayerAdded:Connect(function(player)
+            if not spoofEnabled then return end
+            task.wait(0.1)
+            if player ~= localplayer then
+                spoofPlayerName(player, false)
+            end
+        end)
+
+        heartbeatConn = runService.Heartbeat:Connect(function()
+            if not spoofEnabled then return end
+            if config.level_spoof ~= 0 then
+                pcall(function()
+                    if localplayer:FindFirstChild("CustomLeaderstats") and localplayer.CustomLeaderstats:FindFirstChild("Level") then
+                        localplayer.CustomLeaderstats.Level.Value = config.level_spoof
+                    end
+                    localplayer:SetAttribute("Level", config.level_spoof)
+                end)
+            end
+        end)
+    end
+
+    local function disable()
+        if not spoofEnabled then return end
+        spoofEnabled = false
+
+        if heartbeatConn then
+            heartbeatConn:Disconnect()
+            heartbeatConn = nil
+        end
+        if playerAddedConn then
+            playerAddedConn:Disconnect()
+            playerAddedConn = nil
+        end
+
+        restoreLevel()
+        restoreAllPlayers()
+    end
+
+    local Spoofer = vape.Categories.Blatant:CreateModule({
+        Name = "Name/Level Spoofer",
+        Function = function(callback)
+            if callback then
+                enable()
+            else
+                disable()
+            end
+        end,
+        Tooltip = "Spoofs your name"
+    })
+
+    Spoofer:CreateTextBox({
+        Name = "Name",
+        Default = config.client_name,
+        Placeholder = "Your fake name",
+        Function = function(val)
+            if val ~= "" then
+                config.client_name = val
+                if spoofEnabled then
+                    spoofPlayerName(localplayer, true)
+                end
+            end
+        end
+    })
+
+    Spoofer:CreateTextBox({
+        Name = "Level Spoof",
+        Default = tostring(config.level_spoof),
+        Placeholder = "Set level",
+        Function = function(val)
+            local num = tonumber(val)
+            if num then
+                config.level_spoof = num
+            else
+                warn("Level must be a number")
+            end
+        end
+    })
+end)                                                                                                                                                                                                                                                                                                                
                                                                                                                                                                                                                                                                                                                                                         
 run(function()
     local module = vape.Categories.Utility:CreateModule({
