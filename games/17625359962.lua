@@ -3135,9 +3135,9 @@ run(function()
     local originalLevel, originalAttributeLevel
 
     local config = {
-        level_spoof = 1381,
+        level_spoof = 6741,
         client_name = "rawr.xyz",
-        enemy_name = "rawr.xyz | discord.gg/UFjWRWsSB"
+        enemy_name = "discord.gg/UFjWRWsSB"
     }
 
     local alloc = function(str) return cloneref(game:GetService(str)) end
@@ -3168,6 +3168,15 @@ run(function()
         if originalAttributeLevel then
             localplayer:SetAttribute("Level", originalAttributeLevel)
         end
+    end
+
+    local function applyLevelSpoof()
+        pcall(function()
+            if localplayer:FindFirstChild("CustomLeaderstats") and localplayer.CustomLeaderstats:FindFirstChild("Level") then
+                localplayer.CustomLeaderstats.Level.Value = config.level_spoof
+            end
+            localplayer:SetAttribute("Level", config.level_spoof)
+        end)
     end
 
     local function spoofPlayerName(plr, isLocal)
@@ -3230,12 +3239,7 @@ run(function()
         heartbeatConn = runService.Heartbeat:Connect(function()
             if not spoofEnabled then return end
             if config.level_spoof ~= 0 then
-                pcall(function()
-                    if localplayer:FindFirstChild("CustomLeaderstats") and localplayer.CustomLeaderstats:FindFirstChild("Level") then
-                        localplayer.CustomLeaderstats.Level.Value = config.level_spoof
-                    end
-                    localplayer:SetAttribute("Level", config.level_spoof)
-                end)
+                applyLevelSpoof()
             end
         end)
     end
@@ -3256,7 +3260,7 @@ run(function()
         Function = function(callback)
             if callback then enable() else disable() end
         end,
-        Tooltip = "Your name → rawr.xyz | Level spoof | Others show rawr.xyz tag"
+        Tooltip = "u"
     })
 
     Spoofer:CreateTextBox({
@@ -3286,12 +3290,15 @@ run(function()
                 else
                     config.level_spoof = num
                 end
+                if spoofEnabled then
+                    applyLevelSpoof()
+                end
             else
                 notif("Name/Level Spoofer", "Level must be a number", 2, "alert")
             end
         end
     })
-end)                                                                                                                                                                                                                                                                                  
+end)                                                                                                                                                                                                                                                                   
                                                                                                                                                                                                                                                                                                                                                         
 run(function()
     local module = vape.Categories.Utility:CreateModule({
