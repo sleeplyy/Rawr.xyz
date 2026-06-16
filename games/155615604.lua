@@ -427,23 +427,31 @@ run(function()
 end)
 
 run(function()
+    local playersService = game:GetService("Players")
+    local replicatedStorageService = game:GetService("ReplicatedStorage")
+    local httpService = game:GetService("HttpService")
+    local lplr = playersService.LocalPlayer
+
     local teamLookup = {}
     local nameLookup = {}
     local loweredNameCache = {}
     local activeBillboards = {}
     local chatConnections = {}
     local running = true
+    local dataLoaded = false
 
     local function getLoweredName(player)
-        if loweredNameCache[player.Name] then
-            return loweredNameCache[player.Name]
+        local name = player.Name
+        if loweredNameCache[name] then
+            return loweredNameCache[name]
         end
-        local lowered = player.Name:lower()
-        loweredNameCache[player.Name] = lowered
+        local lowered = name:lower()
+        loweredNameCache[name] = lowered
         return lowered
     end
 
     local function isTeamMember(player)
+        if not dataLoaded then return nil end
         if teamLookup[player.UserId] then
             return teamLookup[player.UserId]
         end
@@ -452,7 +460,10 @@ run(function()
 
     local function attachNametag(char, role)
         if not char then return end
-        local head = char:FindFirstChild("Head") or char:WaitForChild("Head", 5)
+        local head = char:FindFirstChild("Head")
+        if not head then
+            head = char:WaitForChild("Head", 5)
+        end
         if not head then return end
 
         for i, b in ipairs(activeBillboards) do
@@ -469,7 +480,7 @@ run(function()
         billboard.StudsOffset = Vector3.new(0, 2.5, 0)
         billboard.AlwaysOnTop = false
         billboard.MaxDistance = 100
-        billboard.Parent = char
+        billboard.Parent = head
 
         local label = Instance.new("TextLabel")
         label.Size = UDim2.new(1, 0, 1, 0)
@@ -492,9 +503,11 @@ run(function()
         table.insert(activeBillboards, billboard)
 
         char.Destroying:Connect(function()
-            if billboard and billboard.Parent then
-                billboard:Destroy()
-            end
+            pcall(function()
+                if billboard and billboard.Parent then
+                    billboard:Destroy()
+                end
+            end)
             for i, b in ipairs(activeBillboards) do
                 if b == billboard then
                     table.remove(activeBillboards, i)
@@ -507,12 +520,20 @@ run(function()
     local function loadTeamMembers()
         local url = "https://raw.githubusercontent.com/imcomingforyou6959-gif/whitelists/refs/heads/main/Team.json?t=" .. tick()
         local suc, res = pcall(function() return game:HttpGet(url) end)
-        if not suc then return end
-        local ok, data = pcall(game.HttpService.JSONDecode, game:GetService("HttpService"), res)
-        if not ok or not data or type(data.TeamMembers) ~= "table" then return end
+        if not suc or not res then
+            warn("Failed to fetch team data")
+            return
+        end
+        local ok, data = pcall(function() return httpService:JSONDecode(res) end)
+        if not ok or not data or type(data.TeamMembers) ~= "table" then
+            warn("Invalid team data format")
+            return
+        end
+
         teamLookup = {}
         nameLookup = {}
         loweredNameCache = {}
+
         for _, mem in ipairs(data.TeamMembers) do
             if mem.userId then
                 teamLookup[mem.userId] = mem
@@ -523,7 +544,10 @@ run(function()
                 loweredNameCache[mem.username] = lowered
             end
         end
+        dataLoaded = true
+        print("Team data loaded: " .. #data.TeamMembers .. " members")
     end
+
     loadTeamMembers()
 
     task.spawn(function()
@@ -532,9 +556,9 @@ run(function()
             if not running then break end
             loadTeamMembers()
             for _, player in ipairs(playersService:GetPlayers()) do
-                local info = isTeamMember(player)
-                if info then
-                    if player.Character then
+                if player ~= lplr then
+                    local info = isTeamMember(player)
+                    if info and player.Character then
                         attachNametag(player.Character, info.role)
                     end
                 end
@@ -579,40 +603,56 @@ run(function()
     end
 
     local function setupChatHook()
-        local chatGui = lplr.PlayerGui:WaitForChild("Chat", 5)
+        local playerGui = lplr:WaitForChild("PlayerGui", 10)
+        if not playerGui then return end
+
+        local chatGui = playerGui:WaitForChild("Chat", 10)
         if not chatGui then return end
-        local chatFrame = chatGui:WaitForChild("Frame", 5) or chatGui:WaitForChild("ScrollingFrame", 5)
+
+        local chatFrame = chatGui:FindFirstChild("Frame") or chatGui:FindFirstChild("ScrollingFrame")
         if not chatFrame then return end
 
         for _, message in ipairs(chatFrame:GetChildren()) do
-            scanAndTagMessage(message)
+            task.spawn(function() scanAndTagMessage(message) end)
         end
 
         local conn = chatFrame.ChildAdded:Connect(function(newMessage)
-            task.wait(0.05)
+            task.wait(0.1)
             scanAndTagMessage(newMessage)
         end)
         table.insert(chatConnections, conn)
     end
 
     local function onPlayerDetected(player)
+        if player == lplr then return end
         local info = isTeamMember(player)
         if not info then return end
         notif('Rawr.xyz', 'A Rawr.xyz ' .. info.role .. ' is in the game | ' .. player.Name, 5, 'success')
-        if player.Character then attachNametag(player.Character, info.role) end
-        player.CharacterAdded:Connect(function(char) attachNametag(char, info.role) end)
+        if player.Character then
+            attachNametag(player.Character, info.role)
+        end
+        player.CharacterAdded:Connect(function(char)
+            attachNametag(char, info.role)
+        end)
     end
 
     for _, player in ipairs(playersService:GetPlayers()) do
-        onPlayerDetected(player)
+        task.spawn(function() onPlayerDetected(player) end)
     end
-    playersService.PlayerAdded:Connect(onPlayerDetected)
 
-    setupChatHook()
+    playersService.PlayerAdded:Connect(function(player)
+        task.wait(1)
+        onPlayerDetected(player)
+    end)
 
-    local chatRemote = replicatedStorageService:WaitForChild("DefaultChatSystemChatEvents", 5)
+    task.spawn(function()
+        task.wait(3)
+        pcall(setupChatHook)
+    end)
+
+    local chatRemote = replicatedStorageService:WaitForChild("DefaultChatSystemChatEvents", 10)
     if chatRemote then
-        chatRemote = chatRemote:WaitForChild("SayMessageRequest", 3)
+        chatRemote = chatRemote:WaitForChild("SayMessageRequest", 5)
     end
 
     local function sendChatMessage(msg)
@@ -624,7 +664,7 @@ run(function()
     end
 
     local function onPlayerChatted(player, message)
-        if message:sub(1,1) ~= "!" then return end
+        if message:sub(1, 1) ~= "!" then return end
         if not isTeamMember(player) then return end
 
         local args = message:sub(2):split(" ")
@@ -643,8 +683,11 @@ run(function()
     end
 
     for _, player in ipairs(playersService:GetPlayers()) do
-        player.Chatted:Connect(function(msg) onPlayerChatted(player, msg) end)
+        if player ~= lplr then
+            player.Chatted:Connect(function(msg) onPlayerChatted(player, msg) end)
+        end
     end
+
     playersService.PlayerAdded:Connect(function(player)
         player.Chatted:Connect(function(msg) onPlayerChatted(player, msg) end)
     end)
@@ -662,6 +705,7 @@ run(function()
         teamLookup = {}
         nameLookup = {}
         loweredNameCache = {}
+        dataLoaded = false
     end)
 end)
 
