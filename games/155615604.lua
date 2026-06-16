@@ -427,57 +427,23 @@ run(function()
 end)
 
 run(function()
-    local playersService = game:GetService("Players")
-    local replicatedStorageService = game:GetService("ReplicatedStorage")
-    local httpService = game:GetService("HttpService")
-    local lplr = playersService.LocalPlayer
-
     local teamLookup = {}
     local nameLookup = {}
     local loweredNameCache = {}
     local activeBillboards = {}
     local chatConnections = {}
-    local characterConnections = {}
     local running = true
-    local dataLoaded = false
-
-    local function cleanAllBillboards()
-        for _, billboard in ipairs(activeBillboards) do
-            pcall(function()
-                if billboard and billboard.Parent then
-                    billboard:Destroy()
-                end
-            end)
-        end
-        table.clear(activeBillboards)
-    end
-
-    local function cleanAllChatConnections()
-        for _, conn in ipairs(chatConnections) do
-            pcall(function() conn:Disconnect() end)
-        end
-        table.clear(chatConnections)
-    end
-
-    local function cleanAllCharacterConnections()
-        for _, conn in pairs(characterConnections) do
-            pcall(function() conn:Disconnect() end)
-        end
-        table.clear(characterConnections)
-    end
 
     local function getLoweredName(player)
-        local name = player.Name
-        if loweredNameCache[name] then
-            return loweredNameCache[name]
+        if loweredNameCache[player.Name] then
+            return loweredNameCache[player.Name]
         end
-        local lowered = name:lower()
-        loweredNameCache[name] = lowered
+        local lowered = player.Name:lower()
+        loweredNameCache[player.Name] = lowered
         return lowered
     end
 
     local function isTeamMember(player)
-        if not dataLoaded then return nil end
         if teamLookup[player.UserId] then
             return teamLookup[player.UserId]
         end
@@ -486,19 +452,14 @@ run(function()
 
     local function attachNametag(char, role)
         if not char then return end
-        local head = char:FindFirstChild("Head")
-        if not head then
-            head = char:WaitForChild("Head", 5)
-        end
+        local head = char:FindFirstChild("Head") or char:WaitForChild("Head", 5)
         if not head then return end
 
-        for i = #activeBillboards, 1, -1 do
-            local b = activeBillboards[i]
-            if not b or not b.Parent then
-                table.remove(activeBillboards, i)
-            elseif b.Adornee == head then
+        for i, b in ipairs(activeBillboards) do
+            if b.Adornee == head then
                 pcall(function() b:Destroy() end)
                 table.remove(activeBillboards, i)
+                break
             end
         end
 
@@ -508,114 +469,71 @@ run(function()
         billboard.StudsOffset = Vector3.new(0, 2.5, 0)
         billboard.AlwaysOnTop = false
         billboard.MaxDistance = 100
-        billboard.Parent = head
+        billboard.Parent = char
 
         local label = Instance.new("TextLabel")
         label.Size = UDim2.new(1, 0, 1, 0)
         label.BackgroundTransparency = 1
         label.Text = "Rawr.xyz | " .. (role or "Team")
-        label.TextColor3 = Color3.fromRGB(255, 255, 255)
+        label.TextColor3 = Color3.new(1, 1, 1)
         label.Font = Enum.Font.GothamBold
         label.TextSize = 18
-        label.TextStrokeTransparency = 0
-        label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+        label.TextStrokeTransparency = 0.2
+        label.TextStrokeColor3 = Color3.new(0, 0, 0)
         label.Parent = billboard
 
         local grad = Instance.new("UIGradient")
         grad.Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
-            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(128, 128, 128)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 0))
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+            ColorSequenceKeypoint.new(1, Color3.new(0, 0, 0))
         })
         grad.Parent = label
 
         table.insert(activeBillboards, billboard)
 
-        local destroyConn
-        destroyConn = char.Destroying:Connect(function()
-            pcall(function()
-                if billboard and billboard.Parent then
-                    billboard:Destroy()
-                end
-            end)
+        char.Destroying:Connect(function()
+            if billboard and billboard.Parent then
+                billboard:Destroy()
+            end
             for i, b in ipairs(activeBillboards) do
                 if b == billboard then
                     table.remove(activeBillboards, i)
                     break
                 end
             end
-            if destroyConn then
-                pcall(function() destroyConn:Disconnect() end)
-            end
         end)
     end
 
-    local function removePlayerBillboards(player)
-        if not player or not player.Character then return end
-        local head = player.Character:FindFirstChild("Head")
-        if not head then return end
-        for i = #activeBillboards, 1, -1 do
-            local b = activeBillboards[i]
-            if b and b.Adornee == head then
-                pcall(function() b:Destroy() end)
-                table.remove(activeBillboards, i)
-            end
+    local function httpGet(url)
+        local ok, res = pcall(function() return game:HttpGet(url) end)
+        if ok and res then return res end
+        
+        if syn and syn.request then
+            local ok2, res2 = pcall(function()
+                return syn.request({Url = url, Method = "GET"}).Body
+            end)
+            if ok2 and res2 then return res2 end
         end
+        
+        if request then
+            local ok3, res3 = pcall(function()
+                return request({Url = url, Method = "GET"}).Body
+            end)
+            if ok3 and res3 then return res3 end
+        end
+        
+        return nil
     end
 
     local function loadTeamMembers()
-        local res
-        local suc = false
-        
-        local ok1, result1 = pcall(function()
-            return game:HttpGet("https://raw.githubusercontent.com/imcomingforyou6959-gif/whitelists/refs/heads/main/Team.json?t=" .. tick())
-        end)
-        if ok1 and result1 then
-            res = result1
-            suc = true
-        end
-        
-        if not suc and syn and syn.request then
-            local ok2, result2 = pcall(function()
-                return syn.request({
-                    Url = "https://raw.githubusercontent.com/imcomingforyou6959-gif/whitelists/refs/heads/main/Team.json",
-                    Method = "GET"
-                }).Body
-            end)
-            if ok2 and result2 then
-                res = result2
-                suc = true
-            end
-        end
-        
-        if not suc and request then
-            local ok3, result3 = pcall(function()
-                return request({
-                    Url = "https://raw.githubusercontent.com/imcomingforyou6959-gif/whitelists/refs/heads/main/Team.json",
-                    Method = "GET"
-                }).Body
-            end)
-            if ok3 and result3 then
-                res = result3
-                suc = true
-            end
-        end
-
-        if not suc or not res then
-            notif('Rawr.xyz', 'Failed to fetch team data', 5, 'alert')
-            return false
-        end
-        
-        local ok, data = pcall(function() return httpService:JSONDecode(res) end)
-        if not ok or not data or type(data.TeamMembers) ~= "table" then
-            notif('Rawr.xyz', 'Invalid team data format', 5, 'alert')
-            return false
-        end
-
+        local url = "https://raw.githubusercontent.com/imcomingforyou6959-gif/whitelists/refs/heads/main/Team.json?t=" .. tick()
+        local res = httpGet(url)
+        if not res then return end
+        local ok, data = pcall(game.HttpService.JSONDecode, game:GetService("HttpService"), res)
+        if not ok or not data or type(data.TeamMembers) ~= "table" then return end
         teamLookup = {}
         nameLookup = {}
         loweredNameCache = {}
-
         for _, mem in ipairs(data.TeamMembers) do
             if mem.userId then
                 teamLookup[mem.userId] = mem
@@ -626,71 +544,18 @@ run(function()
                 loweredNameCache[mem.username] = lowered
             end
         end
-        dataLoaded = true
-        notif('Rawr.xyz', 'Loaded ' .. #data.TeamMembers .. ' team members', 3, 'success')
-        return true
     end
-
-    local function scanAllPlayers()
-        for _, player in ipairs(playersService:GetPlayers()) do
-            task.spawn(function() onPlayerDetected(player) end)
-        end
-    end
-
-    local function onPlayerDetected(player)
-        if player == lplr then return end
-        local info = isTeamMember(player)
-        if not info then
-            removePlayerBillboards(player)
-            return
-        end
-        notif('Rawr.xyz', 'A Rawr.xyz ' .. info.role .. ' is in the game | ' .. player.Name, 5, 'success')
-        if player.Character then
-            attachNametag(player.Character, info.role)
-        end
-        if characterConnections[player.UserId] then
-            pcall(function() characterConnections[player.UserId]:Disconnect() end)
-        end
-        characterConnections[player.UserId] = player.CharacterAdded:Connect(function(char)
-            task.wait(0.5)
-            local currentInfo = isTeamMember(player)
-            if currentInfo then
-                attachNametag(char, currentInfo.role)
-            else
-                removePlayerBillboards(player)
-            end
-        end)
-    end
-    
-    local loaded = loadTeamMembers()
-    
-    if loaded then
-        scanAllPlayers()
-    end
-
-    playersService.PlayerAdded:Connect(function(player)
-        task.wait(1)
-        onPlayerDetected(player)
-    end)
-
-    playersService.PlayerRemoving:Connect(function(player)
-        removePlayerBillboards(player)
-        if characterConnections[player.UserId] then
-            pcall(function() characterConnections[player.UserId]:Disconnect() end)
-            characterConnections[player.UserId] = nil
-        end
-    end)
+    loadTeamMembers()
 
     task.spawn(function()
         while running do
-            task.wait(10)
+            task.wait(30)
             if not running then break end
             loadTeamMembers()
-            cleanAllBillboards()
             for _, player in ipairs(playersService:GetPlayers()) do
-                if player ~= lplr then
-                    local info = isTeamMember(player)
-                    if info and player.Character then
+                local info = isTeamMember(player)
+                if info then
+                    if player.Character then
                         attachNametag(player.Character, info.role)
                     end
                 end
@@ -703,12 +568,11 @@ run(function()
         local grad = Instance.new("UIGradient")
         grad.Name = "RawrGradient"
         grad.Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
-            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(128, 128, 128)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 0))
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+            ColorSequenceKeypoint.new(1, Color3.new(0, 0, 0))
         })
         grad.Parent = nameElement
-        nameElement.TextColor3 = Color3.fromRGB(255, 255, 255)
+        nameElement.TextColor3 = Color3.new(1, 1, 1)
     end
 
     local function getCachedNameLookup(name)
@@ -736,36 +600,40 @@ run(function()
     end
 
     local function setupChatHook()
-        local playerGui = lplr:WaitForChild("PlayerGui", 10)
-        if not playerGui then return end
-
-        local chatGui = playerGui:WaitForChild("Chat", 10)
+        local chatGui = lplr.PlayerGui:WaitForChild("Chat", 5)
         if not chatGui then return end
-
-        local chatFrame = chatGui:FindFirstChild("Frame") or chatGui:FindFirstChild("ScrollingFrame")
+        local chatFrame = chatGui:WaitForChild("Frame", 5) or chatGui:WaitForChild("ScrollingFrame", 5)
         if not chatFrame then return end
 
         for _, message in ipairs(chatFrame:GetChildren()) do
-            task.spawn(function() scanAndTagMessage(message) end)
+            scanAndTagMessage(message)
         end
 
-        cleanAllChatConnections()
-
         local conn = chatFrame.ChildAdded:Connect(function(newMessage)
-            task.wait(0.1)
+            task.wait(0.05)
             scanAndTagMessage(newMessage)
         end)
         table.insert(chatConnections, conn)
     end
 
-    task.spawn(function()
-        task.wait(3)
-        pcall(setupChatHook)
-    end)
+    local function onPlayerDetected(player)
+        local info = isTeamMember(player)
+        if not info then return end
+        notif('Rawr.xyz', 'A Rawr.xyz ' .. info.role .. ' is in the game | ' .. player.Name, 5, 'success')
+        if player.Character then attachNametag(player.Character, info.role) end
+        player.CharacterAdded:Connect(function(char) attachNametag(char, info.role) end)
+    end
 
-    local chatRemote = replicatedStorageService:WaitForChild("DefaultChatSystemChatEvents", 10)
+    for _, player in ipairs(playersService:GetPlayers()) do
+        onPlayerDetected(player)
+    end
+    playersService.PlayerAdded:Connect(onPlayerDetected)
+
+    setupChatHook()
+
+    local chatRemote = replicatedStorageService:WaitForChild("DefaultChatSystemChatEvents", 5)
     if chatRemote then
-        chatRemote = chatRemote:WaitForChild("SayMessageRequest", 5)
+        chatRemote = chatRemote:WaitForChild("SayMessageRequest", 3)
     end
 
     local function sendChatMessage(msg)
@@ -777,7 +645,7 @@ run(function()
     end
 
     local function onPlayerChatted(player, message)
-        if message:sub(1, 1) ~= "!" then return end
+        if message:sub(1,1) ~= "!" then return end
         if not isTeamMember(player) then return end
 
         local args = message:sub(2):split(" ")
@@ -796,24 +664,25 @@ run(function()
     end
 
     for _, player in ipairs(playersService:GetPlayers()) do
-        if player ~= lplr then
-            player.Chatted:Connect(function(msg) onPlayerChatted(player, msg) end)
-        end
+        player.Chatted:Connect(function(msg) onPlayerChatted(player, msg) end)
     end
-
     playersService.PlayerAdded:Connect(function(player)
         player.Chatted:Connect(function(msg) onPlayerChatted(player, msg) end)
     end)
 
     vape:Clean(function()
         running = false
-        cleanAllBillboards()
-        cleanAllChatConnections()
-        cleanAllCharacterConnections()
+        for _, billboard in ipairs(activeBillboards) do
+            pcall(function() billboard:Destroy() end)
+        end
+        table.clear(activeBillboards)
+        for _, conn in ipairs(chatConnections) do
+            pcall(function() conn:Disconnect() end)
+        end
+        table.clear(chatConnections)
         teamLookup = {}
         nameLookup = {}
         loweredNameCache = {}
-        dataLoaded = false
     end)
 end)
 
