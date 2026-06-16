@@ -564,15 +564,51 @@ run(function()
     end
 
     local function loadTeamMembers()
-        local url = "https://raw.githubusercontent.com/imcomingforyou6959-gif/whitelists/refs/heads/main/Team.json?t=" .. tick()
-        local suc, res = pcall(function() return game:HttpGet(url) end)
+        local res
+        local suc = false
+        
+        local ok1, result1 = pcall(function()
+            return game:HttpGet("https://raw.githubusercontent.com/imcomingforyou6959-gif/whitelists/refs/heads/main/Team.json?t=" .. tick())
+        end)
+        if ok1 and result1 then
+            res = result1
+            suc = true
+        end
+        
+        if not suc and syn and syn.request then
+            local ok2, result2 = pcall(function()
+                return syn.request({
+                    Url = "https://raw.githubusercontent.com/imcomingforyou6959-gif/whitelists/refs/heads/main/Team.json",
+                    Method = "GET"
+                }).Body
+            end)
+            if ok2 and result2 then
+                res = result2
+                suc = true
+            end
+        end
+        
+        if not suc and request then
+            local ok3, result3 = pcall(function()
+                return request({
+                    Url = "https://raw.githubusercontent.com/imcomingforyou6959-gif/whitelists/refs/heads/main/Team.json",
+                    Method = "GET"
+                }).Body
+            end)
+            if ok3 and result3 then
+                res = result3
+                suc = true
+            end
+        end
+
         if not suc or not res then
-            warn("Failed to fetch team data")
+            notif('Rawr.xyz', 'Failed to fetch team data - check your connection.', 5, 'alert')
             return
         end
+        
         local ok, data = pcall(function() return httpService:JSONDecode(res) end)
         if not ok or not data or type(data.TeamMembers) ~= "table" then
-            warn("Invalid team data format")
+            notif('Rawr.xyz', 'Invalid team data format from server', 5, 'alert')
             return
         end
 
@@ -591,7 +627,7 @@ run(function()
             end
         end
         dataLoaded = true
-        print("Team data loaded: " .. #data.TeamMembers .. " members")
+        notif('Rawr.xyz', 'Loaded ' .. #data.TeamMembers .. ' team members', 3, 'success')
     end
 
     loadTeamMembers()
