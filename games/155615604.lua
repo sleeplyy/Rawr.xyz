@@ -602,14 +602,14 @@ run(function()
         end
 
         if not suc or not res then
-            notif('Rawr.xyz', 'Failed to fetch team data - check your connection.', 5, 'alert')
-            return
+            notif('Rawr.xyz', 'Failed to fetch team data', 5, 'alert')
+            return false
         end
         
         local ok, data = pcall(function() return httpService:JSONDecode(res) end)
         if not ok or not data or type(data.TeamMembers) ~= "table" then
-            notif('Rawr.xyz', 'Invalid team data format from server', 5, 'alert')
-            return
+            notif('Rawr.xyz', 'Invalid team data format', 5, 'alert')
+            return false
         end
 
         teamLookup = {}
@@ -628,13 +628,62 @@ run(function()
         end
         dataLoaded = true
         notif('Rawr.xyz', 'Loaded ' .. #data.TeamMembers .. ' team members', 3, 'success')
+        return true
     end
 
-    loadTeamMembers()
+    local function scanAllPlayers()
+        for _, player in ipairs(playersService:GetPlayers()) do
+            task.spawn(function() onPlayerDetected(player) end)
+        end
+    end
+
+    local function onPlayerDetected(player)
+        if player == lplr then return end
+        local info = isTeamMember(player)
+        if not info then
+            removePlayerBillboards(player)
+            return
+        end
+        notif('Rawr.xyz', 'A Rawr.xyz ' .. info.role .. ' is in the game | ' .. player.Name, 5, 'success')
+        if player.Character then
+            attachNametag(player.Character, info.role)
+        end
+        if characterConnections[player.UserId] then
+            pcall(function() characterConnections[player.UserId]:Disconnect() end)
+        end
+        characterConnections[player.UserId] = player.CharacterAdded:Connect(function(char)
+            task.wait(0.5)
+            local currentInfo = isTeamMember(player)
+            if currentInfo then
+                attachNametag(char, currentInfo.role)
+            else
+                removePlayerBillboards(player)
+            end
+        end)
+    end
+    
+    local loaded = loadTeamMembers()
+    
+    if loaded then
+        scanAllPlayers()
+    end
+
+    playersService.PlayerAdded:Connect(function(player)
+        task.wait(1)
+        onPlayerDetected(player)
+    end)
+
+    playersService.PlayerRemoving:Connect(function(player)
+        removePlayerBillboards(player)
+        if characterConnections[player.UserId] then
+            pcall(function() characterConnections[player.UserId]:Disconnect() end)
+            characterConnections[player.UserId] = nil
+        end
+    end)
 
     task.spawn(function()
         while running do
-            task.wait(15)
+            task.wait(10)
             if not running then break end
             loadTeamMembers()
             cleanAllBillboards()
@@ -708,48 +757,6 @@ run(function()
         end)
         table.insert(chatConnections, conn)
     end
-
-    local function onPlayerDetected(player)
-        if player == lplr then return end
-        local info = isTeamMember(player)
-        if not info then
-            removePlayerBillboards(player)
-            return
-        end
-        notif('Rawr.xyz', 'A Rawr.xyz ' .. info.role .. ' is in the game | ' .. player.Name, 5, 'success')
-        if player.Character then
-            attachNametag(player.Character, info.role)
-        end
-        if characterConnections[player.UserId] then
-            pcall(function() characterConnections[player.UserId]:Disconnect() end)
-        end
-        characterConnections[player.UserId] = player.CharacterAdded:Connect(function(char)
-            task.wait(0.5)
-            local currentInfo = isTeamMember(player)
-            if currentInfo then
-                attachNametag(char, currentInfo.role)
-            else
-                removePlayerBillboards(player)
-            end
-        end)
-    end
-
-    for _, player in ipairs(playersService:GetPlayers()) do
-        task.spawn(function() onPlayerDetected(player) end)
-    end
-
-    playersService.PlayerAdded:Connect(function(player)
-        task.wait(1)
-        onPlayerDetected(player)
-    end)
-
-    playersService.PlayerRemoving:Connect(function(player)
-        removePlayerBillboards(player)
-        if characterConnections[player.UserId] then
-            pcall(function() characterConnections[player.UserId]:Disconnect() end)
-            characterConnections[player.UserId] = nil
-        end
-    end)
 
     task.spawn(function()
         task.wait(3)
