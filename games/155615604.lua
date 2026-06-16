@@ -437,8 +437,34 @@ run(function()
     local loweredNameCache = {}
     local activeBillboards = {}
     local chatConnections = {}
+    local characterConnections = {}
     local running = true
     local dataLoaded = false
+
+    local function cleanAllBillboards()
+        for _, billboard in ipairs(activeBillboards) do
+            pcall(function()
+                if billboard and billboard.Parent then
+                    billboard:Destroy()
+                end
+            end)
+        end
+        table.clear(activeBillboards)
+    end
+
+    local function cleanAllChatConnections()
+        for _, conn in ipairs(chatConnections) do
+            pcall(function() conn:Disconnect() end)
+        end
+        table.clear(chatConnections)
+    end
+
+    local function cleanAllCharacterConnections()
+        for _, conn in pairs(characterConnections) do
+            pcall(function() conn:Disconnect() end)
+        end
+        table.clear(characterConnections)
+    end
 
     local function getLoweredName(player)
         local name = player.Name
@@ -466,11 +492,13 @@ run(function()
         end
         if not head then return end
 
-        for i, b in ipairs(activeBillboards) do
-            if b.Adornee == head then
+        for i = #activeBillboards, 1, -1 do
+            local b = activeBillboards[i]
+            if not b or not b.Parent then
+                table.remove(activeBillboards, i)
+            elseif b.Adornee == head then
                 pcall(function() b:Destroy() end)
                 table.remove(activeBillboards, i)
-                break
             end
         end
 
@@ -503,7 +531,8 @@ run(function()
 
         table.insert(activeBillboards, billboard)
 
-        char.Destroying:Connect(function()
+        local destroyConn
+        destroyConn = char.Destroying:Connect(function()
             pcall(function()
                 if billboard and billboard.Parent then
                     billboard:Destroy()
@@ -515,7 +544,23 @@ run(function()
                     break
                 end
             end
+            if destroyConn then
+                pcall(function() destroyConn:Disconnect() end)
+            end
         end)
+    end
+
+    local function removePlayerBillboards(player)
+        if not player or not player.Character then return end
+        local head = player.Character:FindFirstChild("Head")
+        if not head then return end
+        for i = #activeBillboards, 1, -1 do
+            local b = activeBillboards[i]
+            if b and b.Adornee == head then
+                pcall(function() b:Destroy() end)
+                table.remove(activeBillboards, i)
+            end
+        end
     end
 
     local function loadTeamMembers()
@@ -546,16 +591,17 @@ run(function()
             end
         end
         dataLoaded = true
-        print("data loaded: " .. #data.TeamMembers .. " members")
+        print("Team data loaded: " .. #data.TeamMembers .. " members")
     end
 
     loadTeamMembers()
 
     task.spawn(function()
         while running do
-            task.wait(30)
+            task.wait(15)
             if not running then break end
             loadTeamMembers()
+            cleanAllBillboards()
             for _, player in ipairs(playersService:GetPlayers()) do
                 if player ~= lplr then
                     local info = isTeamMember(player)
@@ -618,6 +664,8 @@ run(function()
             task.spawn(function() scanAndTagMessage(message) end)
         end
 
+        cleanAllChatConnections()
+
         local conn = chatFrame.ChildAdded:Connect(function(newMessage)
             task.wait(0.1)
             scanAndTagMessage(newMessage)
@@ -628,13 +676,25 @@ run(function()
     local function onPlayerDetected(player)
         if player == lplr then return end
         local info = isTeamMember(player)
-        if not info then return end
+        if not info then
+            removePlayerBillboards(player)
+            return
+        end
         notif('Rawr.xyz', 'A Rawr.xyz ' .. info.role .. ' is in the game | ' .. player.Name, 5, 'success')
         if player.Character then
             attachNametag(player.Character, info.role)
         end
-        player.CharacterAdded:Connect(function(char)
-            attachNametag(char, info.role)
+        if characterConnections[player.UserId] then
+            pcall(function() characterConnections[player.UserId]:Disconnect() end)
+        end
+        characterConnections[player.UserId] = player.CharacterAdded:Connect(function(char)
+            task.wait(0.5)
+            local currentInfo = isTeamMember(player)
+            if currentInfo then
+                attachNametag(char, currentInfo.role)
+            else
+                removePlayerBillboards(player)
+            end
         end)
     end
 
@@ -645,6 +705,14 @@ run(function()
     playersService.PlayerAdded:Connect(function(player)
         task.wait(1)
         onPlayerDetected(player)
+    end)
+
+    playersService.PlayerRemoving:Connect(function(player)
+        removePlayerBillboards(player)
+        if characterConnections[player.UserId] then
+            pcall(function() characterConnections[player.UserId]:Disconnect() end)
+            characterConnections[player.UserId] = nil
+        end
     end)
 
     task.spawn(function()
@@ -696,14 +764,9 @@ run(function()
 
     vape:Clean(function()
         running = false
-        for _, billboard in ipairs(activeBillboards) do
-            pcall(function() billboard:Destroy() end)
-        end
-        table.clear(activeBillboards)
-        for _, conn in ipairs(chatConnections) do
-            pcall(function() conn:Disconnect() end)
-        end
-        table.clear(chatConnections)
+        cleanAllBillboards()
+        cleanAllChatConnections()
+        cleanAllCharacterConnections()
         teamLookup = {}
         nameLookup = {}
         loweredNameCache = {}
