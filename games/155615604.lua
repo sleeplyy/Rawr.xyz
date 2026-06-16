@@ -486,17 +486,18 @@ run(function()
         label.Size = UDim2.new(1, 0, 1, 0)
         label.BackgroundTransparency = 1
         label.Text = "Rawr.xyz | " .. (role or "Team")
-        label.TextColor3 = Color3.new(1, 1, 1)
+        label.TextColor3 = Color3.fromRGB(255, 255, 255)
         label.Font = Enum.Font.GothamBold
         label.TextSize = 18
-        label.TextStrokeTransparency = 0.2
-        label.TextStrokeColor3 = Color3.new(0, 0, 0)
+        label.TextStrokeTransparency = 0
+        label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
         label.Parent = billboard
 
         local grad = Instance.new("UIGradient")
         grad.Color = ColorSequence.new({
             ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
-            ColorSequenceKeypoint.new(1, Color3.new(0, 0, 0))
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(128, 128, 128)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 0))
         })
         grad.Parent = label
 
@@ -545,7 +546,7 @@ run(function()
             end
         end
         dataLoaded = true
-        print("Team data loaded: " .. #data.TeamMembers .. " members")
+        print("data loaded: " .. #data.TeamMembers .. " members")
     end
 
     loadTeamMembers()
@@ -571,11 +572,12 @@ run(function()
         local grad = Instance.new("UIGradient")
         grad.Name = "RawrGradient"
         grad.Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
-            ColorSequenceKeypoint.new(1, Color3.new(0, 0, 0))
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(128, 128, 128)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 0))
         })
         grad.Parent = nameElement
-        nameElement.TextColor3 = Color3.new(1, 1, 1)
+        nameElement.TextColor3 = Color3.fromRGB(255, 255, 255)
     end
 
     local function getCachedNameLookup(name)
