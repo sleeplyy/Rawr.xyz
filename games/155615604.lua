@@ -495,7 +495,7 @@ run(function()
 
         local grad = Instance.new("UIGradient")
         grad.Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
             ColorSequenceKeypoint.new(1, Color3.new(0, 0, 0))
         })
         grad.Parent = label
