@@ -303,6 +303,37 @@ local t = {
     ka = {}
 }
 
+local CheatFlags = {Flags = {}, Flagged = {}}
+local vapeEvents = vape.Events or {} 
+if not vapeEvents.CheatFlagged then
+    vapeEvents.CheatFlagged = Instance.new("BindableEvent")
+end
+
+run(function()
+    function CheatFlags:Flag(plr, flagtype, limit)
+        if CheatFlags.Flagged[plr.UserId] then
+            return
+        end
+
+        if not CheatFlags.Flags[plr.UserId] then
+            CheatFlags.Flags[plr.UserId] = {}
+        end
+
+        local flags = CheatFlags.Flags[plr.UserId]
+        flags[flagtype] = (flags[flagtype] or 0) + 1
+
+        if flags[flagtype] > (limit or 3) then
+            CheatFlags.Flagged[plr.UserId] = true
+            vapeEvents.CheatFlagged:Fire(plr, flagtype)
+        end
+    end
+
+    function CheatFlags:Clear()
+        table.clear(CheatFlags.Flags)
+        table.clear(CheatFlags.Flagged)
+    end
+end)
+
 run(function()
     if not hookmetamethod then return end
     if not newcclosure then return end
@@ -2020,39 +2051,191 @@ run(function()
 end)
 
 run(function()
-	local AntiInvisible
+    local AntiInvisible
+    local threads = {}
+    local isEnabled = false
+    local whitelist = {
+        -- roblox animations
+        ['http://www.roblox.com/asset/?id=125750702'] = true,
+        ['http://www.roblox.com/asset/?id=128777973'] = true,
+        ['http://www.roblox.com/asset/?id=128853357'] = true,
+        ['http://www.roblox.com/asset/?id=129423030'] = true,
+        ['http://www.roblox.com/asset/?id=129423131'] = true,
+        ['http://www.roblox.com/asset/?id=129967390'] = true,
+        ['http://www.roblox.com/asset/?id=129967478'] = true,
+        ['http://www.roblox.com/asset/?id=178130996'] = true,
+        ['http://www.roblox.com/asset/?id=180426354'] = true,
+        ['http://www.roblox.com/asset/?id=180435571'] = true,
+        ['http://www.roblox.com/asset/?id=180435792'] = true,
+        ['http://www.roblox.com/asset/?id=180436148'] = true,
+        ['http://www.roblox.com/asset/?id=180436334'] = true,
+        ['http://www.roblox.com/asset/?id=182393478'] = true,
+        ['http://www.roblox.com/asset/?id=182435998'] = true,
+        ['http://www.roblox.com/asset/?id=182436842'] = true,
+        ['http://www.roblox.com/asset/?id=182436935'] = true,
+        ['http://www.roblox.com/asset/?id=182491037'] = true,
+        ['http://www.roblox.com/asset/?id=182491065'] = true,
+        ['http://www.roblox.com/asset/?id=182491248'] = true,
+        ['http://www.roblox.com/asset/?id=182491277'] = true,
+        ['http://www.roblox.com/asset/?id=182491368'] = true,
+        ['http://www.roblox.com/asset/?id=182491423'] = true,
+        -- game animations
+        ['rbxassetid://279227693'] = true,
+        ['rbxassetid://279229192'] = true,
+        ['rbxassetid://287112271'] = true,
+        ['rbxassetid://388723916'] = true,
+        ['rbxassetid://388726667'] = true,
+        ['rbxassetid://389472570'] = true,
+        ['rbxassetid://405194080'] = true,
+        ['rbxassetid://405212265'] = true,
+        ['rbxassetid://481088553'] = true,
+        ['rbxassetid://481089053'] = true,
+        ['rbxassetid://484200742'] = true,
+        ['rbxassetid://484926359'] = true,
+        ['rbxassetid://83690472549256'] = true,
+        ['rbxassetid://107176344504758'] = true,
+        ['rbxassetid://111090572475133'] = true,
+        ['rbxassetid://113267949064300'] = true,
+        ['rbxassetid://131326339350805'] = true
+    }
+    
+    local function AnimationAdded(anim, plr)
+        if not isEnabled then return end
+        if not whitelist[anim.Animation.AnimationId] and plr then
+            if threads[anim] then
+                pcall(task.cancel, threads[anim])
+                threads[anim] = nil
+            end
+    
+            CheatFlags:Flag(plr, 'invalid animation', 1)
+            local thread = task.spawn(function()
+                while isEnabled and anim.IsPlaying do
+                    pcall(function()
+                        anim:AdjustWeight(0, 0)
+                    end)
+                    task.wait()
+                end
+    
+                threads[anim] = nil
+            end)
+            
+            if thread then
+                threads[anim] = thread
+            end
+        end
+    end
+    
+    local function EntityAdded(ent)
+        local animator = ent.Humanoid:WaitForChild('Animator', 5)
+    
+        if animator and isEnabled then
+            AntiInvisible:Clean(animator.AnimationPlayed:Connect(function(anim)
+                AnimationAdded(anim, ent.Player)
+            end))
+    
+            for _, anim in animator:GetPlayingAnimationTracks() do
+                task.spawn(AnimationAdded, anim, ent.Player)
+            end
+        end
+    end
+    
+    for _, v in replicatedStorageService:QueryDescendants('Animation') do
+        whitelist[v.AnimationId] = true
+    end
+    
+    AntiInvisible = vape.Categories.Blatant:CreateModule({
+        Name = 'AntiInvisible',
+        Function = function(callback)
+            isEnabled = callback
+            if callback then
+                AntiInvisible:Clean(entitylib.Events.EntityAdded:Connect(EntityAdded))
+                for _, v in entitylib.List do
+                    task.spawn(EntityAdded, v)
+                end
+            else
+                for _, v in pairs(threads) do
+                    pcall(task.cancel, v)
+                end
+                table.clear(threads)
+            end
+        end,
+        Tooltip = 'Prevent people from using invisible animations'
+    })
+end)
+
+run(function()
+	local CheatDetector
+	local overlap = OverlapParams.new()
+	overlap.CollisionGroup = 'Players'
+	overlap.FilterDescendantsInstances = {workspace.CarContainer, workspace.Doors}
+	overlap.FilterType = Enum.RaycastFilterType.Exclude
+	local caroverlap = OverlapParams.new()
+	caroverlap.FilterDescendantsInstances = {workspace.CarContainer}
+	caroverlap.FilterType = Enum.RaycastFilterType.Include
+	caroverlap.MaxParts = 1
 	
-	local function EntityAdded(ent)
-		local animator = ent.Humanoid:WaitForChild('Animator', 5)
-	
-		if animator and AntiInvisible.Enabled then
-			AntiInvisible:Clean(animator.AnimationPlayed:Connect(function(anim)
-				if anim.Animation.AnimationId:find('215384594') then
-					anim:AdjustWeight(0)
-				end
-			end))
-	
-			for _, anim in animator:GetPlayingAnimationTracks() do
-				if anim.Animation.AnimationId:find('215384594') then
-					anim:AdjustWeight(0)
-				end
-			end
-		end
+	local whiteliststates = {
+		[Enum.HumanoidStateType.Running] = true,
+		[Enum.HumanoidStateType.Jumping] = true,
+		[Enum.HumanoidStateType.Freefall] = true,
+		[Enum.HumanoidStateType.Landed] = true,
+		[Enum.HumanoidStateType.FallingDown] = true,
+		[Enum.HumanoidStateType.GettingUp] = true,
+		[Enum.HumanoidStateType.Climbing] = true,
+		[Enum.HumanoidStateType.Seated] = true,
+		[Enum.HumanoidStateType.Ragdoll] = true,
+		[Enum.HumanoidStateType.Dead] = true,
+		[Enum.HumanoidStateType.None] = true
+	}
+
+	local function checkPoint(pos, params)
+		local raycast = workspace:Raycast(pos + Vector3.new(0, 0.1, 0), Vector3.new(0, -0.2, 0), params)
+		return raycast ~= nil
 	end
 	
-	AntiInvisible = vape.Categories.Blatant:CreateModule({
-		Name = 'AntiInvisible',
+	CheatDetector = vape.Categories.Utility:CreateModule({
+		Name = 'CheatDetector',
 		Function = function(callback)
 			if callback then
-				AntiInvisible:Clean(entitylib.Events.EntityAdded:Connect(EntityAdded))
-				for _, v in entitylib.List do
-					task.spawn(EntityAdded, v)
-				end
+				CheatDetector:Clean(vapeEvents.CheatFlagged.Event:Connect(function(plr, flagname)
+					notif('Rawr.xyz says', 'This player may be cheating! ('..flagname..'): '..plr.Name, 30, 'warning')
+				end))
+	
+				repeat
+					for _, ent in entitylib.List do
+						if ent.Health > 0 and ent.Player then
+							if not checkPoint(ent.Head.Position, overlap) then
+								CheatFlags:Flag(ent.Player, 'phase/noclip', 20)
+							end
+	
+							if not whiteliststates[ent.Humanoid:GetState()] then
+								CheatFlags:Flag(ent.Player, 'invalid state '..ent.Humanoid:GetState().Name, 1)
+							end
+	
+							local velo = ent.RootPart.AssemblyLinearVelocity
+							if not ent.Humanoid.SeatPart then
+								if (velo * Vector3.new(1, 0, 1)).Magnitude > 26 then
+									if #workspace:GetPartBoundsInRadius(ent.RootPart.Position, 30, caroverlap) <= 0 then
+										CheatFlags:Flag(ent.Player, 'speed', 20)
+									end
+								end
+	
+								if velo.Y > 50 then
+									CheatFlags:Flag(ent.Player, 'highjump', 20)
+								end
+							end
+						end
+					end
+	
+					task.wait(0.05)
+				until not CheatDetector.Enabled
+			else
+				CheatFlags:Clear()
 			end
 		end,
-		Tooltip = 'Prevent people from using invisible animations'
+		Tooltip = 'Alerts for any possible cheaters.'
 	})
-end)																																			
+end)
                                                                                                                                 
 run(function()
     local GunMods
