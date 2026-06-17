@@ -1436,19 +1436,24 @@ run(function()
     local activeMaterials = defaultMaterials
     local texturedParts = {}
     local descConn = nil
-    local blacklistedNames = {
-        ["Door"] = true,
-        ["CellDoor"] = true,
-        ["Gate"] = true,
-        ["MainDoor"] = true,
-        ["PrisonDoor"] = true,
+    
+    local BL_Doors = {
+        ["door_v3"] = true,
+        ["door_v3_cellblock1"] = true,
+        ["door_v3_ct"] = true,
     }
     
     local function isBlacklisted(part)
-        if blacklistedNames[part.Name] then return true end
+        if BL_Doors[part.Name] then return true end
+        
+        if part.Parent and BL_Doors[part.Parent.Name] then return true end
+        
         local parent = part.Parent
         while parent and parent ~= workspace do
-            if blacklistedNames[parent.Name] then
+            if parent.Name == "Doors" then
+                return true
+            end
+            if BL_Doors[parent.Name] then
                 return true
             end
             parent = parent.Parent
