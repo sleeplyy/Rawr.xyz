@@ -1436,10 +1436,30 @@ run(function()
     local activeMaterials = defaultMaterials
     local texturedParts = {}
     local descConn = nil
+    local blacklistedNames = {
+        ["Door"] = true,
+        ["CellDoor"] = true,
+        ["Gate"] = true,
+        ["MainDoor"] = true,
+        ["PrisonDoor"] = true,
+    }
+    
+    local function isBlacklisted(part)
+        if blacklistedNames[part.Name] then return true end
+        local parent = part.Parent
+        while parent and parent ~= workspace do
+            if blacklistedNames[parent.Name] then
+                return true
+            end
+            parent = parent.Parent
+        end
+        return false
+    end
 
     local function applyTexture(part)
         if not part or not part:IsA("BasePart") then return end
         if texturedParts[part] then return end
+        if isBlacklisted(part) then return end
         local matName = part.Material.Name
         for _, mat in ipairs(activeMaterials) do
             if matName == mat[1] then
@@ -1541,7 +1561,7 @@ run(function()
             end
         end
     })
-end)																			
+end)																		
                                                                                 
 run(function()
     local SilentAim
