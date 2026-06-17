@@ -2163,12 +2163,71 @@ run(function()
     })
 end)
 
+local OriginScanner = {Cache = {}}
+run(function()
+	local rayParams = RaycastParams.new()
+	local rayParams2 = OverlapParams.new()
+	rayParams.CollisionGroup = 'ClientBullet'
+	rayParams.FilterType = Enum.RaycastFilterType.Exclude
+	rayParams2.CollisionGroup = 'ClientBullet'
+	rayParams2.FilterType = Enum.RaycastFilterType.Exclude
+	OriginScanner.Ray = rayParams
+
+	local positions = {
+		Vector3.new(0, 1, 0),
+		Vector3.new(1, 0, 0),
+		Vector3.new(0.7, -0.5, -0.5),
+		Vector3.new(-0.1, -0.8, -0.8),
+		Vector3.new(-0.8, -0.5, -0.5),
+		Vector3.new(-1, 0, 0),
+		Vector3.new(-0.8, 0.4, 0.4),
+		Vector3.new(0, 0.7, 0.7),
+		Vector3.new(0.7, 0.5, 0.5),
+		Vector3.new(1, 0, 0),
+		Vector3.new(0.7, 0, -0.8),
+		Vector3.new(-0.1, 0, -1),
+		Vector3.new(-0.8, 0, -0.8),
+		Vector3.new(-1, 0, 0),
+		Vector3.new(-0.8, 0, 0.7),
+		Vector3.new(0, 0, 1),
+		Vector3.new(0.7, 0, 0.7),
+		Vector3.new(1, 0, 0),
+		Vector3.new(0.7, 0.4, -0.5),
+		Vector3.new(-0.1, 0.7, -0.8),
+		Vector3.new(-0.8, 0.4, -0.5),
+		Vector3.new(-1, -0.1, 0),
+		Vector3.new(-0.8, -0.5, 0.4),
+		Vector3.new(0, -0.8, 0.7),
+		Vector3.new(0.7, -0.6, 0.5),
+		Vector3.new(0, -1, 0)
+	}
+
+	local function checkPoint(pos, params)
+		if not pos then return false end
+		local origin = pos + Vector3.new(0, 0.1, 0)
+		local direction = Vector3.new(0, -0.2, 0)
+		local raycastResult = workspace:Raycast(origin, direction, params)
+		return raycastResult ~= nil
+	end
+
+	function OriginScanner:UpdateIgnore()
+		local ignore = {lplr.Character}
+		for _, v in entitylib.List do
+			table.insert(ignore, v.Character)
+		end
+
+		rayParams.FilterDescendantsInstances = ignore
+		rayParams2.FilterDescendantsInstances = ignore
+	end
+end)
+
 run(function()
 	local CheatDetector
-	local overlap = OverlapParams.new()
-	overlap.CollisionGroup = 'Players'
-	overlap.FilterDescendantsInstances = {workspace.CarContainer, workspace.Doors}
-	overlap.FilterType = Enum.RaycastFilterType.Exclude
+	local rayParams = RaycastParams.new()
+	rayParams.CollisionGroup = 'Players'
+	rayParams.FilterDescendantsInstances = {workspace.CarContainer, workspace.Doors}
+	rayParams.FilterType = Enum.RaycastFilterType.Exclude
+	
 	local caroverlap = OverlapParams.new()
 	caroverlap.FilterDescendantsInstances = {workspace.CarContainer}
 	caroverlap.FilterType = Enum.RaycastFilterType.Include
@@ -2189,8 +2248,41 @@ run(function()
 	}
 
 	local function checkPoint(pos, params)
-		local raycast = workspace:Raycast(pos + Vector3.new(0, 0.1, 0), Vector3.new(0, -0.2, 0), params)
-		return raycast ~= nil
+		if not pos then return false end
+		local origin = pos + Vector3.new(0, 0.1, 0)
+		local direction = Vector3.new(0, -0.2, 0)
+		local raycastResult = workspace:Raycast(origin, direction, params)
+		return raycastResult ~= nil
+	end
+
+	local function checkNoclip(ent)
+		if not ent.Head or not ent.RootPart then return false end
+		
+		local rootPos = ent.RootPart.Position
+		local headPos = ent.Head.Position
+		
+		if not checkPoint(headPos, rayParams) then
+			return true
+		end
+		
+		if not checkPoint(rootPos, rayParams) then
+			return true
+		end
+		
+		local offsets = {
+			Vector3.new(2, 0, 0),
+			Vector3.new(-2, 0, 0),
+			Vector3.new(0, 0, 2),
+			Vector3.new(0, 0, -2)
+		}
+		
+		for _, offset in offsets do
+			if not checkPoint(rootPos + offset, rayParams) then
+				return true
+			end
+		end
+		
+		return false
 	end
 	
 	CheatDetector = vape.Categories.Utility:CreateModule({
@@ -2198,13 +2290,15 @@ run(function()
 		Function = function(callback)
 			if callback then
 				CheatDetector:Clean(vapeEvents.CheatFlagged.Event:Connect(function(plr, flagname)
-					notif('Rawr.xyz says', 'This player may be cheating! ('..flagname..'): '..plr.Name, 30, 'warning')
+					notif('CheatDetector', 'This player may be cheating! ('..flagname..'): '..plr.Name, 35, 'warning')
 				end))
 	
 				repeat
+					OriginScanner:UpdateIgnore()
+					
 					for _, ent in entitylib.List do
 						if ent.Health > 0 and ent.Player then
-							if not checkPoint(ent.Head.Position, overlap) then
+							if checkNoclip(ent) then
 								CheatFlags:Flag(ent.Player, 'phase/noclip', 20)
 							end
 	
