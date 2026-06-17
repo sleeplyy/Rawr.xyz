@@ -215,6 +215,19 @@ print("Checked Cilent")
 
 local cloneref = cloneref or function(obj) return obj end
 
+local run = function(func)
+	func()
+end
+local cloneref = cloneref or function(obj)
+	return obj
+end
+local vapeEvents = setmetatable({}, {
+	__index = function(self, index)
+		self[index] = Instance.new('BindableEvent')
+		return self[index]
+	end
+})
+
 local playersService = cloneref(game:GetService('Players'))
 local teamService = cloneref(game:GetService('Teams'))
 local workspaceService = cloneref(game:GetService('Workspace'))
@@ -424,6 +437,32 @@ run(function()
     end)
 
     vape:Clean(function() hookmetamethod(game, "__namecall", old) end)
+end)
+
+local CheatFlags = {Flags = {}, Flagged = {}}
+run(function()
+	function CheatFlags:Flag(plr, flagtype, limit)
+		if CheatFlags.Flagged[plr.UserId] then
+			return
+		end
+
+		if not CheatFlags.Flags[plr.UserId] then
+			CheatFlags.Flags[plr.UserId] = {}
+		end
+
+		local flags = CheatFlags.Flags[plr.UserId]
+		flags[flagtype] = (flags[flagtype] or 0) + 1
+
+		if flags[flagtype] > limit then
+			CheatFlags.Flagged[plr.UserId] = true
+			vapeEvents.CheatFlagged:Fire(plr, flagtype)
+		end
+	end
+
+	function CheatFlags:Clear()
+		table.clear(CheatFlags.Flags)
+		table.clear(CheatFlags.Flagged)
+	end
 end)
 
 run(function()
@@ -2021,23 +2060,84 @@ end)
 
 run(function()
 	local AntiInvisible
+	local threads = {}
+	local whitelist = {
+		['http://www.roblox.com/asset/?id=125750702'] = true,
+		['http://www.roblox.com/asset/?id=128777973'] = true,
+		['http://www.roblox.com/asset/?id=128853357'] = true,
+		['http://www.roblox.com/asset/?id=129423030'] = true,
+		['http://www.roblox.com/asset/?id=129423131'] = true,
+		['http://www.roblox.com/asset/?id=129967390'] = true,
+		['http://www.roblox.com/asset/?id=129967478'] = true,
+		['http://www.roblox.com/asset/?id=178130996'] = true,
+		['http://www.roblox.com/asset/?id=180426354'] = true,
+		['http://www.roblox.com/asset/?id=180435571'] = true,
+		['http://www.roblox.com/asset/?id=180435792'] = true,
+		['http://www.roblox.com/asset/?id=180436148'] = true,
+		['http://www.roblox.com/asset/?id=180436334'] = true,
+		['http://www.roblox.com/asset/?id=182393478'] = true,
+		['http://www.roblox.com/asset/?id=182435998'] = true,
+		['http://www.roblox.com/asset/?id=182436842'] = true,
+		['http://www.roblox.com/asset/?id=182436935'] = true,
+		['http://www.roblox.com/asset/?id=182491037'] = true,
+		['http://www.roblox.com/asset/?id=182491065'] = true,
+		['http://www.roblox.com/asset/?id=182491248'] = true,
+		['http://www.roblox.com/asset/?id=182491277'] = true,
+		['http://www.roblox.com/asset/?id=182491368'] = true,
+		['http://www.roblox.com/asset/?id=182491423'] = true,
+		['rbxassetid://279227693'] = true,
+		['rbxassetid://279229192'] = true,
+		['rbxassetid://287112271'] = true,
+		['rbxassetid://388723916'] = true,
+		['rbxassetid://388726667'] = true,
+		['rbxassetid://389472570'] = true,
+		['rbxassetid://405194080'] = true,
+		['rbxassetid://405212265'] = true,
+		['rbxassetid://481088553'] = true,
+		['rbxassetid://481089053'] = true,
+		['rbxassetid://484200742'] = true,
+		['rbxassetid://484926359'] = true,
+		['rbxassetid://83690472549256'] = true,
+		['rbxassetid://107176344504758'] = true,
+		['rbxassetid://111090572475133'] = true,
+		['rbxassetid://113267949064300'] = true,
+		['rbxassetid://131326339350805'] = true
+	}
+	
+	local function AnimationAdded(anim, plr)
+		if not whitelist[anim.Animation.AnimationId] and plr then
+			if threads[anim] then
+				task.cancel(threads[anim])
+			end
+	
+			CheatFlags:Flag(plr, 'invalid animation', 1)
+			threads[anim] = task.spawn(function()
+				repeat
+					anim:AdjustWeight(0, 0)
+					task.wait()
+				until not (anim.IsPlaying and AntiInvisible.Enabled)
+	
+				threads[anim] = nil
+			end)
+		end
+	end
 	
 	local function EntityAdded(ent)
 		local animator = ent.Humanoid:WaitForChild('Animator', 5)
 	
 		if animator and AntiInvisible.Enabled then
 			AntiInvisible:Clean(animator.AnimationPlayed:Connect(function(anim)
-				if anim.Animation.AnimationId:find('215384594') then
-					anim:AdjustWeight(0)
-				end
+				AnimationAdded(anim, ent.Player)
 			end))
 	
 			for _, anim in animator:GetPlayingAnimationTracks() do
-				if anim.Animation.AnimationId:find('215384594') then
-					anim:AdjustWeight(0)
-				end
+				task.spawn(AnimationAdded, anim, ent.Player)
 			end
 		end
+	end
+	
+	for _, v in replicatedStorage:QueryDescendants('Animation') do
+		whitelist[v.AnimationId] = true
 	end
 	
 	AntiInvisible = vape.Categories.Blatant:CreateModule({
@@ -2048,6 +2148,11 @@ run(function()
 				for _, v in entitylib.List do
 					task.spawn(EntityAdded, v)
 				end
+			else
+				for _, v in threads do
+					task.cancel(v)
+				end
+				table.clear(threads)
 			end
 		end,
 		Tooltip = 'Prevent people from using invisible animations'
@@ -2106,7 +2211,7 @@ run(function()
     })
 
     WeaponSelector = GunMods:CreateMultiChoice({
-        Name = "Weapons",
+        Name = "Items",
         List = {"M9", "Revolver", "M4A1", "Remington 870", "MP5", "Taser", "M700", "FAL"},
         Default = {"M9", "Revolver", "M4A1", "Remington 870"},
         Function = function(selected)
@@ -2249,7 +2354,113 @@ run(function()
         Default = 100,
         Suffix = function(val) return val == 1 and 'stud' or 'studs' end
     })
-end)																													
+end)
+
+run(function()
+	local CheatDetector
+	local overlap = OverlapParams.new()
+	overlap.CollisionGroup = 'Players'
+	overlap.FilterDescendantsInstances = {workspace.CarContainer, workspace.Doors}
+	overlap.FilterType = Enum.RaycastFilterType.Exclude
+	local caroverlap = OverlapParams.new()
+	caroverlap.FilterDescendantsInstances = {workspace.CarContainer}
+	caroverlap.FilterType = Enum.RaycastFilterType.Include
+	caroverlap.MaxParts = 1
+
+	local whiteliststates = {
+		[Enum.HumanoidStateType.Running] = true,
+		[Enum.HumanoidStateType.Jumping] = true,
+		[Enum.HumanoidStateType.Freefall] = true,
+		[Enum.HumanoidStateType.Landed] = true,
+		[Enum.HumanoidStateType.FallingDown] = true,
+		[Enum.HumanoidStateType.GettingUp] = true,
+		[Enum.HumanoidStateType.Climbing] = true,
+		[Enum.HumanoidStateType.Seated] = true,
+		[Enum.HumanoidStateType.Ragdoll] = true,
+		[Enum.HumanoidStateType.Dead] = true,
+		[Enum.HumanoidStateType.None] = true
+	}
+
+	local playerFlags = {}
+	local scanDelay = {}
+
+	CheatDetector = vape.Categories.Utility:CreateModule({
+		Name = 'CheatDetector',
+		Function = function(callback)
+			if callback then
+				CheatDetector:Clean(vapeEvents.CheatFlagged.Event:Connect(function(plr, flagname)
+					notif('CheatDetector', 'Suspicious: ' .. plr.Name .. ' (' .. flagname .. ')', 20, 'warning')
+					local ent = entitylib.getEntity(plr)
+					if ent then
+						entitylib.Events.EntityUpdated:Fire(ent)
+					end
+				end))
+
+				repeat
+					for _, ent in entitylib.List do
+						if ent.Health <= 0 or not ent.Player then continue end
+						local plr = ent.Player
+						local now = tick()
+
+						if not scanDelay[plr.UserId] or now - scanDelay[plr.UserId] > 0.5 then
+							scanDelay[plr.UserId] = now
+
+							if not checkPoint(ent.Head.Position, overlap) then
+								CheatFlags:Flag(plr, 'phase/noclip', 20)
+							end
+
+							if not whiteliststates[ent.Humanoid:GetState()] then
+								CheatFlags:Flag(plr, 'invalid state ' .. ent.Humanoid:GetState().Name, 1)
+							end
+
+							local velo = ent.RootPart.AssemblyLinearVelocity
+							if not ent.Humanoid.SeatPart then
+								local hVel = (velo * Vector3.new(1, 0, 1)).Magnitude
+								if hVel > 26 then
+									local nearCar = #workspace:GetPartBoundsInRadius(ent.RootPart.Position, 30, caroverlap) <= 0
+									if nearCar then
+										CheatFlags:Flag(plr, 'speed (' .. math.floor(hVel) .. ' studs)', 20)
+									end
+								end
+
+								if velo.Y > 50 then
+									CheatFlags:Flag(plr, 'highjump (' .. math.floor(velo.Y) .. ' studs)', 20)
+								end
+
+								if hVel > 16 and not nearCar then
+									local x, z = math.abs(velo.X), math.abs(velo.Z)
+									local ratio = math.max(x, z) / math.max(math.min(x, z), 0.01)
+									if ratio < 0.1 then
+										CheatFlags:Flag(plr, 'teleport/strafe', 5)
+									end
+								end
+							end
+
+							if ent.Character:GetAttribute('Hostile') == nil and plr.Team == teams.Inmates then
+								local lastPos = playerFlags[plr.UserId] and playerFlags[plr.UserId].lastPos
+								if lastPos and (ent.RootPart.Position - lastPos).Magnitude > 100 then
+									CheatFlags:Flag(plr, 'teleport', 10)
+								end
+							end
+
+							if not playerFlags[plr.UserId] then
+								playerFlags[plr.UserId] = {}
+							end
+							playerFlags[plr.UserId].lastPos = ent.RootPart.Position
+						end
+					end
+
+					task.wait(0.05)
+				until not CheatDetector.Enabled
+			else
+				CheatFlags:Clear()
+				table.clear(playerFlags)
+				table.clear(scanDelay)
+			end
+		end,
+		Tooltip = 'Alerts for any possible cheaters.'
+	})
+end)																																						
 																																					
 run(function()
 	local AntiRiotShield
