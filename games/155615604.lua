@@ -2163,147 +2163,53 @@ run(function()
     })
 end)
 
-local OriginScanner = {Cache = {}}
-run(function()
-	local rayParams = RaycastParams.new()
-	local rayParams2 = OverlapParams.new()
-	rayParams.CollisionGroup = 'ClientBullet'
-	rayParams.FilterType = Enum.RaycastFilterType.Exclude
-	rayParams2.CollisionGroup = 'ClientBullet'
-	rayParams2.FilterType = Enum.RaycastFilterType.Exclude
-	OriginScanner.Ray = rayParams
-
-	local positions = {
-		Vector3.new(0, 1, 0),
-		Vector3.new(1, 0, 0),
-		Vector3.new(0.7, -0.5, -0.5),
-		Vector3.new(-0.1, -0.8, -0.8),
-		Vector3.new(-0.8, -0.5, -0.5),
-		Vector3.new(-1, 0, 0),
-		Vector3.new(-0.8, 0.4, 0.4),
-		Vector3.new(0, 0.7, 0.7),
-		Vector3.new(0.7, 0.5, 0.5),
-		Vector3.new(1, 0, 0),
-		Vector3.new(0.7, 0, -0.8),
-		Vector3.new(-0.1, 0, -1),
-		Vector3.new(-0.8, 0, -0.8),
-		Vector3.new(-1, 0, 0),
-		Vector3.new(-0.8, 0, 0.7),
-		Vector3.new(0, 0, 1),
-		Vector3.new(0.7, 0, 0.7),
-		Vector3.new(1, 0, 0),
-		Vector3.new(0.7, 0.4, -0.5),
-		Vector3.new(-0.1, 0.7, -0.8),
-		Vector3.new(-0.8, 0.4, -0.5),
-		Vector3.new(-1, -0.1, 0),
-		Vector3.new(-0.8, -0.5, 0.4),
-		Vector3.new(0, -0.8, 0.7),
-		Vector3.new(0.7, -0.6, 0.5),
-		Vector3.new(0, -1, 0)
-	}
-
-	local function checkPoint(pos, params)
-		if not pos then return false end
-		local origin = pos + Vector3.new(0, 0.1, 0)
-		local direction = Vector3.new(0, -3, 0)
-		local raycastResult = workspace:Raycast(origin, direction, params)
-		return raycastResult
-	end
-
-	function OriginScanner:CheckNoclip(ent, rayParams)
-		if not ent.Head or not ent.RootPart then return false end
-		
-		local headPos = ent.Head.Position
-		local feetPos = ent.RootPart.Position
-		
-		local headAbove = workspace:Raycast(headPos, Vector3.new(0, 0.5, 0), rayParams)
-		if headAbove then
-			return true
-		end
-		
-		local groundHit = checkPoint(feetPos, rayParams)
-		if not groundHit then
-			return true
-		end
-		
-		local heightAboveGround = feetPos.Y - groundHit.Position.Y
-		local maxAllowedHeight = 8
-		if heightAboveGround > maxAllowedHeight then
-			if ent.Humanoid:GetState() ~= Enum.HumanoidStateType.Freefall or heightAboveGround > 20 then
-				return true
-			end
-		end
-		
-		return false
-	end
-
-	function OriginScanner:UpdateIgnore()
-		local ignore = {lplr.Character}
-		for _, v in entitylib.List do
-			table.insert(ignore, v.Character)
-		end
-
-		rayParams.FilterDescendantsInstances = ignore
-		rayParams2.FilterDescendantsInstances = ignore
-	end
-end)
-
 run(function()
 	local CheatDetector
-	local rayParams = RaycastParams.new()
-	rayParams.CollisionGroup = 'Players'
-	rayParams.FilterDescendantsInstances = {workspace.CarContainer, workspace.Doors}
-	rayParams.FilterType = Enum.RaycastFilterType.Exclude
-	
 	local caroverlap = OverlapParams.new()
 	caroverlap.FilterDescendantsInstances = {workspace.CarContainer}
 	caroverlap.FilterType = Enum.RaycastFilterType.Include
 	caroverlap.MaxParts = 1
 	
-	local whiteliststates = {
-		[Enum.HumanoidStateType.Running] = true,
-		[Enum.HumanoidStateType.Jumping] = true,
-		[Enum.HumanoidStateType.Freefall] = true,
-		[Enum.HumanoidStateType.Landed] = true,
-		[Enum.HumanoidStateType.FallingDown] = true,
-		[Enum.HumanoidStateType.GettingUp] = true,
-		[Enum.HumanoidStateType.Climbing] = true,
-		[Enum.HumanoidStateType.Seated] = true,
-		[Enum.HumanoidStateType.Ragdoll] = true,
-		[Enum.HumanoidStateType.Dead] = true,
-		[Enum.HumanoidStateType.None] = true
-	}
+	local lastPositions = {}
 	
 	CheatDetector = vape.Categories.Utility:CreateModule({
 		Name = 'CheatDetector',
 		Function = function(callback)
 			if callback then
 				CheatDetector:Clean(vapeEvents.CheatFlagged.Event:Connect(function(plr, flagname)
-					notif('CheatDetector', 'This player may be cheating! ('..flagname..'): '..plr.Name, 60, 'warning')
+					notif('CheatDetector', 'This player may be cheating! ('..flagname..'): '..plr.Name, 15, 'warning')
 				end))
 	
 				repeat
 					for _, ent in entitylib.List do
-						if ent.Health > 0 and ent.Player then
-							if OriginScanner:CheckNoclip(ent, rayParams) then
-								CheatFlags:Flag(ent.Player, 'phase/noclip', 20)
-							end
-	
-							if not whiteliststates[ent.Humanoid:GetState()] then
-								CheatFlags:Flag(ent.Player, 'invalid state '..ent.Humanoid:GetState().Name, 1)
-							end
-	
+						if ent.Health > 0 and ent.Player and ent.RootPart then
 							local velo = ent.RootPart.AssemblyLinearVelocity
+							
 							if not ent.Humanoid.SeatPart then
-								if (velo * Vector3.new(1, 0, 1)).Magnitude > 26 then
+								local horizontalSpeed = (velo * Vector3.new(1, 0, 1)).Magnitude
+								if horizontalSpeed > 26 then
 									if #workspace:GetPartBoundsInRadius(ent.RootPart.Position, 30, caroverlap) <= 0 then
 										CheatFlags:Flag(ent.Player, 'speed', 20)
 									end
 								end
-	
+								
 								if velo.Y > 50 then
 									CheatFlags:Flag(ent.Player, 'highjump', 20)
 								end
+								
+								local pos = ent.RootPart.Position
+								if lastPositions[ent.Player.UserId] then
+									local lastPos = lastPositions[ent.Player.UserId]
+									local verticalChange = pos.Y - lastPos.Y
+									local timeDiff = 0.05
+									
+									if ent.Humanoid:GetState() == Enum.HumanoidStateType.Freefall then
+										if verticalChange > 0 and verticalChange < 2 then
+											CheatFlags:Flag(ent.Player, 'fly', 30)
+										end
+									end
+								end
+								lastPositions[ent.Player.UserId] = pos
 							end
 						end
 					end
@@ -2312,6 +2218,7 @@ run(function()
 				until not CheatDetector.Enabled
 			else
 				CheatFlags:Clear()
+				table.clear(lastPositions)
 			end
 		end,
 		Tooltip = 'Alerts for any possible cheaters.'
