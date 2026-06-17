@@ -2171,45 +2171,73 @@ run(function()
 	caroverlap.MaxParts = 1
 	
 	local lastPositions = {}
+	local hoverCount = {}
+	
+	local whiteliststates = {
+		[Enum.HumanoidStateType.Running] = true,
+		[Enum.HumanoidStateType.Jumping] = true,
+		[Enum.HumanoidStateType.Landed] = true,
+		[Enum.HumanoidStateType.FallingDown] = true,
+		[Enum.HumanoidStateType.GettingUp] = true,
+		[Enum.HumanoidStateType.Climbing] = true,
+		[Enum.HumanoidStateType.Seated] = true,
+		[Enum.HumanoidStateType.Ragdoll] = true,
+		[Enum.HumanoidStateType.Dead] = true,
+		[Enum.HumanoidStateType.None] = true
+	}
 	
 	CheatDetector = vape.Categories.Utility:CreateModule({
 		Name = 'CheatDetector',
 		Function = function(callback)
 			if callback then
 				CheatDetector:Clean(vapeEvents.CheatFlagged.Event:Connect(function(plr, flagname)
-					notif('CheatDetector', 'This player may be cheating! ('..flagname..'): '..plr.Name, 15, 'warning')
+					notif('CheatDetector', 'This player may be cheating! ('..flagname..'): '..plr.Name, 60, 'warning')
 				end))
 	
 				repeat
 					for _, ent in entitylib.List do
 						if ent.Health > 0 and ent.Player and ent.RootPart then
 							local velo = ent.RootPart.AssemblyLinearVelocity
+							local state = ent.Humanoid:GetState()
 							
 							if not ent.Humanoid.SeatPart then
-								local horizontalSpeed = (velo * Vector3.new(1, 0, 1)).Magnitude
-								if horizontalSpeed > 26 then
-									if #workspace:GetPartBoundsInRadius(ent.RootPart.Position, 30, caroverlap) <= 0 then
-										CheatFlags:Flag(ent.Player, 'speed', 20)
+								-- Speed detection
+								if not whiteliststates[state] or state == Enum.HumanoidStateType.Running then
+									local horizontalSpeed = (velo * Vector3.new(1, 0, 1)).Magnitude
+									if horizontalSpeed > 26 then
+										if #workspace:GetPartBoundsInRadius(ent.RootPart.Position, 30, caroverlap) <= 0 then
+											CheatFlags:Flag(ent.Player, 'speed', 20)
+										end
 									end
 								end
 								
+								-- High jump detection
 								if velo.Y > 50 then
 									CheatFlags:Flag(ent.Player, 'highjump', 20)
 								end
 								
-								local pos = ent.RootPart.Position
-								if lastPositions[ent.Player.UserId] then
-									local lastPos = lastPositions[ent.Player.UserId]
-									local verticalChange = pos.Y - lastPos.Y
-									local timeDiff = 0.05
+								-- Fly detection
+								if state == Enum.HumanoidStateType.Freefall then
+									local pos = ent.RootPart.Position
+									local uid = ent.Player.UserId
 									
-									if ent.Humanoid:GetState() == Enum.HumanoidStateType.Freefall then
-										if verticalChange > 0 and verticalChange < 2 then
-											CheatFlags:Flag(ent.Player, 'fly', 30)
+									if lastPositions[uid] then
+										local lastPos = lastPositions[uid]
+										local verticalChange = math.abs(pos.Y - lastPos.Y)
+										
+										if verticalChange < 0.1 then
+											hoverCount[uid] = (hoverCount[uid] or 0) + 1
+											if hoverCount[uid] > 15 then
+												CheatFlags:Flag(ent.Player, 'fly', 30)
+											end
+										else
+											hoverCount[uid] = 0
 										end
 									end
+									lastPositions[uid] = pos
+								else
+									hoverCount[ent.Player.UserId] = 0
 								end
-								lastPositions[ent.Player.UserId] = pos
 							end
 						end
 					end
@@ -2219,6 +2247,7 @@ run(function()
 			else
 				CheatFlags:Clear()
 				table.clear(lastPositions)
+				table.clear(hoverCount)
 			end
 		end,
 		Tooltip = 'Alerts for any possible cheaters.'
