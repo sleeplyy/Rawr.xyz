@@ -314,7 +314,7 @@ local function downloadFile(path, func)
 	if not isfile(path) then
 		createDownloader(path)
 		local suc, res = pcall(function()
-			return game:HttpGet('https://raw.githubusercontent.com/imcomingforyou6959-gif/RPL/'..readfile('newvape/profiles/commit.txt')..'/'..select(1, path:gsub('newvape/', '')), true)
+			return game:HttpGet('https://raw.githubusercontent.com/sleeplyy/Rawr.xyz/'..readfile('newvape/profiles/commit.txt')..'/'..select(1, path:gsub('newvape/', '')), true)
 		end)
 		if not suc or res == '404: Not Found' then
 			error(res)
@@ -6371,7 +6371,7 @@ general:CreateButton({
 		if shared.VapeDeveloper then
 			loadstring(readfile('newvape/loader.lua'), 'loader')()
 		else
-			loadstring(game:HttpGet('https://raw.githubusercontent.com/imcomingforyou6959-gif/RPL/'..readfile('newvape/profiles/commit.txt')..'/loader.lua', true))()
+			loadstring(game:HttpGet('https://raw.githubusercontent.com/sleeplyy/Rawr.xyz/'..readfile('newvape/profiles/commit.txt')..'/loader.lua', true))()
 		end
 	end,
 	Tooltip = 'This will set your profile to the default settings of Vape'
@@ -6395,11 +6395,11 @@ general:CreateButton({
                     if success and result then
                         result()
                     else
-                        loadstring(game:HttpGet('https://raw.githubusercontent.com/imcomingforyou6959-gif/RPL/main/loader.lua', true))()
+                        loadstring(game:HttpGet('https://raw.githubusercontent.com/sleeplyy/Rawr.xyz/main/loader.lua', true))()
                     end
                 else
                     local commit = pcall(readfile, 'newvape/profiles/commit.txt') and readfile('newvape/profiles/commit.txt') or 'main'
-                    local url = 'https://raw.githubusercontent.com/imcomingforyou6959-gif/RPL/' .. commit .. '/loader.lua'
+                    local url = 'https://raw.githubusercontent.com/sleeplyy/Rawr.xyz/' .. commit .. '/loader.lua'
                     loadstring(game:HttpGet(url, true))()
                 end
             end)
@@ -6510,7 +6510,7 @@ guipane:CreateDropdown({
 			if shared.VapeDeveloper then
 				loadstring(readfile('newvape/loader.lua'), 'loader')()
 			else
-				loadstring(game:HttpGet('https://raw.githubusercontent.com/imcomingforyou6959-gif/RPL/'..readfile('newvape/profiles/commit.txt')..'/loader.lua', true))()
+				loadstring(game:HttpGet('https://raw.githubusercontent.com/sleeplyy/Rawr.xyz/'..readfile('newvape/profiles/commit.txt')..'/loader.lua', true))()
 			end
 		end
 	end,
