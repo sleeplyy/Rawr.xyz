@@ -1,3 +1,23 @@
+--[[
+    PROPERTY OF RAWR.XYZ - PROPRIETARY AND CONFIDENTIAL SOURCE CODE
+    
+    Copyright (c) 2026 rawr.xyz. All Rights Reserved.
+    
+    This software and its entire source code are the sole intellectual property 
+    of rawr.xyz. Unauthorized copying, distribution, modification, sharing, 
+    hosting, public exhibition, or reverse-engineering (including but not 
+    limited to cracking, deobfuscating, or bypassing licensing checks) of this 
+    material via any medium is strictly prohibited.
+    
+    ANY UNAUTHORIZED LEAKS, CRACKS, OR DISCOVERY OF THIS CODE IN PUBLIC OR PRIVATE 
+    REPOSITORIES (INCLUDING GITHUB, DISCORD, OR WEB FORUMS) WILL FACE IMMEDIATE 
+    LEGAL REMEDIATION, INCLUDING FORMAL DMCA TAKEDOWN NOTICES, LOSS OF ACCESS, 
+    AND POTENTIAL CIVIL/LEGAL ACTIONS.
+
+    If you have obtained this file unauthorized or without a valid license, 
+    please delete it immediately and contact support@rawr.xyz.
+--]]
+
 local loadstring = function(...)
 	local res, err = loadstring(...)
 	if err and vape then
