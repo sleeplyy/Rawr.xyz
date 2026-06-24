@@ -51,59 +51,6 @@
     please delete it immediately and contact support@rawr.xyz.
 --]]
 
---    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⣠⣤⠤⠶⠶⠶⠶⠶⠤⠤⣤⣀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
---    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⡴⠖⠋⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠛⠲⢤⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
---    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⠴⠛⠃⢀⡠⠄⠀⢀⠀⠀⠀⠀⠀⠀⠤⡀⠀⠀⠀⠀⠀⠈⠙⢦⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
---    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⠞⠁⠀⠀⠀⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠢⠀⠀⠀⠀⠀⠀⠀⠀⠈⠳⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀
---    ⠀⠀⠀⠀⠀⠀⠀⠀⢠⠞⠁⠀⠀⠀⠀⣠⠎⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⠀⠀⠀⠀⠀⠀⠀⠀⠙⢦⠄⠀⠀⠀⠀⠀⠀⠀
---    ⠀⠀⠀⠀⠀⠀⠀⣠⠋⠀⠀⠀⠂⢂⣼⡇⠀⠀⡎⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢰⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⢧⠀⠀⠀⠀⠀⠀⠀
---    ⠀⠀⠀⠀⠀⠀⣰⡃⠀⠀⠀⠀⢀⡾⡿⡀⠐⣼⠁⠀⠀⠀⠀⠀⠀⠀⠀⢠⠀⢸⡄⠀⠐⡄⠀⠀⠀⠀⠀⠀⠀⠈⣧⠀⠀⠀⠀⠀⠀
---    ⠀⠀⠀⠀⠀⢠⡿⠁⠀⠀⡜⢀⣞⢿⡇⢁⣾⣟⡀⠀⠀⠀⠀⠀⢀⠆⠀⣞⠀⣼⢻⠀⠀⡟⡄⠀⠀⠀⠀⠀⠀⠀⠸⡆⠀⠀⠀⠀⠀
---    ⠀⠀⠀⢀⡴⠋⠀⠀⠀⢠⡇⡾⡝⢸⠇⡼⠁⡇⠉⠁⠀⠀⠀⠀⣸⠀⢠⣯⢴⣏⠚⡇⠀⣿⢃⠀⠀⠀⠀⠀⠀⠀⠀⢻⠀⠀⠀⠀⠀
---    ⠲⣖⣚⠉⢀⣴⠀⠀⠀⢸⢰⠷⠁⠀⣀⣄⣘⠧⡠⠄⠀⣀⣀⢠⠇⣠⡏⣿⠿⠂⠁⣷⢀⡿⡏⠀⠀⠀⠀⠀⠀⠀⢠⠸⡇⠀⠀⠀⠀
---    ⠀⠀⠉⠉⢹⡇⠀⠀⠀⢸⣾⢤⣴⡿⣿⢿⣿⣿⢦⡀⠀⠀⠀⠉⠘⠋⣹⠏⣀⣀⠀⠙⠸⠃⣿⠀⠀⠀⠀⠀⠀⠀⠈⢷⣧⠀⠀⠀⠀                                      
---    ⠀⠀⠀⠀⢸⠀⡆⠀⠀⢸⢿⣿⠃⣸⢅⣠⣿⠛⡇⠀⠀⠀⠀⠀⠀⠀⢔⣿⣿⣟⡻⣶⡄⠀⢹⠀⠀⠀⠀⠀⠀⢸⡀⠀⠙⢦⣀⠀⠀                                         
---    ⠀⠀⠀⠀⢸⠀⡇⠀⠀⢸⡏⡏⠂⢸⡖⠘⠋⢧⡟⠀⠀⠀⠀⠀⠀⢀⣎⣀⣽⢿⠿⡌⢻⣦⣸⠀⠀⠀⡄⠀⠀⢸⡷⢦⣤⣤⣬⠽⠒                                        
---    ⠀⠀⠀⠀⠸⡇⣹⡀⠀⠘⣿⡇⠀⠀⠙⠲⠶⠊⠀⠀⠀⠀⠀⠀⠀⠈⡧⠖⠛⠫⣵⡇⢈⡿⣾⠀⠀⠀⡏⠀⠀⢸⣇⢣⡇⠀⠀⠀⠀                                         
---    ⠀⠀⠀⠀⠀⢻⡜⣧⠀⠀⢿⣧⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠙⠮⣤⠤⠞⠀⠈⢀⡇⠀⠀⢰⠇⠀⠀⢸⡇⣿⠀⠀⠀⠀⠀
---    ⠀⠀⠀⠀⠀⠀⠙⢿⣧⡀⠘⣿⣿⣦⣀⠀⠀⠀⠀⢀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣼⠈⠀⢄⡾⠀⢀⡴⣿⣿⠃⠀⠀⠀⠀⠀
---    ⠀⠀⠀⠀⠀⠀⠀⠀⠙⢷⣦⣘⢿⠛⠛⠓⠢⣤⣀⣈⠑⠒⠒⠚⠀⠀⠀⠀⠀⣀⣠⣴⣾⠇⠀⣠⣾⣋⠔⣫⡾⠹⠁⠀⠀⠀⠀⠀⠀
---    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠙⠓⠀⠀⣼⣿⣏⢻⣿⣟⠟⠛⠛⣻⣟⣻⣿⡿⣿⡿⠋⣀⣼⡿⣙⣦⡿⠋⠀⠀⠀⠀⠀⠀⠀⠀⠀
---    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣼⣿⣏⣿⡇⠈⠑⠒⢹⣿⢧⣿⣯⣿⡿⠗⠋⠑⠞⠛⠉⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
---    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⢾⣿⢷⣿⣯⣼⣶⢶⣦⣾⣿⣻⣞⣿⡟⣷⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀hi :3 
---    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡴⣟⣺⣿⢎⢿⣿⣽⣻⣾⢿⣽⣿⣷⡯⣳⠹⡜⣷⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀@6x94 on discord⠀
---    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⢾⣻⣴⣿⢾⠚⢻⣿⣞⣧⣼⡿⣞⣿⠧⢿⡵⣫⠝⣖⣻⡆⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀rawr.xyz?⠀
---    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡿⣷⣚⣼⣏⡾⣂⣿⣿⣽⣻⣟⣿⣿⣿⣤⢬⢿⡵⣛⡜⢶⣻⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
---    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⣇⣠⠭⢿⢿⣰⣏⣿⣯⠿⣽⣿⢯⣿⣽⣧⣛⡞⣿⡵⡾⣏⣳⣿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
---    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣾⡹⣅⢀⡿⠯⣟⣿⣿⣧⡭⣿⣿⡁⢈⡷⣻⣷⠟⠋⢹⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
---    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣼⠷⣏⢾⣷⣮⣿⣿⣿⣷⣻⣽⣿⢮⣝⢶⣻⣟⠉⠓⠛⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
---    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠛⠿⣬⣿⡟⠛⠛⠛⠻⡽⡿⠿⢿⣚⢬⢳⣜⣿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
---    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣇⠀⠀⠀⢰⠀⡇⠀⠘⠛⢻⠯⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
---    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢻⠀⠀⠀⢸⠂⡇⠀⠀⠀⢸⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
---    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠸⡇⠀⢀⣸⠃⢹⠀⠀⠀⢸⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
---    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡯⠭⡯⣹⠁⢸⣖⢶⡶⣿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
---    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠁⠒⠉⠁⠀⠘⠦⠭⠵⠋⠀⠀
-
---[[
-    PROPERTY OF RAWR.XYZ - PROPRIETARY AND CONFIDENTIAL SOURCE CODE
-    
-    Copyright (c) 2026 rawr.xyz. All Rights Reserved.
-    
-    This software and its entire source code are the sole intellectual property 
-    of rawr.xyz. Unauthorized copying, distribution, modification, sharing, 
-    hosting, public exhibition, or reverse-engineering (including but not 
-    limited to cracking, deobfuscating, or bypassing licensing checks) of this 
-    material via any medium is strictly prohibited.
-    
-    ANY UNAUTHORIZED LEAKS, CRACKS, OR DISCOVERY OF THIS CODE IN PUBLIC OR PRIVATE 
-    REPOSITORIES (INCLUDING GITHUB, DISCORD, OR WEB FORUMS) WILL FACE IMMEDIATE 
-    LEGAL REMEDIATION, INCLUDING FORMAL DMCA TAKEDOWN NOTICES, LOSS OF ACCESS, 
-    AND POTENTIAL CIVIL/LEGAL ACTIONS.
-
-    If you have obtained this file unauthorized or without a valid license, 
-    please delete it immediately and contact support@rawr.xyz.
---]]
-
 local pl = game:GetService("Players")
 local rs = game:GetService("RunService")
 local ws = game:GetService("Workspace")
@@ -114,19 +61,6 @@ local vape = shared.vape
 local AutoPassEnabled = false
 local TriggerTime = 3
 local IsActive = false
-
-local function GetNetworkOwner(part)
-    if syn and syn.get_network_owner then
-        return syn.get_network_owner(part)
-    end
-    return nil
-end
-
-local function SetNetworkOwner(part, player)
-    if syn and syn.set_network_owner then
-        syn.set_network_owner(part, player)
-    end
-end
 
 local function DoIHaveBomb()
     local Char = lplr.Character
@@ -165,43 +99,68 @@ local function GetNearestPlayer()
     return Target
 end
 
-local function SilentTeleport(root, targetPos)
+-- FORCE BODY TO FACE TARGET (Rotates the entire character)
+local function ForceFaceTarget(root, targetPos)
+    if not root or not targetPos then return end
+    
+    -- Get the character
+    local char = root.Parent
+    if not char then return end
+    
+    -- Get all body parts and rotate them
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if humanoid then
+        -- Disable auto-rotate to take full control
+        humanoid.AutoRotate = false
+    end
+    
+    -- Calculate direction to target
+    local direction = (targetPos - root.Position).Unit
+    local lookCF = CFrame.lookAt(root.Position, targetPos)
+    
+    -- Rotate the root part
+    root.CFrame = lookCF
+    
+    -- Also rotate the upper torso for more realistic facing
+    local upperTorso = char:FindFirstChild("UpperTorso")
+    if upperTorso then
+        upperTorso.CFrame = CFrame.lookAt(upperTorso.Position, targetPos)
+    end
+    
+    -- Rotate the head to look at target
+    local head = char:FindFirstChild("Head")
+    if head then
+        head.CFrame = CFrame.lookAt(head.Position, targetPos)
+    end
+    
+    -- Re-enable auto-rotate after a small delay
+    task.wait(0.1)
+    if humanoid then
+        humanoid.AutoRotate = true
+    end
+end
+
+-- ANTI-CHEAT BYPASS: Use the game's own CFrame update system
+local function BypassTeleport(root, targetCF)
     if not root then return end
     
+    -- Method 1: Clear velocity to avoid detection
     root.Velocity = Vector3.new(0, 0, 0)
     root.RotVelocity = Vector3.new(0, 0, 0)
     
-    local owner = GetNetworkOwner(root)
-    if owner and owner ~= lplr then
-        SetNetworkOwner(root, lplr)
-    end
+    -- Method 2: Teleport using CFrame (the game's native method)
+    root.CFrame = targetCF
     
-    root.CFrame = CFrame.new(targetPos)
+    -- Method 3: Force a network update by changing a property
+    root.Transparency = root.Transparency or 0
+    root.Transparency = 1
+    task.wait(0.01)
+    root.Transparency = 0
     
-    local startPos = root.Position
-    for i = 1, 3 do
-        local lerpPos = startPos:Lerp(targetPos, i / 3)
-        root.CFrame = CFrame.new(lerpPos)
-    end
-    root.CFrame = CFrame.new(targetPos)
-    
+    -- Method 4: Reset velocity again
     task.wait(0.01)
     root.Velocity = Vector3.new(0, 0, 0)
     root.RotVelocity = Vector3.new(0, 0, 0)
-end
-
-local function FakeMovement(root, targetPos, duration)
-    if not root then return end
-    
-    local bv = Instance.new("BodyVelocity")
-    bv.MaxForce = Vector3.new(1/0, 1/0, 1/0)
-    bv.Velocity = (targetPos - root.Position).Unit * 100
-    bv.Parent = root
-    
-    task.wait(0.05)
-    bv:Destroy()
-    
-    root.CFrame = CFrame.new(targetPos)
 end
 
 local function ExecutePass()
@@ -216,40 +175,40 @@ local function ExecutePass()
     if not TargetRoot then IsActive = false return end
 
     local SafeCFrame = Root.CFrame
-    local SafeVel = Root.Velocity
     local StartTick = tick()
     local Timeout = 4
-    local origOwner = GetNetworkOwner(Root)
+    
+    -- Store original humanoid settings
+    local humanoid = Char:FindFirstChildOfClass("Humanoid")
+    local origAutoRotate = humanoid and humanoid.AutoRotate or true
     
     while DoIHaveBomb() and (tick() - StartTick < Timeout) do
         if TargetRoot and TargetRoot.Parent then
+            -- Calculate position 2.5 studs behind target
             local behindOffset = TargetRoot.CFrame.LookVector * -2.5
             local teleportPos = TargetRoot.CFrame.Position + behindOffset + Vector3.new(0, 0.5, 0)
+            local targetCF = CFrame.new(teleportPos)
             
-            SilentTeleport(Root, teleportPos)
+            -- BYPASS: Teleport using the game's native system
+            BypassTeleport(Root, targetCF)
             
-            local lookAt = CFrame.lookAt(Root.Position, TargetRoot.CFrame.Position)
-            Root.CFrame = lookAt
-            
-            Root.Velocity = Vector3.new(0, 0, 0)
-            Root.RotVelocity = Vector3.new(0, 0, 0)
+            -- FORCE FACE: Rotate entire body to look at target
+            ForceFaceTarget(Root, TargetRoot.CFrame.Position)
         end
         rs.Heartbeat:Wait()
     end
     
-    if origOwner then
-        SetNetworkOwner(Root, origOwner)
-    end
-    
-    task.wait(0.05)
-    
-    FakeMovement(Root, SafeCFrame.Position, 0.1)
-    
+    -- Restore original position
     task.wait(0.05)
     if Root and Root.Parent then
         Root.CFrame = SafeCFrame
-        Root.Velocity = SafeVel or Vector3.new(0, 0, 0)
+        Root.Velocity = Vector3.new(0, 0, 0)
         Root.RotVelocity = Vector3.new(0, 0, 0)
+    end
+    
+    -- Restore humanoid settings
+    if humanoid then
+        humanoid.AutoRotate = origAutoRotate
     end
     
     task.wait(0.5)
