@@ -19,7 +19,7 @@
 --    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣼⣿⣏⣿⡇⠈⠑⠒⢹⣿⢧⣿⣯⣿⡿⠗⠋⠑⠞⠛⠉⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 --    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⢾⣿⢷⣿⣯⣼⣶⢶⣦⣾⣿⣻⣞⣿⡟⣷⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀hi :3 
 --    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡴⣟⣺⣿⢎⢿⣿⣽⣻⣾⢿⣽⣿⣷⡯⣳⠹⡜⣷⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀@6x94 on discord⠀
---    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⢾⣻⣴⣿⢾⠚⢻⣿⣞⣧⣼⡿⣞⣿⠧⢿⡵⣫⠝⣖⣻⡆⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀rawr.xyz⠀
+--    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⢾⣻⣴⣿⢾⠚⢻⣿⣞⣧⣼⡿⣞⣿⠧⢿⡵⣫⠝⣖⣻⡆⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀rawr.xyz?⠀
 --    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡿⣷⣚⣼⣏⡾⣂⣿⣿⣽⣻⣟⣿⣿⣿⣤⢬⢿⡵⣛⡜⢶⣻⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 --    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⣇⣠⠭⢿⢿⣰⣏⣿⣯⠿⣽⣿⢯⣿⣽⣧⣛⡞⣿⡵⡾⣏⣳⣿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 --    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣾⡹⣅⢀⡿⠯⣟⣿⣿⣧⡭⣿⣿⡁⢈⡷⣻⣷⠟⠋⢹⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
@@ -81,37 +81,20 @@ local function validateEnvironment()
         str = string.gsub(str, "function: %d+", "function: X")
         return str
     end)(request)
-    
-    if currentFingerprint ~= cleanFingerprint then
-        return false
-    end
-    return true
+    return currentFingerprint == cleanFingerprint
 end
 
 local function fetchBlacklist()
-    if not validateEnvironment() then
-        return nil, "validation_failed"
-    end
-    
+    if not validateEnvironment() then return nil, "validation_failed" end
     local success, response = pcall(function()
-        return request({
-            Url = blacklistu,
-            Method = "GET"
-        })
+        return request({ Url = blacklistu, Method = "GET" })
     end)
-    
-    if not success then
+    if not success or not response or not response.Success or response.StatusCode ~= 200 then
         return nil, "http_failed"
     end
-    
-    if not response or not response.Success or response.StatusCode ~= 200 then
-        return nil, "http_failed"
-    end
-    
     local ok, data = pcall(function()
         return game:GetService("HttpService"):JSONDecode(response.Body)
     end)
-    
     if ok and data and type(data.BlacklistedUsers) == "table" then
         return data.BlacklistedUsers, "success"
     end
@@ -140,12 +123,8 @@ local function haltExecution(reason)
                 gui:Destroy()
             end
         end
-        if vape and vape.gui then
-            vape.gui:Destroy()
-        end
-        if _G.rawr_gui then
-            _G.rawr_gui:Destroy()
-        end
+        if vape and vape.gui then vape.gui:Destroy() end
+        if _G.rawr_gui then _G.rawr_gui:Destroy() end
     end)
     pcall(function()
         local env = getfenv and getfenv() or _G
@@ -161,29 +140,21 @@ end
 local blacklist = nil
 local status = nil
 local attempts = 0
-
 while attempts < 3 and blacklist == nil do
     blacklist, status = fetchBlacklist()
     if status == "http_failed" or status == "parse_failed" then
         attempts = attempts + 1
-        if attempts < 3 then
-            task.wait(1)
-        end
+        if attempts < 3 then task.wait(1) end
     else
         break
     end
 end
 
-if status == "validation_failed" then
-    haltExecution("Environment tampered")
-    return true
-end
-
+if status == "validation_failed" then haltExecution("Environment tampered") return true end
 if blacklist and type(blacklist) == "table" and isBlacklisted(blacklist) then
     haltExecution("You have been blacklisted")
     return true
 end
-
 if blacklist == nil then
     haltExecution("Cannot verify blacklist table | Check your Internet")
     return true
@@ -191,7 +162,7 @@ end
 
 task.spawn(function()
     while true do
-        task.wait(60)
+        task.wait(25)
         local blist, st = fetchBlacklist()
         if blist and type(blist) == "table" and isBlacklisted(blist) then
             haltExecution("You have been blacklisted")
@@ -209,42 +180,28 @@ task.spawn(function()
 end)
 
 local startWait = tick()
-repeat
-    task.wait()
-until (lplr and lplr.PlayerGui and lplr.PlayerGui:FindFirstChild("Home") 
+repeat task.wait() until (lplr and lplr.PlayerGui and lplr.PlayerGui:FindFirstChild("Home") 
        and lplr.Character and lplr.Character:FindFirstChild("HumanoidRootPart"))
-       or tick() - startWait > 1
-
+       or tick() - startWait > 5
 local startWait2 = tick()
-repeat
-    task.wait()
-until (replicatedStorageService and replicatedStorageService:FindFirstChild("Remotes") 
+repeat task.wait() until (replicatedStorageService and replicatedStorageService:FindFirstChild("Remotes") 
        and replicatedStorageService.Remotes:FindFirstChild("RequestTeamChange"))
-       or tick() - startWait2 > 1
-
+       or tick() - startWait2 > 5
 task.wait(0.5)
-
 print("Checked Client")
 
 local cloneref = cloneref or function(obj) return obj end
-
-local playersService = cloneref(game:GetService('Players'))
-local teamService = cloneref(game:GetService('Teams'))
-local workspaceService = cloneref(game:GetService('Workspace'))
-local replicatedStorageService = cloneref(game:GetService('ReplicatedStorage'))
-local runService = cloneref(game:GetService('RunService'))
-local inputService = cloneref(game:GetService('UserInputService'))
-local coreGui = cloneref(game:GetService('CoreGui'))
-local guiService = cloneref(game:GetService('GuiService'))
-local vimService = cloneref(game:GetService('VirtualInputManager'))
-local playerGui = cloneref(playersService.LocalPlayer:WaitForChild("PlayerGui"))
-
-local lplr = playersService.LocalPlayer
+local pl = cloneref(game:GetService('Players'))
+local rs = cloneref(game:GetService('RunService'))
+local ws = cloneref(game:GetService('Workspace'))
+local is = cloneref(game:GetService('UserInputService'))
+local cg = cloneref(game:GetService('CoreGui'))
+local gs = cloneref(game:GetService('GuiService'))
+local lplr = pl.LocalPlayer
 local vape = shared.vape
 local entitylib = vape.Libraries.entity
 local targetinfo = vape.Libraries.targetinfo
-
-local function notif(...) return vape:CreateNotification(...) end
+local notif = function(...) return vape:CreateNotification(...) end
 
 if identifyexecutor then
     local execInfo = {identifyexecutor()}
@@ -263,13 +220,11 @@ if identifyexecutor then
     end
 end
 
-local function DoIHaveBomb()
-    local Char = lplr.Character
-    if not Char then return false end
-    for _, v in pairs(Char:GetChildren()) do
-        if v:IsA("BillboardGui") or v:IsA("Highlight") then
-            return true
-        end
+local function hasBomb()
+    local c = lplr.Character
+    if not c then return false end
+    for _, v in pairs(c:GetChildren()) do
+        if v:IsA("BillboardGui") or v:IsA("Highlight") then return true end
         if v:IsA("Tool") and (v.Name:lower():find("bomb") or v.Name:lower():find("tnt")) then
             return true
         end
@@ -277,56 +232,69 @@ local function DoIHaveBomb()
     return false
 end
 
-local function GetNearestPlayer()
-    local MyChar = lplr.Character
-    local MyRoot = MyChar and MyChar:FindFirstChild("HumanoidRootPart")
-    if not MyRoot then return nil end
-    local ClosestDist = math.huge
-    local Target = nil
-    for _, v in pairs(playersService:GetPlayers()) do
+local function getNearest()
+    local myChar = lplr.Character
+    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    if not myRoot then return nil end
+    local closestDist = math.huge
+    local target = nil
+    for _, v in pairs(pl:GetPlayers()) do
         if v ~= lplr and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
-            local Hum = v.Character:FindFirstChild("Humanoid")
-            if Hum and Hum.Health > 0 then
-                local dist = (MyRoot.Position - v.Character.HumanoidRootPart.Position).Magnitude
-                if dist < ClosestDist then
-                    ClosestDist = dist
-                    Target = v.Character.HumanoidRootPart
+            local hum = v.Character:FindFirstChild("Humanoid")
+            if hum and hum.Health > 0 then
+                local dist = (myRoot.Position - v.Character.HumanoidRootPart.Position).Magnitude
+                if dist < closestDist then
+                    closestDist = dist
+                    target = v.Character.HumanoidRootPart
                 end
             end
         end
     end
-    return Target
+    return target
 end
 
-local function ExecutePass()
-    local Char = lplr.Character
-    if not Char then return end
-    local bombTool = nil
-    for _, v in pairs(Char:GetChildren()) do
-        if v:IsA("Tool") and (v.Name:lower():find("bomb") or v.Name:lower():find("tnt")) then
-            bombTool = v
-            break
-        end
-    end
-    if not bombTool then return end
-    
-    local targetRoot = GetNearestPlayer()
+local _1 = false
+local _2 = 3
+local _3 = nil
+local _4 = false
+local _5 = nil
+
+local function _desyncPass()
+    local char = lplr.Character
+    if not char then return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    local targetRoot = getNearest()
     if not targetRoot then return end
-    bombTool.Handle.CFrame = targetRoot.CFrame + Vector3.new(0, 2, 0)
+
+    local savedCF = root.CFrame
+    local savedVel = root.Velocity
+    local savedRotVel = root.RotVelocity
+
+    root.CFrame = targetRoot.CFrame + Vector3.new(0, 2, 0)
+
+    _5 = rs:BindToRenderStep("__restore", 101, function()
+        pcall(function()
+            if root and root.Parent then
+                root.CFrame = savedCF
+                root.Velocity = savedVel
+                root.RotVelocity = savedRotVel
+            end
+        end)
+        if _5 then
+            rs:UnbindFromRenderStep("__restore")
+            _5 = nil
+        end
+    end)
 end
 
-local autoPassEnabled = false
-local triggerTime = 3
-local monitorConnection = nil
-local isPassing = false
-
-local function MonitorTimer()
-    if not autoPassEnabled or isPassing then return end
-    if not DoIHaveBomb() then return end
-    local Char = lplr.Character
-    if not Char then return end
+local function _monitor()
+    if not _1 or _4 then return end
+    if not hasBomb() then return end
+    local char = lplr.Character
+    if not char then return end
     local foundSeconds = nil
-    for _, v in pairs(Char:GetDescendants()) do
+    for _, v in pairs(char:GetDescendants()) do
         if v:IsA("TextLabel") and v.Visible then
             local txt = v.Text
             local clean = txt:match("%d+%.?%d*")
@@ -339,37 +307,38 @@ local function MonitorTimer()
             end
         end
     end
-    if foundSeconds and foundSeconds <= triggerTime then
-        isPassing = true
-        ExecutePass()
-        isPassing = false
+    if foundSeconds and foundSeconds <= _2 then
+        _4 = true
+        _desyncPass()
+        _4 = false
     end
 end
 
-local AutoPassModule = vape.Categories.Blatant:CreateModule({
+local AutoPass = vape.Categories.Blatant:CreateModule({
     Name = "Auto Pass",
     Function = function(callback)
         if callback then
-            autoPassEnabled = true
-            if not monitorConnection then
-                monitorConnection = runService.Heartbeat:Connect(MonitorTimer)
+            _1 = true
+            if not _3 then
+                _3 = rs.Heartbeat:Connect(_monitor)
             end
         else
-            autoPassEnabled = false
-            if monitorConnection then
-                monitorConnection:Disconnect()
-                monitorConnection = nil
+            _1 = false
+            if _3 then _3:Disconnect(); _3 = nil end
+            _4 = false
+            if _5 then
+                rs:UnbindFromRenderStep("__restore")
+                _5 = nil
             end
-            isPassing = false
         end
     end,
-    Tooltip = "Auto‑pass the bomb to nearest enemy when timer hits)"
+    Tooltip = "Auto‑pass bomb)"
 })
 
-local espEnabled = false
-local espConnection = nil
+local _6 = false
+local _7 = nil
 
-local function CreateGrid(part)
+local function _makeGrid(part)
     if not part:FindFirstChild("RawrGrid") then
         local box = Instance.new("SelectionBox")
         box.Name = "RawrGrid"
@@ -383,90 +352,82 @@ local function CreateGrid(part)
     end
 end
 
-local function UpdateESP()
-    if espEnabled then
-        for _, player in pairs(playersService:GetPlayers()) do
+local function _updateESP()
+    if _6 then
+        for _, player in pairs(pl:GetPlayers()) do
             if player ~= lplr and player.Character then
                 for _, part in pairs(player.Character:GetChildren()) do
                     if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
-                        CreateGrid(part)
+                        _makeGrid(part)
                     end
                 end
             end
         end
     else
-        for _, player in pairs(playersService:GetPlayers()) do
+        for _, player in pairs(pl:GetPlayers()) do
             if player.Character then
                 for _, part in pairs(player.Character:GetDescendants()) do
-                    if part.Name == "RawrGrid" then
-                        part:Destroy()
-                    end
+                    if part.Name == "RawrGrid" then part:Destroy() end
                 end
             end
         end
     end
 end
 
-local ESPModule = vape.Categories.Visuals:CreateModule({
+local ESP = vape.Categories.Visuals:CreateModule({
     Name = "Grid ESP",
     Function = function(callback)
         if callback then
-            espEnabled = true
-            if not espConnection then
-                espConnection = runService.RenderStepped:Connect(UpdateESP)
+            _6 = true
+            if not _7 then
+                _7 = rs.RenderStepped:Connect(_updateESP)
             end
         else
-            espEnabled = false
-            if espConnection then
-                espConnection:Disconnect()
-                espConnection = nil
-            end
-            UpdateESP()
+            _6 = false
+            if _7 then _7:Disconnect(); _7 = nil end
+            _updateESP()
         end
     end,
-    Tooltip = "Full‑body"
+    Tooltip = "Full‑body red line ESP on enemies"
 })
 
-local infJumpEnabled = false
-local jumpConnection = nil
+local _8 = false
+local _9 = nil
 
-local InfJumpModule = vape.Categories.Movement:CreateModule({
+local InfJump = vape.Categories.Movement:CreateModule({
     Name = "Infinite Jump",
     Function = function(callback)
         if callback then
-            infJumpEnabled = true
-            if not jumpConnection then
-                jumpConnection = inputService.JumpRequest:Connect(function()
-                    if infJumpEnabled then
-                        local Char = lplr.Character
-                        if Char and Char:FindFirstChildOfClass("Humanoid") then
-                            Char.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+            _8 = true
+            if not _9 then
+                _9 = is.JumpRequest:Connect(function()
+                    if _8 then
+                        local char = lplr.Character
+                        if char and char:FindFirstChildOfClass("Humanoid") then
+                            char.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
                         end
                     end
                 end)
             end
         else
-            infJumpEnabled = false
-            if jumpConnection then
-                jumpConnection:Disconnect()
-                jumpConnection = nil
-            end
+            _8 = false
+            if _9 then _9:Disconnect(); _9 = nil end
         end
     end,
     Tooltip = "Jump repeatedly while holding space"
 })
 
-local noclipEnabled = false
-local noclipConnection = nil
+local _10 = false
+local _11 = nil
 
-local NoclipModule = vape.Categories.Blatant:CreateModule({
+local Noclip = vape.Categories.Movement:CreateModule({
     Name = "Noclip",
     Function = function(callback)
         if callback then
-            noclipEnabled = true
-            if not noclipConnection then
-                noclipConnection = runService.Stepped:Connect(function()
-                    if noclipEnabled and lplr.Character then
+            _10 = true
+            if not _11 then
+                _11 = rs.Stepped:Connect(function()
+                    if _10 and lplr.Character then
                         for _, part in pairs(lplr.Character:GetDescendants()) do
                             if part:IsA("BasePart") then
                                 part.CanCollide = false
@@ -476,11 +437,8 @@ local NoclipModule = vape.Categories.Blatant:CreateModule({
                 end)
             end
         else
-            noclipEnabled = false
-            if noclipConnection then
-                noclipConnection:Disconnect()
-                noclipConnection = nil
-            end
+            _10 = false
+            if _11 then _11:Disconnect(); _11 = nil end
             if lplr.Character then
                 for _, part in pairs(lplr.Character:GetDescendants()) do
                     if part:IsA("BasePart") then
@@ -493,43 +451,36 @@ local NoclipModule = vape.Categories.Blatant:CreateModule({
     Tooltip = "Walk through walls"
 })
 
-local speedEnabled = false
-local speedValue = 30
-local speedConnection = nil
+local _12 = false
+local _13 = nil
+local _14 = 30
 
-local function ApplySpeed(enable)
-    local Char = lplr.Character
-    if Char then
-        local hum = Char:FindFirstChildOfClass("Humanoid")
+local function _applySpeed(enable)
+    local char = lplr.Character
+    if char then
+        local hum = char:FindFirstChildOfClass("Humanoid")
         if hum then
-            hum.WalkSpeed = enable and speedValue or 16
+            hum.WalkSpeed = enable and _14 or 16
         end
     end
 end
 
-local SpeedModule = vape.Categories.Blatant:CreateModule({
+local SP = vape.Categories.Blatant:CreateModule({
     Name = "Speed Boost",
     Function = function(callback)
         if callback then
-            speedEnabled = true
-            ApplySpeed(true)
-            if not speedConnection then
-                speedConnection = lplr.CharacterAdded:Connect(function()
-                    if speedEnabled then
-                        ApplySpeed(true)
-                    end
+            _12 = true
+            _applySpeed(true)
+            if not _13 then
+                _13 = lplr.CharacterAdded:Connect(function()
+                    if _12 then _applySpeed(true) end
                 end)
             end
         else
-            speedEnabled = false
-            ApplySpeed(false)
-            if speedConnection then
-                speedConnection:Disconnect()
-                speedConnection = nil
-            end
+            _12 = false
+            _applySpeed(false)
+            if _13 then _13:Disconnect(); _13 = nil end
         end
     end,
     Tooltip = "Increase walkspeed to 30"
 })
-
-print("V4.1.0")
