@@ -97,41 +97,69 @@ local _trigger = 3
 local _heartbeat = nil
 local _active = false
 local _restoreStep = nil
+local _savedCF = nil
+local _savedVel = nil
+local _savedRotVel = nil
+local _root = nil
+
+local function _cleanupRestore()
+    if _restoreStep then
+        rs:UnbindFromRenderStep("__restore")
+        _restoreStep = nil
+    end
+    _savedCF = nil
+    _savedVel = nil
+    _savedRotVel = nil
+    _root = nil
+end
 
 local function _desyncPass()
     if _active then return end
     _active = true
+    _cleanupRestore()
+    
     local char = lplr.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     if not root then _active = false return end
+    
     local targetRoot = getNearest()
     if not targetRoot then _active = false return end
-    local safeCF = root.CFrame
+    
     local startTick = tick()
     local timeout = 4
+    
     while hasBomb() and (tick() - startTick < timeout) do
         if targetRoot and targetRoot.Parent then
-            local savedCF = root.CFrame
-            local savedVel = root.Velocity
-            local savedRotVel = root.RotVelocity
-            root.CFrame = targetRoot.CFrame
+            _savedCF = root.CFrame
+            _savedVel = root.Velocity
+            _savedRotVel = root.RotVelocity
+            _root = root
+            
+            root.CFrame = targetRoot.CFrame + Vector3.new(0, 2, 0)
+            
             _restoreStep = rs:BindToRenderStep("__restore", 101, function()
                 pcall(function()
-                    if root and root.Parent then
-                        root.CFrame = savedCF
-                        root.Velocity = savedVel
-                        root.RotVelocity = savedRotVel
+                    if _root and _root.Parent and _savedCF then
+                        _root.CFrame = _savedCF
+                        _root.Velocity = _savedVel or Vector3.new()
+                        _root.RotVelocity = _savedRotVel or Vector3.new()
                     end
                 end)
-                if _restoreStep then
-                    rs:UnbindFromRenderStep("__restore")
-                    _restoreStep = nil
-                end
+                _cleanupRestore()
             end)
         end
-        rs.Heartbeat:Wait()
+        task.wait()
     end
-    root.CFrame = safeCF
+    
+    if root and root.Parent then
+        if _savedCF then
+            root.CFrame = _savedCF
+            root.Velocity = _savedVel or Vector3.new()
+            root.RotVelocity = _savedRotVel or Vector3.new()
+        end
+    end
+    
+    _cleanupRestore()
     task.wait(0.5)
     _active = false
 end
@@ -172,10 +200,7 @@ local AutoPass = vape.Categories.Blatant:CreateModule({
             _auto = false
             if _heartbeat then _heartbeat:Disconnect(); _heartbeat = nil end
             _active = false
-            if _restoreStep then
-                rs:UnbindFromRenderStep("__restore")
-                _restoreStep = nil
-            end
+            _cleanupRestore()
         end
     end,
     Tooltip = "Auto‑pass bomb with desync"
