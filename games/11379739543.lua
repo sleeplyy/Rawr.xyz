@@ -51,6 +51,59 @@
     please delete it immediately and contact support@rawr.xyz.
 --]]
 
+--    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⣠⣤⠤⠶⠶⠶⠶⠶⠤⠤⣤⣀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+--    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⡴⠖⠋⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠛⠲⢤⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+--    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⠴⠛⠃⢀⡠⠄⠀⢀⠀⠀⠀⠀⠀⠀⠤⡀⠀⠀⠀⠀⠀⠈⠙⢦⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+--    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⠞⠁⠀⠀⠀⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠢⠀⠀⠀⠀⠀⠀⠀⠀⠈⠳⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀
+--    ⠀⠀⠀⠀⠀⠀⠀⠀⢠⠞⠁⠀⠀⠀⠀⣠⠎⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⠀⠀⠀⠀⠀⠀⠀⠀⠙⢦⠄⠀⠀⠀⠀⠀⠀⠀
+--    ⠀⠀⠀⠀⠀⠀⠀⣠⠋⠀⠀⠀⠂⢂⣼⡇⠀⠀⡎⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢰⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⢧⠀⠀⠀⠀⠀⠀⠀
+--    ⠀⠀⠀⠀⠀⠀⣰⡃⠀⠀⠀⠀⢀⡾⡿⡀⠐⣼⠁⠀⠀⠀⠀⠀⠀⠀⠀⢠⠀⢸⡄⠀⠐⡄⠀⠀⠀⠀⠀⠀⠀⠈⣧⠀⠀⠀⠀⠀⠀
+--    ⠀⠀⠀⠀⠀⢠⡿⠁⠀⠀⡜⢀⣞⢿⡇⢁⣾⣟⡀⠀⠀⠀⠀⠀⢀⠆⠀⣞⠀⣼⢻⠀⠀⡟⡄⠀⠀⠀⠀⠀⠀⠀⠸⡆⠀⠀⠀⠀⠀
+--    ⠀⠀⠀⢀⡴⠋⠀⠀⠀⢠⡇⡾⡝⢸⠇⡼⠁⡇⠉⠁⠀⠀⠀⠀⣸⠀⢠⣯⢴⣏⠚⡇⠀⣿⢃⠀⠀⠀⠀⠀⠀⠀⠀⢻⠀⠀⠀⠀⠀
+--    ⠲⣖⣚⠉⢀⣴⠀⠀⠀⢸⢰⠷⠁⠀⣀⣄⣘⠧⡠⠄⠀⣀⣀⢠⠇⣠⡏⣿⠿⠂⠁⣷⢀⡿⡏⠀⠀⠀⠀⠀⠀⠀⢠⠸⡇⠀⠀⠀⠀
+--    ⠀⠀⠉⠉⢹⡇⠀⠀⠀⢸⣾⢤⣴⡿⣿⢿⣿⣿⢦⡀⠀⠀⠀⠉⠘⠋⣹⠏⣀⣀⠀⠙⠸⠃⣿⠀⠀⠀⠀⠀⠀⠀⠈⢷⣧⠀⠀⠀⠀                                      
+--    ⠀⠀⠀⠀⢸⠀⡆⠀⠀⢸⢿⣿⠃⣸⢅⣠⣿⠛⡇⠀⠀⠀⠀⠀⠀⠀⢔⣿⣿⣟⡻⣶⡄⠀⢹⠀⠀⠀⠀⠀⠀⢸⡀⠀⠙⢦⣀⠀⠀                                         
+--    ⠀⠀⠀⠀⢸⠀⡇⠀⠀⢸⡏⡏⠂⢸⡖⠘⠋⢧⡟⠀⠀⠀⠀⠀⠀⢀⣎⣀⣽⢿⠿⡌⢻⣦⣸⠀⠀⠀⡄⠀⠀⢸⡷⢦⣤⣤⣬⠽⠒                                        
+--    ⠀⠀⠀⠀⠸⡇⣹⡀⠀⠘⣿⡇⠀⠀⠙⠲⠶⠊⠀⠀⠀⠀⠀⠀⠀⠈⡧⠖⠛⠫⣵⡇⢈⡿⣾⠀⠀⠀⡏⠀⠀⢸⣇⢣⡇⠀⠀⠀⠀                                         
+--    ⠀⠀⠀⠀⠀⢻⡜⣧⠀⠀⢿⣧⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠙⠮⣤⠤⠞⠀⠈⢀⡇⠀⠀⢰⠇⠀⠀⢸⡇⣿⠀⠀⠀⠀⠀
+--    ⠀⠀⠀⠀⠀⠀⠙⢿⣧⡀⠘⣿⣿⣦⣀⠀⠀⠀⠀⢀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣼⠈⠀⢄⡾⠀⢀⡴⣿⣿⠃⠀⠀⠀⠀⠀
+--    ⠀⠀⠀⠀⠀⠀⠀⠀⠙⢷⣦⣘⢿⠛⠛⠓⠢⣤⣀⣈⠑⠒⠒⠚⠀⠀⠀⠀⠀⣀⣠⣴⣾⠇⠀⣠⣾⣋⠔⣫⡾⠹⠁⠀⠀⠀⠀⠀⠀
+--    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠙⠓⠀⠀⣼⣿⣏⢻⣿⣟⠟⠛⠛⣻⣟⣻⣿⡿⣿⡿⠋⣀⣼⡿⣙⣦⡿⠋⠀⠀⠀⠀⠀⠀⠀⠀⠀
+--    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣼⣿⣏⣿⡇⠈⠑⠒⢹⣿⢧⣿⣯⣿⡿⠗⠋⠑⠞⠛⠉⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+--    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⢾⣿⢷⣿⣯⣼⣶⢶⣦⣾⣿⣻⣞⣿⡟⣷⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀hi :3 
+--    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡴⣟⣺⣿⢎⢿⣿⣽⣻⣾⢿⣽⣿⣷⡯⣳⠹⡜⣷⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀@6x94 on discord⠀
+--    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⢾⣻⣴⣿⢾⠚⢻⣿⣞⣧⣼⡿⣞⣿⠧⢿⡵⣫⠝⣖⣻⡆⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀rawr.xyz?⠀
+--    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡿⣷⣚⣼⣏⡾⣂⣿⣿⣽⣻⣟⣿⣿⣿⣤⢬⢿⡵⣛⡜⢶⣻⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+--    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⣇⣠⠭⢿⢿⣰⣏⣿⣯⠿⣽⣿⢯⣿⣽⣧⣛⡞⣿⡵⡾⣏⣳⣿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+--    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣾⡹⣅⢀⡿⠯⣟⣿⣿⣧⡭⣿⣿⡁⢈⡷⣻⣷⠟⠋⢹⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+--    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣼⠷⣏⢾⣷⣮⣿⣿⣿⣷⣻⣽⣿⢮⣝⢶⣻⣟⠉⠓⠛⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+--    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠛⠿⣬⣿⡟⠛⠛⠛⠻⡽⡿⠿⢿⣚⢬⢳⣜⣿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+--    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣇⠀⠀⠀⢰⠀⡇⠀⠘⠛⢻⠯⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+--    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢻⠀⠀⠀⢸⠂⡇⠀⠀⠀⢸⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+--    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠸⡇⠀⢀⣸⠃⢹⠀⠀⠀⢸⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+--    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡯⠭⡯⣹⠁⢸⣖⢶⡶⣿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+--    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠁⠒⠉⠁⠀⠘⠦⠭⠵⠋⠀⠀
+
+--[[
+    PROPERTY OF RAWR.XYZ - PROPRIETARY AND CONFIDENTIAL SOURCE CODE
+    
+    Copyright (c) 2026 rawr.xyz. All Rights Reserved.
+    
+    This software and its entire source code are the sole intellectual property 
+    of rawr.xyz. Unauthorized copying, distribution, modification, sharing, 
+    hosting, public exhibition, or reverse-engineering (including but not 
+    limited to cracking, deobfuscating, or bypassing licensing checks) of this 
+    material via any medium is strictly prohibited.
+    
+    ANY UNAUTHORIZED LEAKS, CRACKS, OR DISCOVERY OF THIS CODE IN PUBLIC OR PRIVATE 
+    REPOSITORIES (INCLUDING GITHUB, DISCORD, OR WEB FORUMS) WILL FACE IMMEDIATE 
+    LEGAL REMEDIATION, INCLUDING FORMAL DMCA TAKEDOWN NOTICES, LOSS OF ACCESS, 
+    AND POTENTIAL CIVIL/LEGAL ACTIONS.
+
+    If you have obtained this file unauthorized or without a valid license, 
+    please delete it immediately and contact support@rawr.xyz.
+--]]
+
 local pl = game:GetService("Players")
 local rs = game:GetService("RunService")
 local ws = game:GetService("Workspace")
@@ -61,6 +114,19 @@ local vape = shared.vape
 local AutoPassEnabled = false
 local TriggerTime = 3
 local IsActive = false
+
+local function GetNetworkOwner(part)
+    if syn and syn.get_network_owner then
+        return syn.get_network_owner(part)
+    end
+    return nil
+end
+
+local function SetNetworkOwner(part, player)
+    if syn and syn.set_network_owner then
+        syn.set_network_owner(part, player)
+    end
+end
 
 local function DoIHaveBomb()
     local Char = lplr.Character
@@ -99,40 +165,43 @@ local function GetNearestPlayer()
     return Target
 end
 
-local function DisablePhysics(char)
-    if not char then return end
-    for _, v in pairs(char:GetDescendants()) do
-        if v:IsA("BasePart") then
-            v.CanCollide = false
-            v.CanTouch = false
-        end
+local function SilentTeleport(root, targetPos)
+    if not root then return end
+    
+    root.Velocity = Vector3.new(0, 0, 0)
+    root.RotVelocity = Vector3.new(0, 0, 0)
+    
+    local owner = GetNetworkOwner(root)
+    if owner and owner ~= lplr then
+        SetNetworkOwner(root, lplr)
     end
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    if hum then
-        hum.PlatformStand = true
-        hum.AutoRotate = false
+    
+    root.CFrame = CFrame.new(targetPos)
+    
+    local startPos = root.Position
+    for i = 1, 3 do
+        local lerpPos = startPos:Lerp(targetPos, i / 3)
+        root.CFrame = CFrame.new(lerpPos)
     end
+    root.CFrame = CFrame.new(targetPos)
+    
+    task.wait(0.01)
+    root.Velocity = Vector3.new(0, 0, 0)
+    root.RotVelocity = Vector3.new(0, 0, 0)
 end
 
-local function EnablePhysics(char)
-    if not char then return end
-    for _, v in pairs(char:GetDescendants()) do
-        if v:IsA("BasePart") then
-            v.CanCollide = true
-            v.CanTouch = true
-        end
-    end
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    if hum then
-        hum.PlatformStand = false
-        hum.AutoRotate = true
-    end
-end
-
-local function FaceTarget(root, targetCF)
-    if not root or not targetCF then return end
-    local lookAt = CFrame.lookAt(root.Position, targetCF.Position)
-    root.CFrame = lookAt
+local function FakeMovement(root, targetPos, duration)
+    if not root then return end
+    
+    local bv = Instance.new("BodyVelocity")
+    bv.MaxForce = Vector3.new(1/0, 1/0, 1/0)
+    bv.Velocity = (targetPos - root.Position).Unit * 100
+    bv.Parent = root
+    
+    task.wait(0.05)
+    bv:Destroy()
+    
+    root.CFrame = CFrame.new(targetPos)
 end
 
 local function ExecutePass()
@@ -147,28 +216,40 @@ local function ExecutePass()
     if not TargetRoot then IsActive = false return end
 
     local SafeCFrame = Root.CFrame
+    local SafeVel = Root.Velocity
     local StartTick = tick()
     local Timeout = 4
-    
-    DisablePhysics(Char)
+    local origOwner = GetNetworkOwner(Root)
     
     while DoIHaveBomb() and (tick() - StartTick < Timeout) do
         if TargetRoot and TargetRoot.Parent then
             local behindOffset = TargetRoot.CFrame.LookVector * -2.5
             local teleportPos = TargetRoot.CFrame.Position + behindOffset + Vector3.new(0, 0.5, 0)
             
-            Root.CFrame = CFrame.new(teleportPos)
+            SilentTeleport(Root, teleportPos)
             
-            FaceTarget(Root, TargetRoot.CFrame)
+            local lookAt = CFrame.lookAt(Root.Position, TargetRoot.CFrame.Position)
+            Root.CFrame = lookAt
+            
+            Root.Velocity = Vector3.new(0, 0, 0)
+            Root.RotVelocity = Vector3.new(0, 0, 0)
         end
         rs.Heartbeat:Wait()
     end
     
-    EnablePhysics(Char)
+    if origOwner then
+        SetNetworkOwner(Root, origOwner)
+    end
     
-    task.wait(0.1)
+    task.wait(0.05)
+    
+    FakeMovement(Root, SafeCFrame.Position, 0.1)
+    
+    task.wait(0.05)
     if Root and Root.Parent then
         Root.CFrame = SafeCFrame
+        Root.Velocity = SafeVel or Vector3.new(0, 0, 0)
+        Root.RotVelocity = Vector3.new(0, 0, 0)
     end
     
     task.wait(0.5)
