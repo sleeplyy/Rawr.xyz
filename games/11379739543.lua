@@ -99,30 +99,78 @@ local function GetNearestPlayer()
     return Target
 end
 
+local function DisablePhysics(char)
+    if not char then return end
+    for _, v in pairs(char:GetDescendants()) do
+        if v:IsA("BasePart") then
+            v.CanCollide = false
+            v.CanTouch = false
+        end
+    end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        hum.PlatformStand = true
+        hum.AutoRotate = false
+    end
+end
+
+local function EnablePhysics(char)
+    if not char then return end
+    for _, v in pairs(char:GetDescendants()) do
+        if v:IsA("BasePart") then
+            v.CanCollide = true
+            v.CanTouch = true
+        end
+    end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        hum.PlatformStand = false
+        hum.AutoRotate = true
+    end
+end
+
+local function FaceTarget(root, targetCF)
+    if not root or not targetCF then return end
+    local lookAt = CFrame.lookAt(root.Position, targetCF.Position)
+    root.CFrame = lookAt
+end
+
 local function ExecutePass()
     if IsActive then return end
     IsActive = true
+    
     local Char = lplr.Character
     local Root = Char and Char:FindFirstChild("HumanoidRootPart")
     if not Root then IsActive = false return end
+    
     local TargetRoot = GetNearestPlayer()
     if not TargetRoot then IsActive = false return end
 
     local SafeCFrame = Root.CFrame
     local StartTick = tick()
-    local Timeout = 4 
-
+    local Timeout = 4
+    
+    DisablePhysics(Char)
+    
     while DoIHaveBomb() and (tick() - StartTick < Timeout) do
         if TargetRoot and TargetRoot.Parent then
-            Root.CFrame = TargetRoot.CFrame
+            local behindOffset = TargetRoot.CFrame.LookVector * -2.5
+            local teleportPos = TargetRoot.CFrame.Position + behindOffset + Vector3.new(0, 0.5, 0)
+            
+            Root.CFrame = CFrame.new(teleportPos)
+            
+            FaceTarget(Root, TargetRoot.CFrame)
         end
         rs.Heartbeat:Wait()
     end
+    
+    EnablePhysics(Char)
     
     task.wait(0.1)
     if Root and Root.Parent then
         Root.CFrame = SafeCFrame
     end
+    
     task.wait(0.5)
     IsActive = false
 end
@@ -161,7 +209,7 @@ local AutoPass = vape.Categories.Blatant:CreateModule({
             IsActive = false
         end
     end,
-    Tooltip = "Auto‑pass bomb when timer hits trigger time"
+    Tooltip = "Auto‑pass bomb with anti-cheat bypass"
 })
 
 AutoPass:CreateSlider({
