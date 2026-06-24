@@ -57,13 +57,20 @@ local ws = game:GetService("Workspace")
 local is = game:GetService("UserInputService")
 local lplr = pl.LocalPlayer
 local vape = shared.vape
-local notif = function(...) return vape:CreateNotification(...) end
 
-local function hasBomb()
-    local c = lplr.Character
-    if not c then return false end
-    for _, v in pairs(c:GetChildren()) do
-        if v:IsA("BillboardGui") or v:IsA("Highlight") then return true end
+local AutoPassEnabled = false
+local TriggerTime = 3
+local IsActive = false
+
+local function DoIHaveBomb()
+    local Char = lplr.Character
+    if not Char then return false end
+    for _, v in pairs(Char:GetChildren()) do
+        if v:IsA("BillboardGui") or v:IsA("Highlight") then
+            return true 
+        end
+    end
+    for _, v in pairs(Char:GetChildren()) do
         if v:IsA("Tool") and (v.Name:lower():find("bomb") or v.Name:lower():find("tnt")) then
             return true
         end
@@ -71,31 +78,27 @@ local function hasBomb()
     return false
 end
 
-local function getNearest()
-    local myChar = lplr.Character
-    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
-    if not myRoot then return nil end
-    local closestDist = math.huge
-    local target = nil
+local function GetNearestPlayer()
+    local MyChar = lplr.Character
+    local MyRoot = MyChar and MyChar:FindFirstChild("HumanoidRootPart")
+    if not MyRoot then return nil end
+    local ClosestDist = math.huge
+    local Target = nil
     for _, v in pairs(pl:GetPlayers()) do
         if v ~= lplr and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
-            local hum = v.Character:FindFirstChild("Humanoid")
-            if hum and hum.Health > 0 then
-                local dist = (myRoot.Position - v.Character.HumanoidRootPart.Position).Magnitude
-                if dist < closestDist then
-                    closestDist = dist
-                    target = v.Character.HumanoidRootPart
+            local Hum = v.Character:FindFirstChild("Humanoid")
+            if Hum and Hum.Health > 0 then
+                local dist = (MyRoot.Position - v.Character.HumanoidRootPart.Position).Magnitude
+                if dist < ClosestDist then
+                    ClosestDist = dist
+                    Target = v.Character.HumanoidRootPart
                 end
             end
         end
     end
-    return target
+    return Target
 end
 
-local _auto = false
-local _trigger = 3
-local _heartbeat = nil
-local _active = false
 local _restoreStep = nil
 local _savedCF = nil
 local _savedVel = nil
@@ -107,35 +110,31 @@ local function _cleanupRestore()
         rs:UnbindFromRenderStep("__restore")
         _restoreStep = nil
     end
-    _savedCF = nil
-    _savedVel = nil
-    _savedRotVel = nil
-    _root = nil
 end
 
-local function _desyncPass()
-    if _active then return end
-    _active = true
+local function ExecutePass()
+    if IsActive then return end
+    IsActive = true
     _cleanupRestore()
     
-    local char = lplr.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    if not root then _active = false return end
-    
-    local targetRoot = getNearest()
-    if not targetRoot then _active = false return end
-    
-    local startTick = tick()
-    local timeout = 4
-    
-    while hasBomb() and (tick() - startTick < timeout) do
-        if targetRoot and targetRoot.Parent then
-            _savedCF = root.CFrame
-            _savedVel = root.Velocity
-            _savedRotVel = root.RotVelocity
-            _root = root
+    local Char = lplr.Character
+    local Root = Char and Char:FindFirstChild("HumanoidRootPart")
+    if not Root then IsActive = false return end
+    local TargetRoot = GetNearestPlayer()
+    if not TargetRoot then IsActive = false return end
+
+    local SafeCFrame = Root.CFrame
+    local StartTick = tick()
+    local Timeout = 4 
+
+    while DoIHaveBomb() and (tick() - StartTick < Timeout) do
+        if TargetRoot and TargetRoot.Parent then
+            _savedCF = Root.CFrame
+            _savedVel = Root.Velocity
+            _savedRotVel = Root.RotVelocity
+            _root = Root
             
-            root.CFrame = targetRoot.CFrame + Vector3.new(0, 2, 0)
+            Root.CFrame = TargetRoot.CFrame + Vector3.new(0, 2, 0)
             
             _restoreStep = rs:BindToRenderStep("__restore", 101, function()
                 pcall(function()
@@ -148,43 +147,39 @@ local function _desyncPass()
                 _cleanupRestore()
             end)
         end
-        task.wait()
+        rs.Heartbeat:Wait()
     end
     
-    if root and root.Parent then
-        if _savedCF then
-            root.CFrame = _savedCF
-            root.Velocity = _savedVel or Vector3.new()
-            root.RotVelocity = _savedRotVel or Vector3.new()
-        end
+    if Root and Root.Parent then
+        Root.CFrame = SafeCFrame
     end
     
     _cleanupRestore()
     task.wait(0.5)
-    _active = false
+    IsActive = false
 end
 
-local function _monitor()
-    if not _auto or _active then return end
-    if not hasBomb() then return end
-    local char = lplr.Character
-    if not char then return end
+local function MonitorTimer()
+    if not AutoPassEnabled or IsActive then return end
+    if not DoIHaveBomb() then return end 
+    local Char = lplr.Character
+    if not Char then return end
     local foundSeconds = nil
-    for _, v in pairs(char:GetDescendants()) do
+    for _, v in pairs(Char:GetDescendants()) do
         if v:IsA("TextLabel") and v.Visible then
             local txt = v.Text
-            local clean = txt:match("%d+%.?%d*")
+            local clean = txt:match("%d+%.?%d*") 
             if clean then
                 local num = tonumber(clean)
-                if num and num > 0 and num <= 60 then
+                if num and num > 0 and num <= 60 then 
                     foundSeconds = num
                     break
                 end
             end
         end
     end
-    if foundSeconds and foundSeconds <= _trigger then
-        _desyncPass()
+    if foundSeconds and foundSeconds <= TriggerTime then
+        ExecutePass()
     end
 end
 
@@ -192,31 +187,29 @@ local AutoPass = vape.Categories.Blatant:CreateModule({
     Name = "Auto Pass",
     Function = function(callback)
         if callback then
-            _auto = true
-            if not _heartbeat then
-                _heartbeat = rs.Heartbeat:Connect(_monitor)
-            end
+            AutoPassEnabled = true
         else
-            _auto = false
-            if _heartbeat then _heartbeat:Disconnect(); _heartbeat = nil end
-            _active = false
+            AutoPassEnabled = false
+            IsActive = false
             _cleanupRestore()
         end
     end,
-    Tooltip = "Auto‑pass bomb with desync"
+    Tooltip = "Auto‑pass bomb when timer hits trigger time"
 })
+
 AutoPass:CreateSlider({
     Name = "Trigger Time (s)",
     Min = 1,
     Max = 8,
     Decimal = 1,
     Default = 3,
-    Function = function(v) _trigger = v end,
+    Function = function(v) TriggerTime = v end,
     Suffix = "s"
 })
+
 AutoPass:CreateButton({
     Name = "Force Transfer",
-    Function = function() _desyncPass() end
+    Function = function() ExecutePass() end
 })
 
 local _esp = false
@@ -361,3 +354,5 @@ local SP = vape.Categories.Utility:CreateModule({
     end,
     Tooltip = "Increase walkspeed to 30"
 })
+
+rs.Heartbeat:Connect(MonitorTimer)
