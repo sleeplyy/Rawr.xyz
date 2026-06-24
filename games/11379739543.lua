@@ -51,150 +51,14 @@
     please delete it immediately and contact support@rawr.xyz.
 --]]
 
-if not mouse1click then mouse1click = function() return false end end
-if not isrbxactive then isrbxactive = function() return true end end
-if not iswindowactive then iswindowactive = function() return true end end
-if not mouse1press then mouse1press = function() end end
-if not mouse1release then mouse1release = function() end end
-local getcustomaudio = getcustomaudio or function(path) return nil end
-local run = function(func, issue)
-    if issue then return end
-    pcall(func)
-end
-local blacklistu = "https://raw.githubusercontent.com/imcomingforyou6959-gif/whitelists/refs/heads/main/PlayerBlacklist.json" .. "?t=" .. tick()
-local originalRequest = request
-local cleanFingerprint = (function(func)
-    local str = tostring(func)
-    str = string.gsub(str, "0x%x+", "0xXXXXX")
-    str = string.gsub(str, "function: %d+", "function: X")
-    return str
-end)(originalRequest)
-local function validateEnvironment()
-    local currentFingerprint = (function(func)
-        local str = tostring(func)
-        str = string.gsub(str, "0x%x+", "0xXXXXX")
-        str = string.gsub(str, "function: %d+", "function: X")
-        return str
-    end)(request)
-    return currentFingerprint == cleanFingerprint
-end
-local function fetchBlacklist()
-    if not validateEnvironment() then return nil, "validation_failed" end
-    local success, response = pcall(function()
-        return request({ Url = blacklistu, Method = "GET" })
-    end)
-    if not success or not response or not response.Success or response.StatusCode ~= 200 then
-        return nil, "http_failed"
-    end
-    local ok, data = pcall(function()
-        return game:GetService("HttpService"):JSONDecode(response.Body)
-    end)
-    if ok and data and type(data.BlacklistedUsers) == "table" then
-        return data.BlacklistedUsers, "success"
-    end
-    return nil, "parse_failed"
-end
-local function isBlacklisted(blacklistTable)
-    local userId = game.Players.LocalPlayer.UserId
-    return blacklistTable and (blacklistTable[tostring(userId)] or blacklistTable[userId])
-end
-local function haltExecution(reason)
-    pcall(function()
-        game.Players.LocalPlayer:Kick("Rawr.xyz | https://discord.gg/RJj7vrNwBy | " .. reason)
-    end)
-    pcall(function()
-        game:Shutdown()
-    end)
-    pcall(function()
-        game:GetService("TeleportService"):Teleport(0)
-    end)
-    pcall(function()
-        local coreGui = game:GetService("CoreGui")
-        for _, gui in ipairs(coreGui:GetChildren()) do
-            if gui.Name:find("Rawr") or gui.Name:find("Vape") or gui.Name:find("rawr") then
-                gui:Destroy()
-            end
-        end
-        if vape and vape.gui then vape.gui:Destroy() end
-        if _G.rawr_gui then _G.rawr_gui:Destroy() end
-    end)
-    pcall(function()
-        local env = getfenv and getfenv() or _G
-        env.loadstring = function() return nil end
-        env.load = function() return nil end
-        if env.debug then env.debug = nil end
-    end)
-    while true do
-        task.wait(9e9)
-    end
-end
-local blacklist = nil
-local status = nil
-local attempts = 0
-while attempts < 3 and blacklist == nil do
-    blacklist, status = fetchBlacklist()
-    if status == "http_failed" or status == "parse_failed" then
-        attempts = attempts + 1
-        if attempts < 3 then task.wait(1) end
-    else
-        break
-    end
-end
-if status == "validation_failed" then haltExecution("Environment tampered") return true end
-if blacklist and type(blacklist) == "table" and isBlacklisted(blacklist) then
-    haltExecution("You have been blacklisted")
-    return true
-end
-if blacklist == nil then
-    haltExecution("Cannot verify blacklist table | Check your Internet")
-    return true
-end
-task.spawn(function()
-    while true do
-        task.wait(25)
-        local blist, st = fetchBlacklist()
-        if blist and type(blist) == "table" and isBlacklisted(blist) then
-            haltExecution("You have been blacklisted")
-            break
-        end
-        if st == "validation_failed" then
-            haltExecution("Environment tampered")
-            break
-        end
-        if blist == nil then
-            haltExecution("Cannot verify blacklist - Retry again")
-            break
-        end
-    end
-end)
-repeat task.wait() until lplr
-local cloneref = cloneref or function(obj) return obj end
-local pl = cloneref(game:GetService('Players'))
-local rs = cloneref(game:GetService('RunService'))
-local ws = cloneref(game:GetService('Workspace'))
-local is = cloneref(game:GetService('UserInputService'))
-local cg = cloneref(game:GetService('CoreGui'))
-local gs = cloneref(game:GetService('GuiService'))
+local pl = game:GetService("Players")
+local rs = game:GetService("RunService")
+local ws = game:GetService("Workspace")
+local is = game:GetService("UserInputService")
 local lplr = pl.LocalPlayer
 local vape = shared.vape
-local entitylib = vape.Libraries.entity
-local targetinfo = vape.Libraries.targetinfo
 local notif = function(...) return vape:CreateNotification(...) end
-if identifyexecutor then
-    local execInfo = {identifyexecutor()}
-    local execName = execInfo[1] or "Unknown"
-    local execVersion = execInfo[2] or "Unknown"
-    notif('Rawr.xyz', 'Executor: ' .. execName .. ' | v' .. execVersion, 5, 'info')
-    local allowed = {
-        Madium = true, Velocity = true, Sirhurt = true, Volt = true, LX63 = true,
-        ["Synapse Z"] = true, Seliware = true, Potassium = true, Cosmic = true,
-        Volcano = true, Wave = true, Luna = true, Yubx = true, Ronix = true,
-        Real = true, Luna = true, Voidclient = true, Yubx = true, Isaeva = true
-    }
-    if not allowed[execName] then
-        notif('Rawr.xyz', 'Your Executor is too bad to use all features :(', 6, 'alert')
-    end
-end
+
 local function hasBomb()
     local c = lplr.Character
     if not c then return false end
@@ -206,6 +70,7 @@ local function hasBomb()
     end
     return false
 end
+
 local function getNearest()
     local myChar = lplr.Character
     local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
@@ -226,11 +91,13 @@ local function getNearest()
     end
     return target
 end
+
 local _auto = false
 local _trigger = 3
 local _heartbeat = nil
 local _active = false
 local _restoreStep = nil
+
 local function _desyncPass()
     if _active then return end
     _active = true
@@ -268,6 +135,7 @@ local function _desyncPass()
     task.wait(0.5)
     _active = false
 end
+
 local function _monitor()
     if not _auto or _active then return end
     if not hasBomb() then return end
@@ -291,6 +159,7 @@ local function _monitor()
         _desyncPass()
     end
 end
+
 local AutoPass = vape.Categories.Blatant:CreateModule({
     Name = "Auto Pass",
     Function = function(callback)
@@ -309,7 +178,7 @@ local AutoPass = vape.Categories.Blatant:CreateModule({
             end
         end
     end,
-    Tooltip = "Auto‑pass bomb"
+    Tooltip = "Auto‑pass bomb with desync"
 })
 AutoPass:CreateSlider({
     Name = "Trigger Time (s)",
@@ -324,6 +193,7 @@ AutoPass:CreateButton({
     Name = "Force Transfer",
     Function = function() _desyncPass() end
 })
+
 local _esp = false
 local _espConn = nil
 local function _makeGrid(part)
@@ -376,6 +246,7 @@ local ESP = vape.Categories.Render:CreateModule({
     end,
     Tooltip = "Full‑body red line ESP on enemies"
 })
+
 local _inf = false
 local _infConn = nil
 local InfJump = vape.Categories.Utility:CreateModule({
@@ -400,6 +271,7 @@ local InfJump = vape.Categories.Utility:CreateModule({
     end,
     Tooltip = "Jump repeatedly while holding space"
 })
+
 local _noclip = false
 local _noclipConn = nil
 local Noclip = vape.Categories.World:CreateModule({
@@ -432,6 +304,7 @@ local Noclip = vape.Categories.World:CreateModule({
     end,
     Tooltip = "Walk through walls"
 })
+
 local _sp = false
 local _spConn = nil
 local _spSpeed = 30
