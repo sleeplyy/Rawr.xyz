@@ -99,24 +99,9 @@ local function GetNearestPlayer()
     return Target
 end
 
-local _restoreStep = nil
-local _savedCF = nil
-local _savedVel = nil
-local _savedRotVel = nil
-local _root = nil
-
-local function _cleanupRestore()
-    if _restoreStep then
-        rs:UnbindFromRenderStep("__restore")
-        _restoreStep = nil
-    end
-end
-
 local function ExecutePass()
     if IsActive then return end
     IsActive = true
-    _cleanupRestore()
-    
     local Char = lplr.Character
     local Root = Char and Char:FindFirstChild("HumanoidRootPart")
     if not Root then IsActive = false return end
@@ -129,32 +114,15 @@ local function ExecutePass()
 
     while DoIHaveBomb() and (tick() - StartTick < Timeout) do
         if TargetRoot and TargetRoot.Parent then
-            _savedCF = Root.CFrame
-            _savedVel = Root.Velocity
-            _savedRotVel = Root.RotVelocity
-            _root = Root
-            
-            Root.CFrame = TargetRoot.CFrame + Vector3.new(0, 2, 0)
-            
-            _restoreStep = rs:BindToRenderStep("__restore", 101, function()
-                pcall(function()
-                    if _root and _root.Parent and _savedCF then
-                        _root.CFrame = _savedCF
-                        _root.Velocity = _savedVel or Vector3.new()
-                        _root.RotVelocity = _savedRotVel or Vector3.new()
-                    end
-                end)
-                _cleanupRestore()
-            end)
+            Root.CFrame = TargetRoot.CFrame
         end
         rs.Heartbeat:Wait()
     end
     
+    task.wait(0.1)
     if Root and Root.Parent then
         Root.CFrame = SafeCFrame
     end
-    
-    _cleanupRestore()
     task.wait(0.5)
     IsActive = false
 end
@@ -191,7 +159,6 @@ local AutoPass = vape.Categories.Blatant:CreateModule({
         else
             AutoPassEnabled = false
             IsActive = false
-            _cleanupRestore()
         end
     end,
     Tooltip = "Auto‑pass bomb when timer hits trigger time"
