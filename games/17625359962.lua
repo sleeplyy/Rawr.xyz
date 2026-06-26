@@ -52,18 +52,6 @@
 --]]
 
 -- FB – Executor Compatibility Layer
-local executorLevel = "Unknown"
-pcall(function()
-    if Drawing and Drawing.new then executorLevel = "Full" end
-end)
-if executorLevel == "Unknown" then
-    pcall(function()
-        if hookfunction and hookmetamethod then executorLevel = "Mid" end
-    end)
-end
-if executorLevel == "Unknown" then executorLevel = "Low" end
-
--- Safe stubs for missing functions (Low-level executors)
 if not Drawing then Drawing = {} end
 if not Drawing.new then
     Drawing.new = function(class)
@@ -98,15 +86,10 @@ if not getsynasset then getsynasset = function() return nil end end
 if not identifyexecutor then identifyexecutor = function() return "Unknown", "0.0" end end
 if not setfflag then setfflag = function() end end
 if not getfflag then getfflag = function() return false end end
-if not setreadonly then setreadonly = function() end end
-if not getrawmetatable then getrawmetatable = function(obj) return getmetatable(obj) or {} end end
+if not setreadonly then setreadonly = function(t, v) end end
+if not getrawmetatable then getrawmetatable = function(obj) return getmetatable(obj) or {__index = function() end} end end
 if not getconnections then getconnections = function() return {} end end
 if not firesignal then firesignal = function() end end
-
-if not coroutine.yield then
-    local co = coroutine.running()
-    coroutine.yield = function() if co then coroutine.yield(co) end end
-end
 
 local run = function(func, issue)
     if issue then return end
