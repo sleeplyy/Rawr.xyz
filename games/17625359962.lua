@@ -51,26 +51,67 @@
     please delete it immediately and contact support@rawr.xyz.
 --]]
 
--- FB
-if not mouse1click then mouse1click = function() return false end end
+-- FB – Executor Compatibility Layer
+local executorLevel = "Unknown"
+pcall(function()
+    if Drawing and Drawing.new then executorLevel = "Full" end
+end)
+if executorLevel == "Unknown" then
+    pcall(function()
+        if hookfunction and hookmetamethod then executorLevel = "Mid" end
+    end)
+end
+if executorLevel == "Unknown" then executorLevel = "Low" end
+
+-- Safe stubs for missing functions (Low-level executors)
+if not Drawing then Drawing = {} end
+if not Drawing.new then
+    Drawing.new = function(class)
+        local obj = {
+            Visible = false, Color = Color3.new(1,1,1), Transparency = 0,
+            Thickness = 1, Radius = 50, Filled = false, NumSides = 100,
+            From = Vector2.new(), To = Vector2.new(), Position = Vector2.new(),
+            Remove = function(self) end
+        }
+        return obj
+    end
+end
+
+if not cloneref then cloneref = function(obj) return obj end end
+if not hookfunction then hookfunction = function(old, new) return old end end
+if not hookmetamethod then hookmetamethod = function(obj, method, hook) return function() end end
+if not newcclosure then newcclosure = function(f) return f end end
+if not getnamecallmethod then getnamecallmethod = function() return "" end end
+if not checkcaller then checkcaller = function() return false end end
 if not isrbxactive then isrbxactive = function() return true end end
 if not iswindowactive then iswindowactive = function() return true end end
+if not mouse1click then mouse1click = function() return false end end
 if not mouse1press then mouse1press = function() end end
 if not mouse1release then mouse1release = function() end end
+if not isfile then isfile = function() return false end end
+if not readfile then readfile = function() return "" end end
+if not writefile then writefile = function() end end
+if not isfolder then isfolder = function() return false end end
+if not makefolder then makefolder = function() end end
+if not getcustomasset then getcustomasset = function() return nil end end
+if not getsynasset then getsynasset = function() return nil end end
+if not identifyexecutor then identifyexecutor = function() return "Unknown", "0.0" end end
+if not setfflag then setfflag = function() end end
+if not getfflag then getfflag = function() return false end end
+if not setreadonly then setreadonly = function() end end
+if not getrawmetatable then getrawmetatable = function(obj) return getmetatable(obj) or {} end end
+if not getconnections then getconnections = function() return {} end end
+if not firesignal then firesignal = function() end end
 
-local isfile = isfile or function(file) local ok,res = pcall(readfile,file) return ok and res ~= nil and res ~= '' end
-local writefile = writefile or function(file,data) end
-local isfolder = isfolder or function(folder) return false end
-local makefolder = makefolder or function(folder) end
-local readfile = readfile or function(file) return '' end
-local getcustomaudio = getcustomaudio or function(path) return nil end
+if not coroutine.yield then
+    local co = coroutine.running()
+    coroutine.yield = function() if co then coroutine.yield(co) end end
+end
 
 local run = function(func, issue)
     if issue then return end
     pcall(func)
 end
-
-local cloneref = cloneref or function(obj) return obj end
 
 local playersService = cloneref(game:GetService('Players'))
 local workspaceService = cloneref(game:GetService('Workspace'))
