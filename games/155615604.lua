@@ -2799,44 +2799,70 @@ run(function()
 end)
                                                                                                                                                                                 
 run(function()
-    local ArrestHighlight = replicatedStorageService:FindFirstChild("ArrestHighlight")
+    local ArrestHighlight = nil
     local originalColor = nil
     local enabled = false
     local currentColor = Color3.fromRGB(255, 255, 255)
     local highlightConn = nil
 
+    pcall(function()
+        local found = replicatedStorageService:FindFirstChild("ArrestHighlight")
+        if found then ArrestHighlight = found end
+    end)
+
     local function applyColor()
-        if not ArrestHighlight or not ArrestHighlight:IsA("Highlight") then return end
-        if enabled then
-            ArrestHighlight.FillColor = currentColor
-            ArrestHighlight.OutlineColor = currentColor
-        elseif originalColor then
-            ArrestHighlight.FillColor = originalColor
-            ArrestHighlight.OutlineColor = originalColor
+        if not ArrestHighlight then return end
+        local ok = pcall(function()
+            if not ArrestHighlight:IsA("Highlight") then return end
+            if enabled then
+                ArrestHighlight.FillColor = currentColor
+                ArrestHighlight.OutlineColor = currentColor
+            elseif originalColor then
+                ArrestHighlight.FillColor = originalColor
+                ArrestHighlight.OutlineColor = originalColor
+            end
+        end)
+        if not ok then
+            -- object became invalid
+            ArrestHighlight = nil
         end
     end
 
     local function onHighlightAppeared(hl)
-        if hl and hl:IsA("Highlight") and hl.Name == "ArrestHighlight" then
-            ArrestHighlight = hl
-            if not originalColor then
-                originalColor = hl.FillColor
+        if not hl then return end
+        local valid = false
+        pcall(function()
+            if hl.Name == "ArrestHighlight" and hl:IsA("Highlight") then
+                ArrestHighlight = hl
+                if not originalColor then
+                    originalColor = hl.FillColor
+                end
+                valid = true
             end
-            applyColor()
+        end)
+        if not valid then return end
+
+        applyColor()
+
+        pcall(function()
             hl.Destroying:Connect(function()
                 ArrestHighlight = nil
                 if highlightConn then
-                    highlightConn:Disconnect()
+                    pcall(function() highlightConn:Disconnect() end)
                     highlightConn = nil
                 end
+                -- wait
                 highlightConn = replicatedStorageService.ChildAdded:Connect(function(child)
                     if child.Name == "ArrestHighlight" and child:IsA("Highlight") then
                         onHighlightAppeared(child)
-                        if highlightConn then highlightConn:Disconnect() end
+                        if highlightConn then
+                            pcall(function() highlightConn:Disconnect() end)
+                            highlightConn = nil
+                        end
                     end
                 end)
             end)
-        end
+        end)
     end
 
     if ArrestHighlight then
@@ -2845,8 +2871,10 @@ run(function()
         highlightConn = replicatedStorageService.ChildAdded:Connect(function(child)
             if child.Name == "ArrestHighlight" and child:IsA("Highlight") then
                 onHighlightAppeared(child)
-                highlightConn:Disconnect()
-                highlightConn = nil
+                if highlightConn then
+                    pcall(function() highlightConn:Disconnect() end)
+                    highlightConn = nil
+                end
             end
         end)
     end
@@ -2871,10 +2899,14 @@ run(function()
 
     vape:Clean(function()
         if ArrestHighlight and ArrestHighlight:IsA("Highlight") and originalColor then
-            ArrestHighlight.FillColor = originalColor
-            ArrestHighlight.OutlineColor = originalColor
+            pcall(function()
+                ArrestHighlight.FillColor = originalColor
+                ArrestHighlight.OutlineColor = originalColor
+            end)
         end
-        if highlightConn then highlightConn:Disconnect() end
+        if highlightConn then
+            pcall(function() highlightConn:Disconnect() end)
+        end
     end)
 end)
 
