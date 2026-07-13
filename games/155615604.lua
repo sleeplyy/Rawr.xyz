@@ -2515,14 +2515,12 @@ run(function()
             if callback then
                 KickAll.Enabled = true
                 local cf = {}
-                local wheelIndex = 1
 
                 kickConnection = game:GetService("RunService").Heartbeat:Connect(function()
                     if not KickAll.Enabled then return end
                     
                     local entitylib = vape.Libraries.entity
                     local ws = game:GetService("Workspace")
-                    local runService = game:GetService("RunService")
                     
                     local seat = entitylib.character and entitylib.character.Humanoid and entitylib.character.Humanoid.SeatPart
                     
@@ -2542,6 +2540,8 @@ run(function()
                         end
                     end
 
+                    if #wheelParts == 0 then return end
+
                     local targets = table.clone(entitylib.List)
                     table.sort(targets, function(a, b)
                         return (a.RootPart.Position - seat.Position).Magnitude < (b.RootPart.Position - seat.Position).Magnitude
@@ -2552,7 +2552,10 @@ run(function()
 
                     for _, entity in pairs(targets) do
                         if entity and entity.Character and entity.Humanoid then
-                            local isWhitelisted = whitelist and whitelist:get and select(2, whitelist:get(entity.Player))
+                            local isWhitelisted = false
+                            if whitelist and whitelist.get then
+                                isWhitelisted = select(2, whitelist:get(entity.Player))
+                            end
                             
                             if (os.clock() - entity.SpawnTime) > 5 and 
                                entity.Health > 0 and 
@@ -2571,7 +2574,9 @@ run(function()
                                 end
 
                                 local target = entity.Humanoid.Torso or entity.RootPart
-                                sethiddenproperty and sethiddenproperty(wheel.Part0, 'PhysicsRepRootPart', entity.RootPart)
+                                if sethiddenproperty then
+                                    sethiddenproperty(wheel.Part0, 'PhysicsRepRootPart', entity.RootPart)
+                                end
                                 wheel.Part0.CFrame = CFrame.new(target.Position) * CFrame.Angles(0, math.rad(90), 0)
                                 wheel.Part1.CFrame = cf[wheel]
                                 wheel.Part0.AssemblyLinearVelocity = Vector3.new(50, 0, 0)
@@ -2607,7 +2612,7 @@ run(function()
                 end
             end
         end,
-        Tooltip = 'kick everyone in the server'
+        Tooltip = 'Kick everyone in the server using vehicle wheels'
     })
 end)
 																																					
@@ -2622,6 +2627,7 @@ run(function()
                 AntiRiotShield.Enabled = true
                 shieldConnection = game:GetService("RunService").Heartbeat:Connect(function()
                     if not AntiRiotShield.Enabled then return end
+                    local entitylib = vape.Libraries.entity
                     for _, ent in pairs(entitylib.List) do
                         if ent and ent.Character then
                             local shield = ent.Character:FindFirstChild('RiotShieldPart')
@@ -2637,6 +2643,7 @@ run(function()
                     shieldConnection:Disconnect()
                     shieldConnection = nil
                 end
+                local entitylib = vape.Libraries.entity
                 for _, ent in pairs(entitylib.List) do
                     if ent and ent.Character then
                         local shield = ent.Character:FindFirstChild('RiotShieldPart')
@@ -2650,7 +2657,7 @@ run(function()
         Tooltip = 'Allow you to shoot through riot shields.'
     })
 end)
-
+																																										
 run(function()
     local AntiFence
     local fenceConnection = nil
