@@ -2507,90 +2507,66 @@ end)
 
 run(function()
     local KickAll
-    local kickConnection = nil
 
     KickAll = vape.Categories.Blatant:CreateModule({
         Name = 'KickAll',
         Function = function(callback)
             if callback then
-                KickAll.Enabled = true
                 local cf = {}
-
-                kickConnection = game:GetService("RunService").Heartbeat:Connect(function()
-                    if not KickAll.Enabled then return end
-                    
-                    local entitylib = vape.Libraries.entity
-                    local ws = game:GetService("Workspace")
-                    
-                    local seat = entitylib.character and entitylib.character.Humanoid and entitylib.character.Humanoid.SeatPart
-                    
-                    if not (seat and seat:IsDescendantOf(ws.CarContainer) and seat.Name == 'VehicleSeat') then
-                        vape:CreateNotification('KickAll', 'Vehicle required!', 10, 'alert')
+                local flingtimes = {}
+                local flingcooldown = {}
+                local runService = game:GetService("RunService")
+                local workspace = game:GetService("Workspace")
+                local entitylib = vape.Libraries.entity
+                local whitelist = vape.Libraries.whitelist
+                local notif = function(title, text, duration) 
+                    return vape:CreateNotification(title, text, duration, 'alert') 
+                end
+                
+                KickAll:Clean(runService.Heartbeat:Connect(function()
+                    local seat = entitylib.isAlive and entitylib.character.Humanoid.SeatPart
+                    if not (seat and seat:IsDescendantOf(workspace.CarContainer) and seat.Name == 'VehicleSeat') then
+                        notif('KickAll', 'Vehicle required!', 10)
                         KickAll:Toggle()
                         return
                     end
 
-                    local wheels = seat.Parent.Parent:FindFirstChild("Wheels")
-                    if not wheels then return end
-                    
-                    local wheelParts = {}
-                    for _, v in pairs(wheels:GetDescendants()) do
-                        if v.Name == "Rotate" then
-                            table.insert(wheelParts, v)
-                        end
-                    end
-
-                    if #wheelParts == 0 then return end
-
+                    local wheelIndex = 1
+                    local wheels = seat.Parent.Parent.Wheels:QueryDescendants('Rotate')
                     local targets = table.clone(entitylib.List)
+
                     table.sort(targets, function(a, b)
                         return (a.RootPart.Position - seat.Position).Magnitude < (b.RootPart.Position - seat.Position).Magnitude
                     end)
 
-                    local whitelist = vape.Libraries.whitelist
-                    local wheelIndex = 1
-
                     for _, entity in pairs(targets) do
-                        if entity and entity.Character and entity.Humanoid then
-                            local isWhitelisted = false
-                            if whitelist and whitelist.get then
-                                isWhitelisted = select(2, whitelist:get(entity.Player))
+                        if (os.clock() - entity.SpawnTime) > 5 and entity.Health > 0 and entity.Humanoid:GetState() ~= Enum.HumanoidStateType.Dead and select(2, whitelist:get(entity.Player)) and not (entity.Humanoid.SeatPart and entity.Humanoid.SeatPart.Anchored) and entity.RootPart.AssemblyLinearVelocity.Magnitude < 60 then
+                            local wheel = wheels[wheelIndex]
+                            if not wheel then
+                                break
                             end
-                            
-                            if (os.clock() - entity.SpawnTime) > 5 and 
-                               entity.Health > 0 and 
-                               entity.Humanoid:GetState() ~= Enum.HumanoidStateType.Dead and 
-                               (not isWhitelisted) and 
-                               not (entity.Humanoid.SeatPart and entity.Humanoid.SeatPart.Anchored) and 
-                               entity.RootPart.AssemblyLinearVelocity.Magnitude < 60 then
-                                
-                                local wheel = wheelParts[wheelIndex]
-                                if not wheel then
-                                    break
-                                end
 
-                                if not cf[wheel] then
-                                    cf[wheel] = wheel.Part1.CFrame
-                                end
-
-                                local target = entity.Humanoid.Torso or entity.RootPart
-                                if sethiddenproperty then
-                                    sethiddenproperty(wheel.Part0, 'PhysicsRepRootPart', entity.RootPart)
-                                end
-                                wheel.Part0.CFrame = CFrame.new(target.Position) * CFrame.Angles(0, math.rad(90), 0)
-                                wheel.Part1.CFrame = cf[wheel]
-                                wheel.Part0.AssemblyLinearVelocity = Vector3.new(50, 0, 0)
-                                wheel.Part0.AssemblyAngularVelocity = Vector3.zero
-                                wheel.Part1.AssemblyLinearVelocity = Vector3.zero
-                                wheel.Part1.AssemblyAngularVelocity = Vector3.zero
-
-                                wheelIndex = wheelIndex + 1
+                            if not cf[wheel] then
+                                cf[wheel] = wheel.Part1.CFrame
                             end
+
+                            local target = entity.Humanoid.Torso or entity.RootPart
+                            if sethiddenproperty then
+                                sethiddenproperty(wheel.Part0, 'PhysicsRepRootPart', entity.RootPart)
+                            end
+                            wheel.Part0.CFrame = CFrame.new(target.Position) * CFrame.Angles(0, math.rad(90), 0)
+                            wheel.Part1.CFrame = cf[wheel]
+                            wheel.Part0.AssemblyLinearVelocity = Vector3.new(50, 0, 0)
+                            wheel.Part0.AssemblyAngularVelocity = Vector3.zero
+                            wheel.Part1.AssemblyLinearVelocity = Vector3.zero
+                            wheel.Part1.AssemblyAngularVelocity = Vector3.zero
+
+                            wheelIndex = wheelIndex + 1
                         end
                     end
 
-                    for i = wheelIndex, #wheelParts do
-                        local wheel = wheelParts[i]
+                    for i = 1, #wheels - wheelIndex do
+                        local wheel = wheels[wheelIndex]
                         if cf[wheel] then
                             wheel.Part0.CFrame = cf[wheel]
                             wheel.Part1.CFrame = cf[wheel]
@@ -2603,16 +2579,10 @@ run(function()
                     end
 
                     table.clear(targets)
-                end)
-            else
-                KickAll.Enabled = false
-                if kickConnection then
-                    kickConnection:Disconnect()
-                    kickConnection = nil
-                end
+                end))
             end
         end,
-        Tooltip = 'Kick everyone in the server using vehicle wheels'
+        Tooltip = 'kick everyone in the server'
     })
 end)
 																																					
