@@ -2534,6 +2534,78 @@ run(function()
 		Tooltip = 'Allow you to shoot through riot shields.'
 	})
 end)
+
+run(function()
+    local AntiFence
+    local fenceConnection = nil
+
+    local function pattycakebaby(part)
+        if not part or not part:IsA("BasePart") then return end
+        pcall(function()
+            part.CanTouch = false
+            part.CanCollide = true
+        end)
+    end
+
+    local function FindAndDisableFences()
+        if not AntiFence or not AntiFence.Enabled then return end
+        
+        local ws = game:GetService("Workspace")
+        local fences = ws:FindFirstChild("Prison_Fences")
+        if not fences then return end
+        
+        local fencepeople = {
+            fences:GetChildren()[3],
+            fences:GetChildren()[4],
+            fences:GetChildren()[5],
+            fences:GetChildren()[7],
+            fences:GetChildren()[9],
+            fences:GetChildren()[10],
+            fences:GetChildren()[2],
+            fences:GetChildren()[6],
+            fences:FindFirstChild("fence"),
+            fences:FindFirstChild("Prison_Gate")
+        }
+        
+        for _, loc in ipairs(fencepeople) do
+            if loc then
+                if loc:IsA("Model") then
+                    local damagePart = loc:FindFirstChild("damagePart")
+                    if damagePart then
+                        pattycakebaby(damagePart)
+                    end
+                elseif loc:IsA("BasePart") and loc.Name:lower():find("damage") then
+                    pattycakebaby(loc)
+                elseif loc:IsA("BasePart") then
+                    local damagePart = loc:FindFirstChild("damagePart")
+                    if damagePart then
+                        pattycakebaby(damagePart)
+                    end
+                end
+            end
+        end
+    end
+
+    AntiFence = vape.Categories.World:CreateModule({
+        Name = "AntiFence",
+        Function = function(callback)
+            if callback then
+                AntiFence.Enabled = true
+                FindAndDisableFences()
+                if not fenceConnection then
+                    fenceConnection = game:GetService("RunService").Heartbeat:Connect(FindAndDisableFences)
+                end
+            else
+                AntiFence.Enabled = false
+                if fenceConnection then
+                    fenceConnection:Disconnect()
+                    fenceConnection = nil
+                end
+            end
+        end,
+        Tooltip = "Disables all fence kill parts"
+    })
+end)
                                                                                                                                                 
 run(function()
     local AutoReset
