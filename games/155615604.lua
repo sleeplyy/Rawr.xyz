@@ -1975,11 +1975,21 @@ run(function()
         if handle then
             local position = handle.CFrame
             local new = CFrame.new(position.X, position.Y - 5, position.Z)
+            local attempts = 0
+            local maxAttempts = 2
             repeat
+                attempts = attempts + 1
                 t.d.s = new
                 safeCall('GiverPressed', function() GiverPressed:FireServer(v) end)
                 task.wait(0.5)
-            until not entitylib or not entitylib.isAlive or checkInv(v, name)
+                -- max check
+                if attempts >= maxAttempts then
+                    if not checkInv(v, name) then
+                        -- cancel on 2nd
+                        break
+                    end
+                end
+            until not entitylib or not entitylib.isAlive or checkInv(v, name) or attempts >= maxAttempts
             t.d.s = CFrame.new()
         end
     end
@@ -2036,8 +2046,7 @@ run(function()
         end
     end
 end)
-                                                                                                                    
-                                                                                                                            
+                                                                                                                                                                                                                                                
 run(function()
     local camera = workspace.CurrentCamera
     local defaultFOV = 70
