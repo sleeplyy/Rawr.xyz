@@ -2505,103 +2505,150 @@ run(function()
     })
 end)
 
-local KickAll
+run(function()
+    local KickAll
+    local kickConnection = nil
 
-KickAll = vape.Categories.Blatant:CreateModule({
-	Name = 'KickAll',
-	Function = function(callback)
-		if callback then
-			local cf = {}
-			local flingtimes = {}
-			local flingcooldown = {}
-			KickAll:Clean(runService.Heartbeat:Connect(function()
-				local seat = entitylib.isAlive and entitylib.character.Humanoid.SeatPart
-				if not (seat and seat:IsDescendantOf(workspace.CarContainer) and seat.Name == 'VehicleSeat') then
-					notif('KickAll', 'Vehicle required!', 10)
-					KickAll:Toggle()
-					return
-				end
+    KickAll = vape.Categories.Blatant:CreateModule({
+        Name = 'KickAll',
+        Function = function(callback)
+            if callback then
+                KickAll.Enabled = true
+                local cf = {}
+                local wheelIndex = 1
 
-				local wheelIndex = 1
-				local wheels = seat.Parent.Parent.Wheels:QueryDescendants('Rotate')
-				local targets = table.clone(entitylib.List)
+                kickConnection = game:GetService("RunService").Heartbeat:Connect(function()
+                    if not KickAll.Enabled then return end
+                    
+                    local entitylib = vape.Libraries.entity
+                    local ws = game:GetService("Workspace")
+                    local runService = game:GetService("RunService")
+                    
+                    local seat = entitylib.character and entitylib.character.Humanoid and entitylib.character.Humanoid.SeatPart
+                    
+                    if not (seat and seat:IsDescendantOf(ws.CarContainer) and seat.Name == 'VehicleSeat') then
+                        vape:CreateNotification('KickAll', 'Vehicle required!', 10, 'alert')
+                        KickAll:Toggle()
+                        return
+                    end
 
-				table.sort(targets, function(a, b)
-					return (a.RootPart.Position - seat.Position).Magnitude < (b.RootPart.Position - seat.Position).Magnitude
-				end)
+                    local wheels = seat.Parent.Parent:FindFirstChild("Wheels")
+                    if not wheels then return end
+                    
+                    local wheelParts = {}
+                    for _, v in pairs(wheels:GetDescendants()) do
+                        if v.Name == "Rotate" then
+                            table.insert(wheelParts, v)
+                        end
+                    end
 
-				for _, entity in targets do
-					if (os.clock() - entity.SpawnTime) > 5 and entity.Health > 0 and entity.Humanoid:GetState() ~= Enum.HumanoidStateType.Dead and select(2, whitelist:get(entity.Player)) and not (entity.Humanoid.SeatPart and entity.Humanoid.SeatPart.Anchored) and entity.RootPart.AssemblyLinearVelocity.Magnitude < 60 then
-						local wheel = wheels[wheelIndex]
-						if not wheel then
-							break
-						end
+                    local targets = table.clone(entitylib.List)
+                    table.sort(targets, function(a, b)
+                        return (a.RootPart.Position - seat.Position).Magnitude < (b.RootPart.Position - seat.Position).Magnitude
+                    end)
 
-						if not cf[wheel] then
-							cf[wheel] = wheel.Part1.CFrame
-						end
+                    local whitelist = vape.Libraries.whitelist
+                    local wheelIndex = 1
 
-						local target = entity.Humanoid.Torso or entity.RootPart
-						sethiddenproperty(wheel.Part0, 'PhysicsRepRootPart', entity.RootPart)
-						wheel.Part0.CFrame = CFrame.new(target.Position) * CFrame.Angles(0, math.rad(90), 0)
-						wheel.Part1.CFrame = cf[wheel]
-						wheel.Part0.AssemblyLinearVelocity = Vector3.new(50, 0, 0)
-						wheel.Part0.AssemblyAngularVelocity = Vector3.zero
-						wheel.Part1.AssemblyLinearVelocity = Vector3.zero
-						wheel.Part1.AssemblyAngularVelocity = Vector3.zero
+                    for _, entity in pairs(targets) do
+                        if entity and entity.Character and entity.Humanoid then
+                            local isWhitelisted = whitelist and whitelist:get and select(2, whitelist:get(entity.Player))
+                            
+                            if (os.clock() - entity.SpawnTime) > 5 and 
+                               entity.Health > 0 and 
+                               entity.Humanoid:GetState() ~= Enum.HumanoidStateType.Dead and 
+                               (not isWhitelisted) and 
+                               not (entity.Humanoid.SeatPart and entity.Humanoid.SeatPart.Anchored) and 
+                               entity.RootPart.AssemblyLinearVelocity.Magnitude < 60 then
+                                
+                                local wheel = wheelParts[wheelIndex]
+                                if not wheel then
+                                    break
+                                end
 
-						wheelIndex += 1
-					end
-				end
+                                if not cf[wheel] then
+                                    cf[wheel] = wheel.Part1.CFrame
+                                end
 
-				for i = 1, #wheels - wheelIndex do
-					local wheel = wheels[wheelIndex]
-					if cf[wheel] then
-						wheel.Part0.CFrame = cf[wheel]
-						wheel.Part1.CFrame = cf[wheel]
-					end
+                                local target = entity.Humanoid.Torso or entity.RootPart
+                                sethiddenproperty and sethiddenproperty(wheel.Part0, 'PhysicsRepRootPart', entity.RootPart)
+                                wheel.Part0.CFrame = CFrame.new(target.Position) * CFrame.Angles(0, math.rad(90), 0)
+                                wheel.Part1.CFrame = cf[wheel]
+                                wheel.Part0.AssemblyLinearVelocity = Vector3.new(50, 0, 0)
+                                wheel.Part0.AssemblyAngularVelocity = Vector3.zero
+                                wheel.Part1.AssemblyLinearVelocity = Vector3.zero
+                                wheel.Part1.AssemblyAngularVelocity = Vector3.zero
 
-					wheel.Part0.AssemblyLinearVelocity = Vector3.zero
-					wheel.Part0.AssemblyAngularVelocity = Vector3.zero
-					wheel.Part1.AssemblyLinearVelocity = Vector3.zero
-					wheel.Part1.AssemblyAngularVelocity = Vector3.zero
-				end
+                                wheelIndex = wheelIndex + 1
+                            end
+                        end
+                    end
 
-				table.clear(targets)
-			end))
-		end
-	end,
-	Tooltip = 'kick everyone in the server'
-})
+                    for i = wheelIndex, #wheelParts do
+                        local wheel = wheelParts[i]
+                        if cf[wheel] then
+                            wheel.Part0.CFrame = cf[wheel]
+                            wheel.Part1.CFrame = cf[wheel]
+                        end
+
+                        wheel.Part0.AssemblyLinearVelocity = Vector3.zero
+                        wheel.Part0.AssemblyAngularVelocity = Vector3.zero
+                        wheel.Part1.AssemblyLinearVelocity = Vector3.zero
+                        wheel.Part1.AssemblyAngularVelocity = Vector3.zero
+                    end
+
+                    table.clear(targets)
+                end)
+            else
+                KickAll.Enabled = false
+                if kickConnection then
+                    kickConnection:Disconnect()
+                    kickConnection = nil
+                end
+            end
+        end,
+        Tooltip = 'kick everyone in the server'
+    })
+end)
 																																					
 run(function()
-	local AntiRiotShield
-	
-	AntiRiotShield = vape.Categories.Blatant:CreateModule({
-		Name = 'Anti Riot',
-		Function = function(callback)
-			if callback then
-				repeat
-					for _, ent in entitylib.List do
-						local shield = ent.Character:FindFirstChild('RiotShieldPart')
-						if shield then
-							shield.CanQuery = false
-						end
-					end
-	
-					task.wait(0.05)
-				until not AntiRiotShield.Enabled
-			else
-				for _, ent in entitylib.List do
-					local shield = ent.Character:FindFirstChild('RiotShieldPart')
-					if shield then
-						shield.CanQuery = true
-					end
-				end
-			end
-		end,
-		Tooltip = 'Allow you to shoot through riot shields.'
-	})
+    local AntiRiotShield
+    local shieldConnection = nil
+
+    AntiRiotShield = vape.Categories.Blatant:CreateModule({
+        Name = 'Anti Riot',
+        Function = function(callback)
+            if callback then
+                AntiRiotShield.Enabled = true
+                shieldConnection = game:GetService("RunService").Heartbeat:Connect(function()
+                    if not AntiRiotShield.Enabled then return end
+                    for _, ent in pairs(entitylib.List) do
+                        if ent and ent.Character then
+                            local shield = ent.Character:FindFirstChild('RiotShieldPart')
+                            if shield then
+                                shield.CanQuery = false
+                            end
+                        end
+                    end
+                end)
+            else
+                AntiRiotShield.Enabled = false
+                if shieldConnection then
+                    shieldConnection:Disconnect()
+                    shieldConnection = nil
+                end
+                for _, ent in pairs(entitylib.List) do
+                    if ent and ent.Character then
+                        local shield = ent.Character:FindFirstChild('RiotShieldPart')
+                        if shield then
+                            shield.CanQuery = true
+                        end
+                    end
+                end
+            end
+        end,
+        Tooltip = 'Allow you to shoot through riot shields.'
+    })
 end)
 
 run(function()
