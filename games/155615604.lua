@@ -2361,7 +2361,7 @@ run(function()
 
     WeaponSelector = GunMods:CreateMultiChoice({
         Name = "Weapons",
-        List = {"M9", "Revolver", "M4A1", "Remington 870", "MP5", "Taser", "M700", "FAL"},
+        List = {"M9", "Revolver", "M4A1", "Remington 870", "MP5", "Taser", "M700", "FAL", "AK47"},
         Default = {"M9", "Revolver", "M4A1", "Remington 870"},
         Function = function(selected)
             selectedWeapons = selected
