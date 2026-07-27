@@ -2810,38 +2810,60 @@ run(function()
                     end
 
                     local char = entitylib.character.Character
-                    local backpack = lplr:FindFirstChildOfClass('Backpack')
-                    if not backpack then
-                        task.wait(0.5)
-                        continue
-                    end
-
+                    local player = game:GetService("Players").LocalPlayer
+                    local toolContainer = player:FindFirstChild('Backpack') or player:FindFirstChild('StarterGear')
+                    local charTools = char:GetChildren()
+                    
                     local healTool
-                    for _, tool in ipairs(backpack:GetChildren()) do
-                        if tool:IsA('Tool') and healItems[tool.Name] then
-                            local lastConsumed = tool:GetAttribute('Client_LastConsumedAt') or 0
-                            if os.clock() - lastConsumed >= 3 then
-                                healTool = tool
-                                break
+                    
+                    if toolContainer then
+                        for _, tool in ipairs(toolContainer:GetChildren()) do
+                            if tool:IsA('Tool') and healItems[tool.Name] then
+                                local lastConsumed = tool:GetAttribute('Client_LastConsumedAt') or 0
+                                local quantity = tool:GetAttribute('Quantity') or 1
+                                if quantity > 0 and os.clock() - lastConsumed >= 3 then
+                                    healTool = tool
+                                    break
+                                end
+                            end
+                        end
+                    end
+                    
+                    if not healTool then
+                        for _, tool in ipairs(charTools) do
+                            if tool:IsA('Tool') and healItems[tool.Name] then
+                                local lastConsumed = tool:GetAttribute('Client_LastConsumedAt') or 0
+                                local quantity = tool:GetAttribute('Quantity') or 1
+                                if quantity > 0 and os.clock() - lastConsumed >= 3 then
+                                    healTool = tool
+                                    break
+                                end
                             end
                         end
                     end
 
                     if not healTool then
+                        notif('AutoHeal', 'No heal items available', 2)
                         task.wait(0.5)
                         continue
                     end
 
                     local equipped = char:FindFirstChildOfClass('Tool')
-                    if equipped then
-                        equipped.Parent = backpack
+                    local equippedName = equipped and equipped.Name or "None"
+                    
+                    if healTool.Parent ~= char then
+                        if equipped then
+                            equipped.Parent = toolContainer or player
+                        end
+                        healTool.Parent = char
+                        task.wait(0.2)
                     end
-                    healTool.Parent = char
 
-                    local stoppedForDeath = false
+                    local consumed = false
+                    local startTime = os.clock()
+                    
                     repeat
                         if not entitylib.isAlive or humanoid.Health <= 0 then
-                            stoppedForDeath = true
                             break
                         end
 
@@ -2849,28 +2871,38 @@ run(function()
                         task.wait(0.05)
                         if mouse1release then mouse1release() end
 
-                        task.wait(1)
+                        task.wait(1.5)
 
                         if entitylib.isAlive then
                             currentHealth = humanoid.Health
+                            healthPercent = (currentHealth / maxHealth) * 100
                         else
-                            stoppedForDeath = true
                             break
                         end
 
-                        if not healTool.Parent or (healTool:GetAttribute('Quantity') or 0) <= 0 then
+                        local quantity = healTool:GetAttribute('Quantity') or 1
+                        if quantity <= 0 then
+                            consumed = true
                             break
                         end
-                    until currentHealth >= maxHealth or not entitylib.isAlive
 
-                    if not stoppedForDeath then
-                        if healTool.Parent == char then
-                            healTool.Parent = backpack
+                    until healthPercent >= maxHealth or not entitylib.isAlive or os.clock() - startTime > 10
+
+                    if healTool.Parent == char then
+                        local finalQuantity = healTool:GetAttribute('Quantity') or 1
+                        if finalQuantity <= 0 then
+                            healTool:Destroy()
+                        else
+                            healTool.Parent = toolContainer or player
                         end
-                        if equipped and equipped.Parent == backpack then
-                            equipped.Parent = char
-                        end
-                        notif('AutoHeal', 'Finished eating ' .. healTool.Name, 2)
+                    end
+                    
+                    if equipped and equipped.Parent ~= char then
+                        equipped.Parent = char
+                    end
+
+                    if healthPercent >= maxHealth then
+                        notif('AutoHeal', 'Full health restored!', 2)
                     end
 
                     task.wait(0.5)
