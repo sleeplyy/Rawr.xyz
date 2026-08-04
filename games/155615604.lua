@@ -2843,7 +2843,6 @@ run(function()
                     end
 
                     if not healTool then
-                        notif('AutoHeal', 'No heal items available', 2)
                         task.wait(0.5)
                         continue
                     end
