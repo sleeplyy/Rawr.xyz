@@ -1466,17 +1466,14 @@ run(function()
     local function isPartOfDoor(part)
         if not part then return true end
         
-        -- Check the part name directly
         if BL_Doors[part.Name] then return true end
         if part.Name:lower():find("door") then return true end
         
-        -- Check the part's parent
         if part.Parent then
             if BL_Doors[part.Parent.Name] then return true end
             if part.Parent.Name:lower():find("door") then return true end
         end
         
-        -- Walk up the hierarchy
         local parent = part.Parent
         while parent and parent ~= workspace do
             if parent.Name == "Doors" then
@@ -1497,8 +1494,6 @@ run(function()
         if not part or not part:IsA("BasePart") then return end
         if texturedParts[part] then return end
         if isPartOfDoor(part) then return end
-        
-        -- Don't modify unanchored parts (doors, moving objects, etc.)
         if not part.Anchored then return end
         
         local matName = part.Material.Name
