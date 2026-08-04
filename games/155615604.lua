@@ -1463,17 +1463,29 @@ run(function()
         ["door_v3_ct"] = true,
     }
     
-    local function isBlacklisted(part)
+    local function isPartOfDoor(part)
+        if not part then return true end
+        
+        -- Check the part name directly
         if BL_Doors[part.Name] then return true end
+        if part.Name:lower():find("door") then return true end
         
-        if part.Parent and BL_Doors[part.Parent.Name] then return true end
+        -- Check the part's parent
+        if part.Parent then
+            if BL_Doors[part.Parent.Name] then return true end
+            if part.Parent.Name:lower():find("door") then return true end
+        end
         
+        -- Walk up the hierarchy
         local parent = part.Parent
         while parent and parent ~= workspace do
             if parent.Name == "Doors" then
                 return true
             end
             if BL_Doors[parent.Name] then
+                return true
+            end
+            if parent.Name:lower():find("door") then
                 return true
             end
             parent = parent.Parent
@@ -1484,7 +1496,11 @@ run(function()
     local function applyTexture(part)
         if not part or not part:IsA("BasePart") then return end
         if texturedParts[part] then return end
-        if isBlacklisted(part) then return end
+        if isPartOfDoor(part) then return end
+        
+        -- Don't modify unanchored parts (doors, moving objects, etc.)
+        if not part.Anchored then return end
+        
         local matName = part.Material.Name
         for _, mat in ipairs(activeMaterials) do
             if matName == mat[1] then
