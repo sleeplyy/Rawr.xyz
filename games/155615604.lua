@@ -2326,11 +2326,31 @@ run(function()
     local FireRate
     local WeaponSelector
     local selectedWeapons = {"M9", "Revolver", "M4A1", "Remington 870"}
+    local Automatic
+    local olddata, old = {}
+    local oldequip
+    local oldshoot = pl and pl.Shoot
 
     local function isWeaponSelected(name)
         if not WeaponSelector or not WeaponSelector.Value then return true end
         if #WeaponSelector.Value == 0 then return true end
         return table.find(WeaponSelector.Value, name) ~= nil
+    end
+
+    local function Modify()
+        local data = debug.getupvalue(oldshoot or pl.Shoot, 10)
+        if data and GunMods and GunMods.Enabled then
+            if old ~= data then
+                olddata = table.clone(data)
+                old = data
+            end
+
+            data.SpreadRadius = Automatic and Automatic.Enabled and 0 or (SpreadRadius and SpreadRadius.Value or olddata.SpreadRadius)
+            data.FireRate = (olddata.FireRate or 0) * ((FireRate and FireRate.Value or 0.1) / (olddata.FireRate or 0.1))
+            data.AutoFire = (Automatic and Automatic.Enabled) or olddata.AutoFire
+            data.Range = Range and Range.Value or olddata.Range
+            data.AccurateRange = Range and Range.Value or olddata.AccurateRange
+        end
     end
 
     local function itemAdded(v)
@@ -2340,7 +2360,11 @@ run(function()
                 v:SetAttribute("AccurateRange", Range and Range.Value)
                 v:SetAttribute("SpreadRadius", SpreadRadius and SpreadRadius.Value)
                 v:SetAttribute("FireRate", FireRate and FireRate.Value)
+                if Automatic and Automatic.Enabled then
+                    v:SetAttribute("AutoFire", true)
+                end
             end
+            Modify()
         end
     end
 
@@ -2366,8 +2390,33 @@ run(function()
             if callback then
                 if entitylib and entitylib.character then characterAdded(entitylib.character) end
                 GunMods:Clean(entitylib.Events.LocalAdded:Connect(characterAdded))
+                
+                if pl and pl.Equip then
+                    oldequip = hookfunction(pl.Equip, function(...)
+                        local res = table.pack(oldequip(...))
+                        Modify()
+                        return unpack(res, 1, res.n)
+                    end)
+                    Modify()
+                end
+            else
+                if oldequip then
+                    if restorefunction then
+                        restorefunction(pl.Equip)
+                    else
+                        oldequip = nil
+                    end
+                end
+                if old then
+                    for i, v in olddata do
+                        old[i] = v
+                    end
+                    table.clear(olddata)
+                    old = nil
+                end
             end
-        end
+        end,
+        Tooltip = 'Apply various modifications'
     })
 
     WeaponSelector = GunMods:CreateMultiChoice({
@@ -2379,9 +2428,10 @@ run(function()
         end
     })
 
-    Range = GunMods:CreateSlider({ Name = "Range", Min=1, Max=9999, Default=150, Suffix=function(val) return val==1 and 'stud' or 'studs' end })
-    SpreadRadius = GunMods:CreateSlider({ Name = "Spread Radius", Min=0, Max=1, Default=0.03, Decimal=100, Suffix='studs' })
-    FireRate = GunMods:CreateSlider({ Name = "Fire Rate", Min=0, Max=1, Decimal=100, Default=0.1, Suffix=function(val) return val==1 and 'second' or 'seconds' end })
+    Range = GunMods:CreateSlider({ Name = "Range", Min=1, Max=9999, Default=150, Suffix=function(val) return val==1 and 'stud' or 'studs' end, Function = Modify })
+    SpreadRadius = GunMods:CreateSlider({ Name = "Spread Radius", Min=0, Max=1, Default=0.03, Decimal=100, Suffix='studs', Function = Modify })
+    FireRate = GunMods:CreateSlider({ Name = "Fire Rate Multiplier", Min=1, Max=100, Default=100, Suffix='%', Function = Modify })
+    Automatic = GunMods:CreateToggle({ Name = "Full Automatic", Function = Modify })
 end)
                                                                                                                                                                     
 run(function()
