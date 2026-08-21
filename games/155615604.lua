@@ -2345,11 +2345,7 @@ run(function()
                 old = data
             end
 
-            data.SpreadRadius = Automatic and Automatic.Enabled and 0 or (SpreadRadius and SpreadRadius.Value or olddata.SpreadRadius)
-            data.FireRate = (olddata.FireRate or 0) * ((FireRate and FireRate.Value or 0.1) / (olddata.FireRate or 0.1))
             data.AutoFire = (Automatic and Automatic.Enabled) or olddata.AutoFire
-            data.Range = Range and Range.Value or olddata.Range
-            data.AccurateRange = Range and Range.Value or olddata.AccurateRange
         end
     end
 
@@ -2364,7 +2360,6 @@ run(function()
                     v:SetAttribute("AutoFire", true)
                 end
             end
-            Modify()
         end
     end
 
@@ -2390,15 +2385,6 @@ run(function()
             if callback then
                 if entitylib and entitylib.character then characterAdded(entitylib.character) end
                 GunMods:Clean(entitylib.Events.LocalAdded:Connect(characterAdded))
-                
-                if pl and pl.Equip then
-                    oldequip = hookfunction(pl.Equip, function(...)
-                        local res = table.pack(oldequip(...))
-                        Modify()
-                        return unpack(res, 1, res.n)
-                    end)
-                    Modify()
-                end
             else
                 if oldequip then
                     if restorefunction then
@@ -2415,8 +2401,7 @@ run(function()
                     old = nil
                 end
             end
-        end,
-        Tooltip = 'Apply various modifications'
+        end
     })
 
     WeaponSelector = GunMods:CreateMultiChoice({
@@ -2428,9 +2413,9 @@ run(function()
         end
     })
 
-    Range = GunMods:CreateSlider({ Name = "Range", Min=1, Max=9999, Default=150, Suffix=function(val) return val==1 and 'stud' or 'studs' end, Function = Modify })
-    SpreadRadius = GunMods:CreateSlider({ Name = "Spread Radius", Min=0, Max=1, Default=0.03, Decimal=100, Suffix='studs', Function = Modify })
-    FireRate = GunMods:CreateSlider({ Name = "Fire Rate Multiplier", Min=1, Max=100, Default=100, Suffix='%', Function = Modify })
+    Range = GunMods:CreateSlider({ Name = "Range", Min=1, Max=9999, Default=150, Suffix=function(val) return val==1 and 'stud' or 'studs' end })
+    SpreadRadius = GunMods:CreateSlider({ Name = "Spread Radius", Min=0, Max=1, Default=0.03, Decimal=100, Suffix='studs' })
+    FireRate = GunMods:CreateSlider({ Name = "Fire Rate", Min=0, Max=1, Decimal=100, Default=0.1, Suffix=function(val) return val==1 and 'second' or 'seconds' end })
     Automatic = GunMods:CreateToggle({ Name = "Full Automatic", Function = Modify })
 end)
                                                                                                                                                                     
