@@ -2338,70 +2338,87 @@ run(function()
     end
 
     local function Modify()
-        local data = debug.getupvalue(oldshoot or pl.Shoot, 10)
-        if data and GunMods and GunMods.Enabled then
-            if old ~= data then
-                olddata = table.clone(data)
-                old = data
-            end
+        pcall(function()
+            local data = debug.getupvalue(oldshoot or pl.Shoot, 10)
+            if data and GunMods and GunMods.Enabled then
+                if old ~= data then
+                    olddata = table.clone(data)
+                    old = data
+                end
 
-            data.AutoFire = (Automatic and Automatic.Enabled) or olddata.AutoFire
-        end
+                if Automatic and Automatic.Enabled then
+                    data.AutoFire = true
+                else
+                    data.AutoFire = olddata.AutoFire
+                end
+            end
+        end)
     end
 
     local function itemAdded(v)
-        if v and v:IsA("Tool") and v:GetAttribute("Local_ReloadSession") then
-            if isWeaponSelected(v.Name) then
-                v:SetAttribute("Range", Range and Range.Value)
-                v:SetAttribute("AccurateRange", Range and Range.Value)
-                v:SetAttribute("SpreadRadius", SpreadRadius and SpreadRadius.Value)
-                v:SetAttribute("FireRate", FireRate and FireRate.Value)
-                if Automatic and Automatic.Enabled then
-                    v:SetAttribute("AutoFire", true)
+        pcall(function()
+            if v and v:IsA("Tool") and v:GetAttribute("Local_ReloadSession") then
+                if isWeaponSelected(v.Name) then
+                    if Range then v:SetAttribute("Range", Range.Value) end
+                    if Range then v:SetAttribute("AccurateRange", Range.Value) end
+                    if SpreadRadius then v:SetAttribute("SpreadRadius", SpreadRadius.Value) end
+                    if FireRate then v:SetAttribute("FireRate", FireRate.Value) end
+                    if Automatic and Automatic.Enabled then
+                        v:SetAttribute("AutoFire", true)
+                    end
                 end
             end
-        end
+        end)
     end
 
     local function characterAdded(char)
         if not char then return end
-        local character = char.Character
-        if character then
-            GunMods:Clean(character.ChildAdded:Connect(itemAdded))
-            local children = character:GetChildren()
-            for i = 1, #children do itemAdded(children[i]) end
-        end
-        local backpack = lplr and lplr.Backpack
-        if backpack then
-            GunMods:Clean(backpack.ChildAdded:Connect(itemAdded))
-            local children = backpack:GetChildren()
-            for i = 1, #children do itemAdded(children[i]) end
-        end
+        pcall(function()
+            local character = char.Character
+            if character then
+                GunMods:Clean(character.ChildAdded:Connect(itemAdded))
+                local children = character:GetChildren()
+                for i = 1, #children do itemAdded(children[i]) end
+            end
+        end)
+        pcall(function()
+            local backpack = lplr and lplr.Backpack
+            if backpack then
+                GunMods:Clean(backpack.ChildAdded:Connect(itemAdded))
+                local children = backpack:GetChildren()
+                for i = 1, #children do itemAdded(children[i]) end
+            end
+        end)
     end
 
     GunMods = vape.Categories.Combat:CreateModule({
         Name = "GunMods",
         Function = function(callback)
             if callback then
-                if entitylib and entitylib.character then characterAdded(entitylib.character) end
-                GunMods:Clean(entitylib.Events.LocalAdded:Connect(characterAdded))
+                pcall(function()
+                    if entitylib and entitylib.character then characterAdded(entitylib.character) end
+                    GunMods:Clean(entitylib.Events.LocalAdded:Connect(characterAdded))
+                end)
             else
-                if oldequip then
-                    if restorefunction then
-                        restorefunction(pl.Equip)
-                    else
-                        oldequip = nil
+                pcall(function()
+                    if oldequip then
+                        if restorefunction then
+                            restorefunction(pl.Equip)
+                        else
+                            oldequip = nil
+                        end
                     end
-                end
-                if old then
-                    for i, v in olddata do
-                        old[i] = v
+                    if old then
+                        for i, v in olddata do
+                            old[i] = v
+                        end
+                        table.clear(olddata)
+                        old = nil
                     end
-                    table.clear(olddata)
-                    old = nil
-                end
+                end)
             end
-        end
+        end,
+        Tooltip = 'Apply various modifications to enhance any firearm'
     })
 
     WeaponSelector = GunMods:CreateMultiChoice({
