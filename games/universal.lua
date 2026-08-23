@@ -3572,26 +3572,26 @@ run(function()
     }
 
     local function getAngleOffset()
-        local camForward = gameCamera.CFrame.LookVector * Vector3.new(1, 0, 1)
-        local angle = math.atan2(camForward.X, camForward.Z)
+    local camForward = gameCamera.CFrame.LookVector * Vector3.new(1, 0, 1)
+    local angle = math.atan2(camForward.X, camForward.Z)
 
-        if getgenv().AntiAimOverride and getgenv().AntiAimOverride.active then
-            if getgenv().AntiAimOverride.direction == "Left" then
-                return angle + math.rad(90)
-            elseif getgenv().AntiAimOverride.direction == "Right" then
-                return angle - math.rad(90)
-            end
-        end
-
-        local dir = Direction and Direction.Value or "Left"
-        if dir == "Left" then
-            return angle + math.rad(90)
-        elseif dir == "Right" then
+    if getgenv().AntiAimOverride and getgenv().AntiAimOverride.active then
+        if getgenv().AntiAimOverride.direction == "Left" then
             return angle - math.rad(90)
-        else
-            return angle + (math.random(0, 1) == 0 and math.rad(90) or math.rad(-90))
+        elseif getgenv().AntiAimOverride.direction == "Right" then
+            return angle + math.rad(90)
         end
     end
+
+    local dir = Direction and Direction.Value or "Left"
+    if dir == "Left" then
+        return angle - math.rad(90)
+    elseif dir == "Right" then
+        return angle + math.rad(90)
+    else
+        return angle + (math.random(0, 1) == 0 and math.rad(90) or math.rad(-90))
+    end
+end
 
     local function applyFirstPersonFix()
         if not entitylib.isAlive then return end
