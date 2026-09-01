@@ -312,7 +312,7 @@ for _, v in {
     'ChatSpammer', 'Arrest Highlight', 'HitNotifications',
     'Bullet Tracers', 'Head Pitch Spinbot (Client)', 'AutoArrest',
     'Anti Riot', 'Anti Taze', 'C4 ESP',
-    'AutoReset', 'AutoHeal'
+    'AutoReset', 'AutoHeal', 'Auto Rejoin'
 } do vape:Remove(v) end
 
 local t = {
@@ -2701,6 +2701,93 @@ run(function()
         end,
         Tooltip = 'Automatically reset after becoming a criminal.'
     })
+end)
+
+run(function()
+	local AutoRejoin
+	local Sort
+	local RejoinMode
+	local teamChangeConnection
+	local wasGuard = false
+	local justSwitched = false
+	
+	local function setupTeamMonitor()
+		if teamChangeConnection then
+			pcall(function() teamChangeConnection:Disconnect() end)
+			teamChangeConnection = nil
+		end
+		
+		teamChangeConnection = lplr:GetPropertyChangedSignal('Team'):Connect(function()
+			if not AutoRejoin.Enabled then return end
+			if RejoinMode.Value ~= "Innocent Warn" then return end
+			
+			local currentTeam = lplr.Team
+			
+			if wasGuard and currentTeam == inmatesTeam and not justSwitched then
+				justSwitched = true
+				notif('AutoRejoin', 'Killed 3 innocent inmates! Rejoining...', 3, 'warning')
+				task.wait(1)
+				serverHop(nil, Sort.Value)
+			end
+																																																	
+			wasGuard = (currentTeam == guardsTeam)
+		end)
+	end
+	
+	AutoRejoin = vape.Categories.Utility:CreateModule({
+		Name = 'AutoRejoin',
+		Function = function(callback)
+			if callback then
+				local check
+				AutoRejoin:Clean(guiService.ErrorMessageChanged:Connect(function(str)
+					if (not check or guiService:GetErrorCode() ~= Enum.ConnectionError.DisconnectLuaKick) and guiService:GetErrorCode() ~= Enum.ConnectionError.DisconnectConnectionLost and not str:lower():find('ban') then
+						check = true
+						serverHop(nil, Sort.Value)
+					end
+				end))
+				
+				wasGuard = (lplr.Team == guardsTeam)
+				setupTeamMonitor()
+			else
+				if teamChangeConnection then
+					pcall(function() teamChangeConnection:Disconnect() end)
+					teamChangeConnection = nil
+				end
+				wasGuard = false
+				justSwitched = false
+			end
+		end,
+		Tooltip = 'Automatically rejoins into a new server based on selected mode'
+	})
+	
+	RejoinMode = AutoRejoin:CreateDropdown({
+		Name = 'Rejoin Mode',
+		List = {'Normal', 'Innocent Warn'},
+		Default = 'Normal',
+		Function = function(val)
+			if AutoRejoin.Enabled then
+				if val == "Innocent Warn" then
+					wasGuard = (lplr.Team == guardsTeam)
+					justSwitched = false
+					setupTeamMonitor()
+				else
+					if teamChangeConnection then
+						pcall(function() teamChangeConnection:Disconnect() end)
+						teamChangeConnection = nil
+					end
+					wasGuard = false
+					justSwitched = false
+				end
+			end
+		end,
+		Tooltip = 'Normal - Rejoins on disconnect/kick\nInnocent Warn - Rejoins after being switched to inmate for killing 3 innocents'
+	})
+	
+	Sort = AutoRejoin:CreateDropdown({
+		Name = 'Sort',
+		List = {'Descending', 'Ascending'},
+		Tooltip = 'Descending - Prefers full servers\nAscending - Prefers empty servers'
+	})
 end)
                                                                                                                                                     
 run(function()
