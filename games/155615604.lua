@@ -312,7 +312,7 @@ for _, v in {
     'ChatSpammer', 'Arrest Highlight', 'HitNotifications',
     'Bullet Tracers', 'Head Pitch Spinbot (Client)', 'AutoArrest',
     'Anti Riot', 'Anti Taze', 'C4 ESP',
-    'AutoReset', 'AutoHeal', 'Auto Rejoin'
+    'AutoReset', 'AutoHeal', 'AutoRejoin'
 } do vape:Remove(v) end
 
 local t = {
@@ -2710,6 +2710,13 @@ run(function()
 	local teamChangeConnection
 	local wasGuard = false
 	local justSwitched = false
+	local teleportService = game:GetService("TeleportService")
+	
+	local function doRejoin()
+		pcall(function()
+			teleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, lplr)
+		end)
+	end
 	
 	local function setupTeamMonitor()
 		if teamChangeConnection then
@@ -2727,9 +2734,9 @@ run(function()
 				justSwitched = true
 				notif('AutoRejoin', 'Killed 3 innocent inmates! Rejoining...', 3, 'warning')
 				task.wait(1)
-				serverHop(nil, Sort.Value)
+				doRejoin()
 			end
-																																																	
+			
 			wasGuard = (currentTeam == guardsTeam)
 		end)
 	end
@@ -2745,7 +2752,6 @@ run(function()
 						serverHop(nil, Sort.Value)
 					end
 				end))
-				
 				wasGuard = (lplr.Team == guardsTeam)
 				setupTeamMonitor()
 			else
@@ -2761,7 +2767,7 @@ run(function()
 	})
 	
 	RejoinMode = AutoRejoin:CreateDropdown({
-		Name = 'Rejoin Mode',
+		Name = 'Mode',
 		List = {'Normal', 'Innocent Warn'},
 		Default = 'Normal',
 		Function = function(val)
@@ -2780,13 +2786,13 @@ run(function()
 				end
 			end
 		end,
-		Tooltip = 'Normal - Rejoins on disconnect/kick\nInnocent Warn - Rejoins after being switched to inmate for killing 3 innocents'
+		Tooltip = 'Normal - Rejoins on disconnect\nInnocent Warn - Rejoins after 3 innocent kills'
 	})
 	
 	Sort = AutoRejoin:CreateDropdown({
 		Name = 'Sort',
 		List = {'Descending', 'Ascending'},
-		Tooltip = 'Descending - Prefers full servers\nAscending - Prefers empty servers'
+		Tooltip = 'Descending - Full servers\nAscending - Empty servers'
 	})
 end)
                                                                                                                                                     
