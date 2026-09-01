@@ -6653,6 +6653,125 @@ run(function()
 		Tooltip = 'Descending - Prefers full servers\nAscending - Prefers empty servers'
 	})
 end)
+
+run(function()
+	local AuraModule
+	local AuraEnabled
+	local AuraColor
+	local AuraType
+	local auraParts = {}
+	
+	local auraAssets = {
+		["starlight"] = game:GetObjects("rbxassetid://134645216613107")[1],
+		["heavenly"] = game:GetObjects("rbxassetid://139300897520961")[1],
+		["ribbon"] = game:GetObjects("rbxassetid://132069507632161")[1],
+		["sakura"] = game:GetObjects("rbxassetid://81755778619404")[1],
+		["angel"] = game:GetObjects("rbxassetid://97658130917593")[1],
+		["wind"] = game:GetObjects("rbxassetid://80694081850877")[1],
+		["flow"] = game:GetObjects("rbxassetid://119913533725648")[1],
+		["star"] = game:GetObjects("rbxassetid://73754563740680")[1],
+		["explo"] = game:GetObjects("rbxassetid://75789713107155")[1],
+		["waves"] = game:GetObjects("rbxassetid://94581063446738")[1],
+	}
+	
+	local function updateColors()
+		local col = AuraColor and Color3.fromHSV(AuraColor.Hue, AuraColor.Sat, AuraColor.Value) or Color3.fromRGB(255, 255, 255)
+		local seq = ColorSequence.new(col)
+		for _, p in ipairs(auraParts) do
+			if p then
+				if p:IsA("ParticleEmitter") or p:IsA("Trail") or p:IsA("Beam") then
+					p.Color = seq
+				elseif p:IsA("PointLight") then
+					p.Color = col
+				end
+				for _, d in ipairs(p:GetDescendants()) do
+					if d:IsA("ParticleEmitter") or d:IsA("Trail") or d:IsA("Beam") then
+						d.Color = seq
+					elseif d:IsA("PointLight") then
+						d.Color = col
+					end
+				end
+			end
+		end
+	end
+	
+	local function clearAura()
+		for _, v in ipairs(auraParts) do
+			if v then v:Destroy() end
+		end
+		table.clear(auraParts)
+	end
+	
+	local function applyAura()
+		clearAura()
+		if not AuraEnabled or not AuraEnabled.Enabled then return end
+		if not entitylib.isAlive then return end
+		
+		local char = entitylib.character.Character
+		local asset = auraAssets[AuraType and AuraType.Value or "angel"]
+		if not char or not asset then return end
+		
+		local clo = asset:Clone()
+		for _, m_p in ipairs(clo:GetChildren()) do
+			local targ = char:FindFirstChild(m_p.Name)
+			if targ then
+				for _, eff in ipairs(m_p:GetChildren()) do
+					eff.Name = "\0"
+					eff.Parent = targ
+					table.insert(auraParts, eff)
+				end
+			end
+		end
+		clo:Destroy()
+		updateColors()
+	end
+	
+	AuraModule = vape.Categories.Render:CreateModule({
+		Name = 'Aura',
+		Function = function(callback)
+			if callback then
+				applyAura()
+			else
+				clearAura()
+			end
+		end,
+		Tooltip = 'Custom aura effects for your character'
+	})
+	
+	AuraEnabled = AuraModule:CreateToggle({
+		Name = 'Apply Aura',
+		Default = false,
+		Function = function(callback)
+			if callback then
+				applyAura()
+			else
+				clearAura()
+			end
+		end
+	})
+	
+	AuraColor = AuraModule:CreateColorSlider({
+		Name = 'Aura Color',
+		Function = function(hue, sat, val)
+			updateColors()
+		end
+	})
+	
+	AuraType = AuraModule:CreateDropdown({
+		Name = 'Aura Type',
+		List = {"starlight", "heavenly", "ribbon", "sakura", "angel", "wind", "flow", "star", "explo", "waves"},
+		Default = 'angel',
+		Function = function(val)
+			if AuraEnabled and AuraEnabled.Enabled then
+				applyAura()
+			end
+		end
+	})
+	
+	vape:Clean(function()
+		clearAura()
+	end)
+end)
 	
 run(function()
 	local Blink
