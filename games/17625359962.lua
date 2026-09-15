@@ -3190,7 +3190,7 @@ run(function()
 
     local config = {
         client_name = "rawr.xyz",
-        enemy_name = "rawr.xyz | discord.gg/UFjWRWsSB"
+        enemy_name = "rawr.xyz | discord.gg/eMpUQzFrNG"
     }
 
     local alloc = function(str) return cloneref(game:GetService(str)) end
