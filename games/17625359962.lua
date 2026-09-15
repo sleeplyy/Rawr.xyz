@@ -428,13 +428,29 @@ run(function()
     local replicatedStorageService = cloneref(game:GetService('ReplicatedStorage'))
     local UtilityModule = nil
     local originalRaycastGlobal = nil
+    local EnumLibrary = nil
+    local UseItem = nil
+    local originalUseItemFireServer = nil
+
     pcall(function()
         UtilityModule = require(replicatedStorageService:WaitForChild("Modules"):WaitForChild("Utility"))
         originalRaycastGlobal = UtilityModule.Raycast
     end)
 
-    if not UtilityModule or not originalRaycastGlobal then
-        notif('Silent Aim V2', 'Could not access Utility module.', 5, 'alert')
+    pcall(function()
+        EnumLibrary = require(replicatedStorageService:WaitForChild("Modules"):WaitForChild("EnumLibrary"))
+    end)
+
+    pcall(function()
+        UseItem = replicatedStorageService
+            :WaitForChild("Remotes")
+            :WaitForChild("Replication")
+            :WaitForChild("Fighter")
+            :WaitForChild("UseItem")
+    end)
+
+    if not UtilityModule or not originalRaycastGlobal or not EnumLibrary or not UseItem then
+        notif('Silent Aim V2', 'Could not access required modules.', 5, 'alert')
         return
     end
 
@@ -569,21 +585,37 @@ run(function()
         end
     end
 
-    X = {}
-    X.mod = UtilityModule
-    X.original = originalRaycastGlobal
-    X.mod.Raycast = function(...)
-        local args = {...}
-        if not enabled or not gameReady then
-            return X.original(...)
-        end
+    -- [[ New hooking: redirect camdata on UseItem.FireServer ]]
 
-        updateTarget()
-        if cachedTarget and cachedTarget[aimPartName] and isAlive(cachedTarget) then
-            args[3] = cachedTarget[aimPartName].Position
-        end
-        return X.original(table.unpack(args))
+    local function encodeCFrameForRedir(cf)
+        return UtilityModule:EncodeCFrame(cf)
     end
+
+    local function buildCFD(origin, part)
+        local cf = part.CFrame
+        local d = {}
+        d[utf8.char(1)] = {
+            [utf8.char(0)] = encodeCFrameForRedir(CFrame.lookAt(origin, part.Position)),
+            [utf8.char(1)] = encodeCFrameForRedir(cf),
+            [utf8.char(2)] = part,
+            [utf8.char(3)] = encodeCFrameForRedir(cf:ToObjectSpace(CFrame.new(part.Position))),
+        }
+        return d
+    end
+
+    originalUseItemFireServer = UseItem.FireServer
+    local hookedUseItemFireServer
+    hookedUseItemFireServer = hookfunction(originalUseItemFireServer, newcclosure(function(self, objID, enumVal, camdata, extra)
+        if enabled and gameReady and enumVal == EnumLibrary:ToEnum("StartShooting") then
+            updateTarget()
+            local root = me.Character and me.Character:FindFirstChild("HumanoidRootPart")
+            local part = cachedTarget and cachedTarget[aimPartName]
+            if root and part and isAlive(cachedTarget) then
+                camdata = buildCFD(root.Position, part)
+            end
+        end
+        return hookedUseItemFireServer(self, objID, enumVal, camdata, extra)
+    end))
 
     local circleUpdateConn
     circleUpdateConn = runService.RenderStepped:Connect(function()
@@ -693,7 +725,11 @@ run(function()
     })
 
     vape:Clean(function()
-        X.mod.Raycast = X.original
+        if hookedUseItemFireServer and originalUseItemFireServer then
+            pcall(function()
+                hookfunction(originalUseItemFireServer, hookedUseItemFireServer)
+            end)
+        end
         if circleUpdateConn then circleUpdateConn:Disconnect() end
         if CircleObject then
             pcall(function() CircleObject:Remove() end)
